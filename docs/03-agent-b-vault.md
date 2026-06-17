@@ -1,21 +1,35 @@
 # 03. Agent B (The Vault)
 
-**Agent B** adalah sistem brankas eksekutor yang beroperasi di jaringan blockchain **Base**. Karena berurusan dengan uang sungguhan, desain arsitektur Agent B sepenuhnya difokuskan pada tingkat keamanan militer (*bulletproof security*) dan keandalan sistem.
+**Agent B** adalah sistem brankas eksekutor A2Z Agentz yang beroperasi di blockchain **Base**. Karena berurusan dengan dana sungguhan, Agent B difokuskan pada keamanan tingkat militer (*bulletproof security*) dan keandalan sistem.
+
+> **Catatan:** Agent B **tidak menjalankan LLM** — semua decision-making ada di Agent A (AIM-tuned). Agent B murni eksekutor deterministik, jadi tidak ada perubahan stack AMD di sini. Yang berubah hanya **infrastruktur deployment** (Host di AMD Developer Cloud bersama Agent A atau dedicated compute).
 
 ## 1. Manajemen Wallet & Kunci (Keys)
-Agent B menggunakan *Externally Owned Account* (EOA) untuk kesederhanaan *deployment* selama hackathon, namun dikelilingi oleh lapisan perlindungan ketat:
-- **AWS KMS / HashiCorp Vault**: *Private key* tidak pernah disimpan di dalam file `.env` biasa atau *hardcoded*. Private key dikelola secara eksternal melalui layanan *Key Management Service* dengan rotasi otomatis.
-- **Smart Contract Modifier**: Agent B hanya dapat berinteraksi dengan sebuah *Custom Smart Contract* yang memiliki fungsi `onlyOwner` (di mana Owner-nya adalah KMS Agent B).
+
+Agent B menggunakan *Externally Owned Account* (EOA) untuk kesederhanaan *deployment* selama hackathon, dengan lapisan perlindungan ketat:
+
+- **AWS KMS / HashiCorp Vault** — *Private key* tidak pernah disimpan di file `.env` atau *hardcoded*. Dikelola via *Key Management Service* dengan rotasi otomatis.
+- **Smart Contract Modifier** — Agent B hanya berinteraksi dengan *Custom Smart Contract* yang memiliki fungsi `onlyOwner` (Owner = KMS Agent B).
 
 ## 2. Strategi Gas & Multi-RPC Fallback
+
 Untuk menjamin 99.9% *uptime* dan mencegah transaksi menggantung (*stuck*):
-- **Gas Oracle API**: Sebelum mengeksekusi, Agent B melakukan ping ke *Alchemy/Infura Gas Station API* dan menyetel `maxFeePerGas` pada nominal rata-rata + 15%.
-- **Multi-RPC Fallback**: Eksekusi utama dikirim melalui Alchemy. Jika jaringan Alchemy *timeout* / *down*, Agent B secara otomatis melakukan *fail-over* me-routing transaksi via Infura atau RPC Publik Base.
+
+- **Gas Oracle API** — Sebelum eksekusi, Agent B melakukan ping ke *Alchemy/Infura Gas Station API* dan menyetel `maxFeePerGas` pada nominal rata-rata + 15%.
+- **Multi-RPC Fallback** — Eksekusi utama via Alchemy. Jika *timeout/down*, otomatis *fail-over* ke Infura atau RPC Publik Base.
 
 ## 3. Idempotensi & Circuit Breaker
-- **Mencegah Double-Spending**: Sebelum *broadcasting* transaksi ke mempool, Agent B mencatat *hash* kombinasi unik `(AgentA_ID, Project_Address, Timestamp)` ke dalam database **PostgreSQL** lokal. Jika Agent A tanpa sengaja mengirim *payload* ganda karena jaringan *retry*, Agent B akan membatalkannya secara lokal berdasarkan catatan DB.
-- **Emergency Pause (Kill Switch)**: Terdapat variabel global yang terhubung dengan Dashboard Next.js. Manusia dapat memicu tombol darurat yang menghentikan semua operasi on-chain seketika jika LLM terdeteksi berhalusinasi parah.
-- **Limit Per Transaksi**: Menggunakan *hard-cap* sebesar $1 hingga $2 per transaksi maksimal untuk keamanan ekstra. Jika lebih dari batas ini, wajib masuk fase *Manual Approval* (Hybrid-mode).
+
+- **Mencegah Double-Spending** — Sebelum *broadcasting* ke mempool, Agent B mencatat *hash* kombinasi unik `(AgentA_ID, Project_Address, Timestamp)` ke **PostgreSQL**. Jika Agent A kirim *payload* ganda, Agent B reject lokal.
+- **Emergency Pause (Kill Switch)** — Variabel global terhubung dengan Dashboard Next.js. Manusia bisa memicu tombol darurat yang menghentikan semua operasi on-chain seketika.
+- **Limit Per Transaksi** — *Hard-cap* $1 hingga $2 per transaksi. Jika lebih, wajib masuk fase *Manual Approval*.
 
 ## 4. Validasi Keamanan Transaksi (Anti-Honeypot)
-Sebelum mengirimkan dana ke *address* project, Agent B melakukan **Dry Run** (simulasi transaksi lokal) misalnya mem-fork state menggunakan *Tenderly* atau *forge script*. Jika simulasi menunjukkan transaksi akan *revert* (gagal) atau menguras token yang tidak semestinya, transaksi akan diblokir.
+
+Sebelum mengirim dana ke *address* project, Agent B melakukan **Dry Run** simulasi lokal (mem-fork state via *Foundry Anvil* atau *Tenderly*). Jika simulasi menunjukkan transaksi *revert* atau menguras token tidak semestinya → transaksi diblokir.
+
+## 5. Deployment Context
+
+- **Host**: Container di AMD Developer Cloud (region yang sama dengan Agent A untuk latensi rendah antar-agen via REST).
+- **TIdak ada LLM di Agent B** — semua logika deterministic, hemat GPU.
+- **Komunikasi dengan Agent A**: HTTPS REST dengan ECDSA signature verification (lihat [04-communication-protocol.md](04-communication-protocol.md)).
