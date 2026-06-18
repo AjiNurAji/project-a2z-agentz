@@ -4,6 +4,7 @@ import { LucideIcon, TrendingUp, TrendingDown } from "lucide-react";
 import { motion } from "motion/react";
 import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { useRef, useState, useEffect } from "react";
 
 interface KpiCardProps {
   label: string;
@@ -19,6 +20,7 @@ interface KpiCardProps {
   counterSuffix?: string;
   counterDecimals?: number;
   iconTooltip?: string;
+  showPulse?: boolean;
 }
 
 const colorMap = {
@@ -51,15 +53,36 @@ const colorMap = {
 
 export default function KpiCard({
   label, value, subValue, icon: Icon, color = "accent", trend, trendValue, index = 0,
-  numericValue, counterPrefix, counterSuffix, counterDecimals, iconTooltip,
+  numericValue, counterPrefix, counterSuffix, counterDecimals, iconTooltip, showPulse = false,
 }: KpiCardProps) {
   const c = colorMap[color];
+  const prevValueRef = useRef<number | undefined>(numericValue);
+  const [glowing, setGlowing] = useState(false);
+  const [positiveChange, setPositiveChange] = useState(true);
+
+  useEffect(() => {
+    if (numericValue !== undefined && prevValueRef.current !== undefined && numericValue !== prevValueRef.current) {
+      setPositiveChange(numericValue > prevValueRef.current);
+      setGlowing(true);
+      const timeout = setTimeout(() => setGlowing(false), 600);
+      prevValueRef.current = numericValue;
+      return () => clearTimeout(timeout);
+    }
+    prevValueRef.current = numericValue;
+  }, [numericValue]);
+
+  const boxShadow = glowing
+    ? positiveChange
+      ? "0 0 20px rgba(110, 156, 126, 0.3)"
+      : "0 0 20px rgba(201, 89, 106, 0.3)"
+    : "0 0 0px rgba(0, 0, 0, 0)";
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05, duration: 0.3 }}
-      className="card card-interactive p-5 flex flex-col gap-3"
+      animate={{ opacity: 1, y: 0, boxShadow }}
+      transition={{ delay: index * 0.05, duration: 0.3, boxShadow: { duration: 0.4, ease: "easeInOut" } }}
+      className="card card-interactive p-5 flex flex-col gap-3 relative"
     >
       <div className="flex items-start justify-between">
         <p className="text-sm font-medium text-[var(--color-body-subtle)]">{label}</p>
@@ -106,10 +129,35 @@ export default function KpiCard({
                 : "var(--color-body-subtle)",
           }}
         >
-          {trend === "up" && <TrendingUp className="w-3.5 h-3.5" />}
-          {trend === "down" && <TrendingDown className="w-3.5 h-3.5" />}
+          {trend === "up" && (
+            <motion.span
+              animate={glowing ? { y: [0, -4, 0] } : { y: 0 }}
+              transition={{ duration: 0.5, repeat: glowing ? 1 : 0 }}
+              className="inline-flex"
+            >
+              <TrendingUp className="w-3.5 h-3.5" />
+            </motion.span>
+          )}
+          {trend === "down" && (
+            <motion.span
+              animate={glowing ? { y: [0, 4, 0] } : { y: 0 }}
+              transition={{ duration: 0.5, repeat: glowing ? 1 : 0 }}
+              className="inline-flex"
+            >
+              <TrendingDown className="w-3.5 h-3.5" />
+            </motion.span>
+          )}
           <span>{trendValue}</span>
         </div>
+      )}
+      {showPulse && (
+        <div
+          className="absolute inset-0 rounded-xl pointer-events-none"
+          style={{
+            border: "2px solid var(--color-brand)",
+            animation: "pulse-ring 1.5s infinite",
+          }}
+        />
       )}
     </motion.div>
   );

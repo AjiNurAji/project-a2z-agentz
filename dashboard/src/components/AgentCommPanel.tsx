@@ -1,10 +1,10 @@
 "use client";
 import { useDashboard, type AgentMessage, type MessageStatus } from "./DashboardContext";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Bot, Shield, Check, X, Loader2, Clock, Send, Radio,
-  Hash, TrendingUp, DollarSign, FolderOpen,
+  Hash, TrendingUp, DollarSign, FolderOpen, Copy,
 } from "lucide-react";
 
 // ── Status indicator ────────────────────────────────────────
@@ -115,6 +115,86 @@ function TypingIndicator({ sender }: { sender: "agent_a" | "agent_b" }) {
   );
 }
 
+// ── Hash code block component ──────────────────────────────
+function HashCodeBlock({ hash }: { hash: string }) {
+  const [copied, setCopied] = useState(false);
+  
+  const copyToClipboard = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(hash);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  }, [hash]);
+
+  return (
+    <div className="mt-1.5">
+      <div
+        className="flex items-center gap-2 px-3 py-2 rounded-lg border font-mono text-[11px] text-[var(--color-body-subtle)]"
+        style={{
+          background: "var(--color-neutral-primary)",
+          borderColor: "var(--color-border-default)",
+        }}
+      >
+        <code className="flex-1 truncate">{hash}</code>
+        <button
+          onClick={copyToClipboard}
+          className="flex-shrink-0 p-1 rounded hover:bg-[var(--color-neutral-secondary-medium)] transition-colors"
+          title={copied ? "Copied!" : "Copy to clipboard"}
+        >
+          {copied ? (
+            <Check className="w-3 h-3 text-[var(--color-fg-success)]" />
+          ) : (
+            <Copy className="w-3 h-3 text-[var(--color-body-subtle)]" />
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Content renderer with hash detection ──────────────────
+function MessageContent({ content }: { content: string }) {
+  // Detect hash patterns: 0x followed by 10+ hex chars, or 64 hex chars
+  const hashRegex = /(0x[a-fA-F0-9]{10,}|[a-fA-F0-9]{64})/g;
+  const parts = content.split(hashRegex);
+  
+  // If no hashes found, render plain text
+  if (parts.length === 1) {
+    return (
+      <p className="text-xs sm:text-[13px] leading-relaxed" style={{ color: "var(--color-body)" }}>
+        {content}
+      </p>
+    );
+  }
+  
+  return (
+    <div>
+      {parts.map((part, index) => {
+        // Check if this part matches hash pattern
+        if (hashRegex.test(part)) {
+          // Reset lastIndex for test
+          hashRegex.lastIndex = 0;
+          return <HashCodeBlock key={index} hash={part} />;
+        }
+        
+        // Regular text
+        if (part) {
+          return (
+            <p key={index} className="text-xs sm:text-[13px] leading-relaxed" style={{ color: "var(--color-body)" }}>
+              {part}
+            </p>
+          );
+        }
+        
+        return null;
+      })}
+    </div>
+  );
+}
+
 // ── Single bubble ───────────────────────────────────────────
 function MessageBubble({ message, index }: { message: AgentMessage; index: number }) {
   const isAgentA = message.sender === "agent_a";
@@ -198,9 +278,7 @@ function MessageBubble({ message, index }: { message: AgentMessage; index: numbe
             borderRadius: isAgentA ? "4px 16px 16px 16px" : "16px 4px 16px 16px",
           }}
         >
-          <p className="text-xs sm:text-[13px] leading-relaxed" style={{ color: "var(--color-body)" }}>
-            {message.content}
-          </p>
+          <MessageContent content={message.content} />
           <MetadataChips metadata={message.metadata} />
         </div>
 
@@ -242,7 +320,14 @@ export default function AgentCommPanel() {
       const lastMsg = agentMessages[agentMessages.length - 1];
       if (lastMsg && lastMsg.sender !== "system") {
         setTypingAgent(lastMsg.sender as "agent_a" | "agent_b");
-        const timer = setTimeout(() => setTypingAgent(null), 900);
+        
+        // Dynamic typing delay based on message length
+        const baseDelay = 600;
+        const lengthDelay = lastMsg.content.length * 10;
+        const randomDelay = Math.random() * 400;
+        const totalDelay = Math.min(2000, Math.max(600, baseDelay + lengthDelay + randomDelay));
+        
+        const timer = setTimeout(() => setTypingAgent(null), totalDelay);
         return () => clearTimeout(timer);
       }
     }

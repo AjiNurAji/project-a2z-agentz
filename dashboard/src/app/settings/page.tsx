@@ -5,20 +5,37 @@ import SettingsPanel from "@/components/SettingsPanel";
 import PageHeader from "@/components/PageHeader";
 import { Settings } from "lucide-react";
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.15, delayChildren: 0.05 }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 16 },
+  visible: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 120, damping: 20 } }
+};
+
 export default function SettingsPage() {
   return (
     <motion.div
       className="space-y-6"
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
     >
-      <PageHeader
-        title="Configuration & Settings"
-        description="Tune Agent A scoring parameters, Agent B execution limits, and RPC configuration"
-        icon={Settings}
-      />
-      <SettingsPanel />
+      <motion.div variants={itemVariants}>
+        <PageHeader
+          title="Configuration & Settings"
+          description="Tune Agent A scoring parameters, Agent B execution limits, and RPC configuration"
+          icon={Settings}
+        />
+      </motion.div>
+      <motion.div variants={itemVariants}>
+        <SettingsPanel />
+      </motion.div>
     </motion.div>
   );
 }

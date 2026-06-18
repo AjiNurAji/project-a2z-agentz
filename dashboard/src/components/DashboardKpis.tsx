@@ -1,11 +1,31 @@
 "use client";
 
+import { useState, useEffect, useRef } from "react";
 import { useDashboard } from "./DashboardContext";
 import KpiCard from "./KpiCard";
 import { Activity, TrendingUp, Zap, Fuel, ScanSearch, AlertTriangle } from "lucide-react";
 
 export default function DashboardKpis() {
   const { kpiMetrics } = useDashboard();
+  const prevMetricsRef = useRef(kpiMetrics);
+  const [lastChangedIndex, setLastChangedIndex] = useState<number>(-1);
+  const pulseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const prev = prevMetricsRef.current;
+    const metricsKeys = ["totalTvlAnalyzed", "successRate", "totalTransactions", "gasSavedUsd", "projectsScanned", "activeAlerts"] as const;
+    for (let i = 0; i < metricsKeys.length; i++) {
+      const key = metricsKeys[i];
+      if (kpiMetrics[key] !== prev[key]) {
+        setLastChangedIndex(i);
+        if (pulseTimeoutRef.current) clearTimeout(pulseTimeoutRef.current);
+        pulseTimeoutRef.current = setTimeout(() => setLastChangedIndex(-1), 2000);
+        break;
+      }
+    }
+    prevMetricsRef.current = kpiMetrics;
+  }, [kpiMetrics]);
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       <KpiCard
@@ -20,6 +40,7 @@ export default function DashboardKpis() {
         trendValue="Live tracking"
         iconTooltip="Total value locked across all scanned DeFi protocols"
         index={0}
+        showPulse={lastChangedIndex === 0}
       />
       <KpiCard
         label="Success Rate"
@@ -33,6 +54,7 @@ export default function DashboardKpis() {
         trendValue="vs 72% avg"
         iconTooltip="Percentage of transactions that completed successfully"
         index={1}
+        showPulse={lastChangedIndex === 1}
       />
       <KpiCard
         label="Total Txs"
@@ -44,6 +66,7 @@ export default function DashboardKpis() {
         color="purple"
         iconTooltip="Total transactions executed on Base Network"
         index={2}
+        showPulse={lastChangedIndex === 2}
       />
       <KpiCard
         label="Gas Saved"
@@ -58,6 +81,7 @@ export default function DashboardKpis() {
         trendValue="+15% efficiency"
         iconTooltip="Gas fees saved through oracle-based optimization"
         index={3}
+        showPulse={lastChangedIndex === 3}
       />
       <KpiCard
         label="Projects Scanned"
@@ -69,6 +93,7 @@ export default function DashboardKpis() {
         color="accent"
         iconTooltip="DeFi projects analyzed via Farcaster and Twitter signals"
         index={4}
+        showPulse={lastChangedIndex === 4}
       />
       <KpiCard
         label="Active Alerts"
@@ -82,6 +107,7 @@ export default function DashboardKpis() {
         trendValue={kpiMetrics.activeAlerts > 0 ? "Action needed" : "All clear"}
         iconTooltip="Pending approval requests requiring manual review"
         index={5}
+        showPulse={lastChangedIndex === 5}
       />
     </div>
   );

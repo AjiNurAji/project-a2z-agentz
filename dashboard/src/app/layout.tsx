@@ -62,10 +62,11 @@ export default function RootLayout({
     >
       <head>
         <link rel="manifest" href="/manifest.json" />
+        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('a2z-theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}})()` }} />
       </head>
       <body
         className="flex h-screen overflow-hidden font-sans"
-        style={{ backgroundColor: "var(--color-surface)", color: "var(--color-body)" }}
+        style={{ backgroundColor: "var(--color-surface)", color: "var(--color-body)", transition: "background-color 0.3s ease, color 0.3s ease" }}
       >
         <PWARegister />
         <SkipToContent />
@@ -80,11 +81,11 @@ export default function RootLayout({
                 <main className="flex-1 overflow-y-auto relative" id="main-content">
                   <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
                     <div
-                      className="absolute top-[-15%] right-[5%] w-[35%] h-[35%] rounded-full blur-[140px] opacity-10"
+                      className="absolute top-[-15%] right-[5%] w-[35%] h-[35%] rounded-full blur-[140px] opacity-7 mesh-blob-1"
                       style={{ backgroundColor: "var(--color-brand)" }}
                     />
                     <div
-                      className="absolute bottom-[-10%] left-[20%] w-[30%] h-[30%] rounded-full blur-[120px] opacity-8"
+                      className="absolute bottom-[-10%] left-[20%] w-[30%] h-[30%] rounded-full blur-[120px] opacity-7 mesh-blob-2"
                       style={{ backgroundColor: "var(--color-accent-purple)" }}
                     />
                   </div>
