@@ -153,15 +153,16 @@ Penyelarasan ini menjadikan A2Z Agentz **100%契合 (cocok) dengan tema wajib AC
 
 | Kategori | Jumlah |
 |----------|--------|
-| File baru ditambahkan | **29 file** |
+| File baru ditambahkan | **57 file** |
 | File yang diubah/direfaktor | **11 file** |
 | File dihapus | **0 file** |
-| Dependensi baru | **2 paket** (`recharts`, `lucide-react`) |
+| Dependensi baru | **3 paket** (`recharts`, `lucide-react`, `motion.dev`) |
 | Route/halaman baru | **4 route** |
-| Komponen baru | **9 komponen** |
+| Komponen baru | **37+ komponen** (14 original + 14 ui/ + 5 loading + 4 SEO) |
 | Komponen direfaktor | **5 komponen** |
 | **Dokumen alignment** | **1 file khusus juri** (`docs/06-amd-stack.md`) |
 | **Stack migrasi** | **1 sesi** (Sesi 6 — vLLM → AMD AI Workbench + AIM + SGLang) |
+| **UI/UX Fitur** | **16 fitur** (Sesi 9 — TypeUI design system + PWA + SEO) |
 
 ---
 
@@ -204,34 +205,73 @@ project-a2z-agentz/
 │   ├── 03-agent-b-vault.md            # KMS, Gas, Multi-RPC
 │   ├── 04-communication-protocol.md   # ECDSA + SGLang endpoint
 │   ├── 05-setup-guide.md              # End-to-end AMD Cloud setup
-│   └── 06-amd-stack.md                # [BARU] Alignment khusus juri
+│   └── 06-amd-stack.md                # Alignment khusus juri
 └── dashboard/
     ├── package.json
+    ├── tsconfig.json
+    ├── public/
+    │   ├── manifest.json              # [BARU] PWA manifest
+    │   └── sw.js                      # [BARU] Service worker (offline cache)
     └── src/
         ├── app/
         │   ├── layout.tsx
         │   ├── page.tsx
         │   ├── globals.css
-        │   ├── analytics/page.tsx
-        │   ├── memory/page.tsx
-        │   ├── settings/page.tsx
-        │   └── history/page.tsx
+        │   ├── loading.tsx            # [BARU] Root loading skeleton
+        │   ├── not-found.tsx          # [BARU] Custom 404 page
+        │   ├── opengraph-image.tsx    # [BARU] OG image generator (1200×630)
+        │   ├── robots.ts             # [BARU] robots.txt generator
+        │   ├── sitemap.ts            # [BARU] sitemap.xml generator
+        │   ├── analytics/
+        │   │   ├── page.tsx
+        │   │   └── loading.tsx        # [BARU] Analytics loading skeleton
+        │   ├── memory/
+        │   │   ├── page.tsx
+        │   │   └── loading.tsx        # [BARU] Memory loading skeleton
+        │   ├── settings/
+        │   │   ├── page.tsx
+        │   │   └── loading.tsx        # [BARU] Settings loading skeleton
+        │   └── history/
+        │       ├── page.tsx
+        │       └── loading.tsx        # [BARU] History loading skeleton
+        ├── hooks/
+        │   └── useReducedMotion.ts    # [BARU] prefers-reduced-motion hook
         └── components/
-            ├── DashboardContext.tsx   # [BARU] Global state + data simulator
-            ├── Sidebar.tsx            # [BARU] Collapsible sidebar navigasi
-            ├── KpiCard.tsx            # [BARU] Reusable metric card
-            ├── PageHeader.tsx         # [BARU] Header halaman konsisten
-            ├── DashboardKpis.tsx      # [BARU] 6 KPI cards dashboard
-            ├── AnalyticsCharts.tsx    # [BARU] 3 Recharts visualisasi data
-            ├── VectorMemoryExplorer.tsx # [BARU] ChromaDB cache viewer
-            ├── SettingsPanel.tsx      # [BARU] Form konfigurasi agent
-            ├── AuditTrail.tsx         # [BARU] Log audit paginasi
-            ├── Navbar.tsx             # [UBAH] Context-aware, AMD badge
-            ├── CircuitBreaker.tsx     # [UBAH] Context + Lucide + premium states
-            ├── LiveLog.tsx            # [UBAH] Context + level colors + aria
-            ├── ApprovalQueue.tsx      # [UBAH] Context + empty state + a11y
-            └── TransactionList.tsx     # [UBAH] Context + expandable + Basescan
+            ├── DashboardContext.tsx    # Global state + data simulator
+            ├── Sidebar.tsx            # Collapsible sidebar navigasi
+            ├── KpiCard.tsx            # Reusable metric card
+            ├── PageHeader.tsx         # Header halaman konsisten
+            ├── DashboardKpis.tsx      # 6 KPI cards dashboard
+            ├── AnalyticsCharts.tsx    # 3 Recharts visualisasi data
+            ├── VectorMemoryExplorer.tsx # ChromaDB cache viewer
+            ├── SettingsPanel.tsx      # Form konfigurasi agent
+            ├── AuditTrail.tsx         # Log audit paginasi
+            ├── AgentCommPanel.tsx     # Agent communication panel
+            ├── Navbar.tsx             # Context-aware, AMD badge
+            ├── CircuitBreaker.tsx     # Context + Lucide + premium states
+            ├── LiveLog.tsx            # Context + level colors + aria
+            ├── ApprovalQueue.tsx      # Context + empty state + a11y
+            ├── TransactionList.tsx    # Context + expandable + Basescan
+            └── ui/                    # [BARU] TypeUI Design System
+                ├── Skeleton.tsx       # Loading skeleton placeholders
+                ├── Toast.tsx          # Toast notification system
+                ├── ErrorBoundary.tsx  # React error boundary w/ fallback
+                ├── EmptyState.tsx     # Reusable empty state component
+                ├── CommandPalette.tsx # Cmd+K command palette
+                ├── CommandCenter.tsx  # Command center overlay
+                ├── KeyboardNavWrapper.tsx # Keyboard navigation provider
+                ├── AnimatedCounter.tsx # Animated number counters
+                ├── Tooltip.tsx        # Hover/focus tooltips
+                ├── Breadcrumbs.tsx    # Navigation breadcrumbs
+                ├── RouteProgress.tsx  # Route transition progress bar
+                ├── ScrollToTop.tsx    # Scroll-to-top button
+                ├── SkipToContent.tsx  # Skip-to-content a11y link
+                ├── PWARegister.tsx    # PWA service worker registration
+                ├── exportUtils.ts     # CSV/JSON export utilities
+                └── useKeyboardNav.ts  # Keyboard navigation hook
 ```
+
+**Total file count**: 48 source files (.tsx/.ts/.css) + 2 PWA files (manifest.json, sw.js) + config files
 
 ## Sesi 6 — 2026-06-17 | Pondasi Modular Agent B, Fix raw_transaction, dan Async JSON Task Listener
 
@@ -311,3 +351,90 @@ Melakukan perbaikan dan penyempurnaan lanjutan terhadap isu-isu visual dan layou
 | `TransactionList.tsx` | `/dashboard/src/components/` | Penghapusan tag `<tbody>` bersarang yang menyalahi standar struktur tabel HTML. |
 
 **Status: ✅ TAMPILAN DASHBOARD SEMPURNA & HYDRATION ERROR TERTANGANI.**
+
+---
+
+## Sesi 9 — 2026-06-18 | UI/UX Audit — 16 Fitur Baru + TypeUI Design System
+
+### 📌 Ringkasan
+Audit komprehensif UI/UX yang menghasilkan **16 fitur baru** untuk meningkatkan kualitas frontend ke level production-grade. Mencakup TypeUI design system (`components/ui/`), per-route loading states, error handling, aksesibilitas lanjutan, SEO metadata, dan PWA offline support.
+
+### 📦 Dependensi Baru
+- `motion.dev` — Animasi halus (pengganti framer-motion)
+
+### ✅ File Baru (TypeUI Design System — `components/ui/`)
+| File | Deskripsi |
+|------|-----------|
+| `Skeleton.tsx` | Loading skeleton placeholders (card, list, chart variants) |
+| `Toast.tsx` | Toast notification system (success, error, info, auto-dismiss) |
+| `ErrorBoundary.tsx` | React error boundary dengan fallback UI |
+| `EmptyState.tsx` | Reusable empty state (icon + message + CTA) |
+| `CommandPalette.tsx` | Keyboard-driven command palette (⌘+K) |
+| `CommandCenter.tsx` | Command center overlay dengan grouped actions |
+| `KeyboardNavWrapper.tsx` | Keyboard navigation provider (1-5, /, Esc) |
+| `AnimatedCounter.tsx` | Animated number counters (tween morph) |
+| `Tooltip.tsx` | Hover/focus tooltips (accessible) |
+| `Breadcrumbs.tsx` | Navigation breadcrumbs (route-aware) |
+| `RouteProgress.tsx` | Top progress bar pada navigasi antar-halaman |
+| `ScrollToTop.tsx` | Scroll-to-top floating button |
+| `SkipToContent.tsx` | Skip-to-content link (a11y WCAG 2.1) |
+| `PWARegister.tsx` | PWA service worker registration |
+
+### ✅ File Baru (UI Utilities)
+| File | Lokasi | Deskripsi |
+|------|--------|-----------|
+| `exportUtils.ts` | `components/ui/` | CSV/JSON export utility functions |
+| `useKeyboardNav.ts` | `components/ui/` | Keyboard navigation hook (keybindings) |
+
+### ✅ File Baru (Loading States — 5 files)
+| File | Lokasi |
+|------|--------|
+| `loading.tsx` | `app/` (root) |
+| `loading.tsx` | `app/analytics/` |
+| `loading.tsx` | `app/memory/` |
+| `loading.tsx` | `app/settings/` |
+| `loading.tsx` | `app/history/` |
+
+### ✅ File Baru (Hooks)
+| File | Deskripsi |
+|------|-----------|
+| `useReducedMotion.ts` | `hooks/` — Detect `prefers-reduced-motion` media query |
+
+### ✅ File Baru (SEO & Meta)
+| File | Deskripsi |
+|------|-----------|
+| `opengraph-image.tsx` | OG image generator (1200×630, branded purple glow) |
+| `robots.ts` | Dynamic `robots.txt` generator |
+| `sitemap.ts` | Dynamic `sitemap.xml` generator |
+| `not-found.tsx` | Custom 404 page (animated, branded) |
+
+### ✅ File Baru (PWA)
+| File | Lokasi | Deskripsi |
+|------|--------|-----------|
+| `manifest.json` | `public/` | PWA manifest (icons, theme_color, display: standalone) |
+| `sw.js` | `public/` | Service worker (offline cache-first strategy) |
+
+### 📊 Ringkasan Sesi 9
+- **28 file baru** ditambahkan
+- **0 file dihapus**
+- **1 dependency baru**: `motion.dev`
+- **16 fitur UI/UX** diimplementasi
+- Semua halaman memiliki loading skeleton, error boundary, dan toast notifications
+
+### 🎯 16 Fitur UI/UX yang Ditambahkan
+1. **Loading Skeletons** — `Skeleton.tsx` + 5× `loading.tsx` (per-route skeleton states)
+2. **Toast Notifications** — `Toast.tsx` (success/error/info, auto-dismiss, ARIA live)
+3. **Error Boundaries** — `ErrorBoundary.tsx` (crash recovery w/ fallback UI)
+4. **Empty States** — `EmptyState.tsx` (icon + message + CTA button)
+5. **Command Palette** — `CommandPalette.tsx` (⌘+K keyboard shortcut)
+6. **Command Center** — `CommandCenter.tsx` (grouped action overlay)
+7. **Keyboard Navigation** — `KeyboardNavWrapper.tsx` + `useKeyboardNav.ts` (1-5, /, Esc)
+8. **Animated Counters** — `AnimatedCounter.tsx` (tween morph numbers)
+9. **Tooltips** — `Tooltip.tsx` (accessible hover/focus tooltips)
+10. **Breadcrumbs** — `Breadcrumbs.tsx` (route-aware navigation trail)
+11. **Route Progress** — `RouteProgress.tsx` (top loading bar on navigation)
+12. **Scroll to Top** — `ScrollToTop.tsx` (floating scroll button)
+13. **Skip to Content** — `SkipToContent.tsx` (WCAG 2.1 skip link)
+14. **PWA Support** — `PWARegister.tsx` + `manifest.json` + `sw.js` (offline-capable)
+15. **Export Utilities** — `exportUtils.ts` (CSV/JSON data export)
+16. **Reduced Motion** — `useReducedMotion.ts` (respects `prefers-reduced-motion`)

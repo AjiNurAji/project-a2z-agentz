@@ -49,8 +49,12 @@ graph TD
         SC[Custom Smart Contract w/ Pausable]
     end
 
-    subgraph User Interface
+    subgraph User Interface (TypeUI Design System)
         UI[Next.js Web Dashboard]
+        PWA[PWA: Service Worker + Manifest]
+        CMD[Command Palette ⌘+K]
+        SKELETON[Loading Skeletons]
+        A11Y[Skip-to-Content + Reduced Motion]
     end
 
     Scoring -->|JSON Payload| API
@@ -95,3 +99,79 @@ Agent A Scout → panggil AIM via OpenAI-compatible API
 ```
 
 Seluruh pipeline berjalan di **AMD Developer Cloud**, tanpa ketergantungan pada provider cloud eksternal untuk workload AI-nya.
+
+---
+
+## Frontend Architecture (Dashboard)
+
+### TypeUI Design System
+
+Dashboard menggunakan sistem desain internal bernama **TypeUI** dengan token-token berikut (didefinisikan di `globals.css` via CSS `:root` variables):
+
+| Token | Kegunaan |
+|-------|----------|
+| `--color-brand` | Warna utama (purple gradient) |
+| `--color-brand-medium` | Variasi brand medium |
+| `--color-brand-soft` | Brand glow / shadow |
+| `--color-heading` | Warna teks heading |
+| `--color-body` | Warna teks body |
+| `--color-body-subtle` | Teks sekunder / muted |
+| `--color-border-default` | Border standar |
+| `--color-neutral-secondary-medium` | Background netral |
+| `--font-heading` (Outfit) | Font heading |
+| `--font-body` (Inter) | Font body / data |
+| `--font-mono` (Geist Mono) | Font log / code |
+
+Glassmorphism: `.glass` dan `.glass-card` utility classes untuk efek blur transparan.
+
+### Component Hierarchy
+
+```
+App Layout (layout.tsx)
+├── SkipToContent          ← WCAG 2.1 skip link
+├── RouteProgress          ← Top loading bar
+├── PWARegister            ← Service worker registration
+├── KeyboardNavWrapper     ← Global keyboard shortcuts
+│   ├── Toast (provider)   ← Toast notification system
+│   ├── ErrorBoundary      ← Crash recovery
+│   ├── Sidebar            ← Navigation
+│   ├── Navbar             ← Top bar
+│   └── Page Content
+│       ├── Breadcrumbs    ← Route trail
+│       ├── PageHeader     ← Consistent header
+│       ├── CommandPalette ← ⌘+K overlay
+│       ├── CommandCenter  ← Action overlay
+│       └── Page Components
+│           ├── KpiCard / AnimatedCounter
+│           ├── Skeleton (loading state)
+│           ├── EmptyState (no data)
+│           └── ScrollToTop
+```
+
+### Loading & Streaming Patterns
+
+Setiap route memiliki `loading.tsx` yang menampilkan **Skeleton** komponen saat data sedang dimuat:
+
+- `app/loading.tsx` — Root dashboard skeleton (6 KPI cards + 3-column grid)
+- `app/analytics/loading.tsx` — Chart skeletons (area, line, bar)
+- `app/memory/loading.tsx` — Vector memory explorer skeleton
+- `app/settings/loading.tsx` — Settings form skeleton
+- `app/history/loading.tsx` — Audit trail table skeleton
+
+Pattern: **Streaming SSR** via Next.js App Router — komponen server mengalir data ke komponen client, dengan `loading.tsx` sebagai Suspense boundary.
+
+### Error Handling
+
+- `ErrorBoundary.tsx` — Setiap section utama dibungkus error boundary dengan fallback UI
+- `not-found.tsx` — Custom 404 page (animated, branded)
+- `Toast.tsx` — Notifikasi error/info/success global (ARIA live regions)
+
+### Accessibility Stack
+
+- `SkipToContent.tsx` — WCAG 2.1 skip navigation link
+- `useReducedMotion.ts` — Detect `prefers-reduced-motion` media query
+- `KeyboardNavWrapper.tsx` — Full keyboard navigation (1-5 routes, ⌘+K, Esc)
+- `aria-live="polite"` pada semua area yang update real-time (LiveLog, Toast)
+- `role="log"`, `role="alert"`, `aria-label` pada semua interactive elements
+- Focus-visible rings pada semua interactive targets
+- Touch targets minimum 44×44px

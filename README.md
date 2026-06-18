@@ -24,6 +24,11 @@ Sistem ini terdiri dari dua agen utama yang bekerja secara asinkron menggunakan 
 | **Model Deployment** | **AMD Inference Microservice (AIM)** |
 | **Inference Server** | **SGLang** (AMD-recommended) |
 | **Compute Marketplace** | Akash Systems (co-sponsor) |
+| **Frontend** | Next.js 16, React 19, Tailwind CSS v4, TypeScript |
+| **Charts** | Recharts |
+| **Icons** | Lucide React |
+| **Animations** | Motion (motion.dev) |
+| **PWA** | Service Worker, Web App Manifest (offline-capable) |
 
 ## 📚 Dokumentasi
 
@@ -41,7 +46,29 @@ Baca secara berurutan untuk pemahaman maksimal:
 - **AMD-Native Pipeline**: Fine-tune LLM di AMD AI Workbench → deploy sebagai AMD Inference Microservice (AIM) → serve via SGLang di MI300X. Sepenuhnya di AMD Developer Cloud.
 - **Ultra-Low Latency**: Scraping → AIM inference (SGLang-served) → on-chain Tx selesai dalam < 30 detik di MI300X.
 - **Bulletproof Security**: Verifikasi tanda tangan kriptografi, deteksi *double-spending* via PostgreSQL, dan *Emergency Pause* (Circuit Breaker).
-- **Web Dashboard**: Antarmuka Next.js + TailwindCSS untuk memantau aktivitas agen dan *Live Tx Hash* di Base Network.
+
+### 🎨 Dashboard UI/UX (16 Fitur Production-Grade)
+
+| # | Fitur | Deskripsi |
+|---|-------|-----------|
+| 1 | **Loading Skeletons** | Per-route skeleton states (card, list, chart) |
+| 2 | **Toast Notifications** | Success/error/info toast (auto-dismiss, ARIA live) |
+| 3 | **Error Boundaries** | Crash recovery dengan fallback UI |
+| 4 | **Empty States** | Icon + message + CTA button |
+| 5 | **Command Palette** | ⌘+K keyboard-driven command palette |
+| 6 | **Command Center** | Grouped action overlay |
+| 7 | **Keyboard Navigation** | 1-5 routes, `/` search, `Esc` close |
+| 8 | **Animated Counters** | Tween morph number animations |
+| 9 | **Tooltips** | Accessible hover/focus tooltips |
+| 10 | **Breadcrumbs** | Route-aware navigation trail |
+| 11 | **Route Progress** | Top loading bar on page transitions |
+| 12 | **Scroll to Top** | Floating scroll button |
+| 13 | **Skip to Content** | WCAG 2.1 skip-to-content link |
+| 14 | **PWA Support** | Service worker + manifest (offline-capable) |
+| 15 | **Export Utilities** | CSV/JSON data export |
+| 16 | **Reduced Motion** | Respects `prefers-reduced-motion` |
+
+**Aksesibilitas**: WCAG AA, focus rings, ARIA semantics, 44×44px touch targets, `aria-live` regions, skip-to-content, reduced-motion support.
 
 ---
 
