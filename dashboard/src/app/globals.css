@@ -120,7 +120,7 @@
 }
 
 /* ── Light Theme ────────────────────────────── */
-[data-theme="light"] {
+html[data-theme="light"] {
   /* Surface & Card */
   --color-surface: #FAF9F7;
   --color-card: #FFFFFF;
@@ -222,7 +222,7 @@
   --color-shadow: 0 1px 3px rgba(26, 22, 37, 0.08), 0 4px 12px rgba(26, 22, 37, 0.04);
 }
 
-[data-theme="light"] .card {
+html[data-theme="light"] .card {
   background: linear-gradient(
     180deg,
     #FFFFFF 0%,
@@ -232,7 +232,7 @@
   );
 }
 
-[data-theme="light"] .card-interactive:hover {
+html[data-theme="light"] .card-interactive:hover {
   background: linear-gradient(
     180deg,
     #FFFFFF 0%,
@@ -241,26 +241,26 @@
   );
 }
 
-[data-theme="light"] .btn-glint {
+html[data-theme="light"] .btn-glint {
   box-shadow:
     0 1px 2px 0 rgba(0, 0, 0, 0.05),
     inset rgba(255, 255, 255, 0.7) 0 6px 0px -5px,
     rgba(0, 0, 0, 0.08) 0 4px 10px -5px;
 }
 
-[data-theme="light"] ::selection {
+html[data-theme="light"] ::selection {
   background: #6B4F8A;
   color: #FFFFFF;
 }
 
-[data-theme="light"] ::-webkit-scrollbar-thumb {
+html[data-theme="light"] ::-webkit-scrollbar-thumb {
   background: #D4D0DC;
 }
-[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   background: #C8C3D0;
 }
 
-[data-theme="light"] .focus-ring:focus-visible {
+html[data-theme="light"] .focus-ring:focus-visible {
   box-shadow: 0 0 0 2px #6B4F8A;
 }
 
