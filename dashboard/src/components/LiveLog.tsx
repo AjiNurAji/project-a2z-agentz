@@ -2,7 +2,7 @@
 import { useDashboard, type LogEntry } from "./DashboardContext";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Terminal, ChevronDown, ChevronUp, Wifi, Radio } from "lucide-react";
+import { Terminal, ChevronDown, ChevronUp, Radio } from "lucide-react";
 
 const levelStyles: Record<LogEntry["level"], { text: string; badge: string }> = {
   INFO:    { text: "text-[#7F94AD]",   badge: "bg-[#7F94AD]/10 text-[#7F94AD] border-[#7F94AD]/20" },
@@ -21,12 +21,12 @@ export default function LiveLog() {
   const { logs, agentAStatus } = useDashboard();
   const bottomRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const prevLengthRef = useRef(logs.length);
 
   useEffect(() => {
-    if (autoScroll && bottomRef.current) {
-      bottomRef.current.scrollIntoView({ behavior: "smooth" });
+    if (autoScroll && containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
   }, [logs, autoScroll]);
 
@@ -45,7 +45,7 @@ export default function LiveLog() {
 
   return (
     <div
-      className="card flex flex-col"
+      className={`card flex flex-col transition-all duration-300 ${isCollapsed ? "h-auto" : "h-80"}`}
       style={{ borderRadius: "var(--radius-base)" }}
     >
       {/* Header */}
@@ -79,63 +79,78 @@ export default function LiveLog() {
           </span>
         </div>
 
-        <button
-          onClick={() => setAutoScroll(!autoScroll)}
-          aria-label={autoScroll ? "Pause auto-scroll" : "Resume auto-scroll"}
-          className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] transition-colors"
-          style={{
-            color: autoScroll ? "var(--color-fg-success)" : "var(--color-fg-disabled)",
-            background: autoScroll ? "var(--color-success-soft)" : "transparent",
-          }}
-        >
-          <Radio className="w-3 h-3" />
-          {autoScroll ? "Live" : "Paused"}
-        </button>
+        <div className="flex items-center gap-1.5">
+          {!isCollapsed && (
+            <button
+              onClick={() => setAutoScroll(!autoScroll)}
+              aria-label={autoScroll ? "Pause auto-scroll" : "Resume auto-scroll"}
+              className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] transition-colors"
+              style={{
+                color: autoScroll ? "var(--color-fg-success)" : "var(--color-fg-disabled)",
+                background: autoScroll ? "var(--color-success-soft)" : "transparent",
+              }}
+            >
+              <Radio className="w-3 h-3" />
+              {autoScroll ? "Live" : "Paused"}
+            </button>
+          )}
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            aria-label={isCollapsed ? "Expand log" : "Collapse log"}
+            className="flex items-center justify-center w-7 h-7 rounded-lg transition-colors hover:bg-white/[0.05]"
+            style={{ color: "var(--color-fg-disabled)" }}
+            title={isCollapsed ? "Expand" : "Collapse"}
+          >
+            {isCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+          </button>
+        </div>
       </div>
 
       {/* Log Lines */}
-      <div
-        ref={containerRef}
-        onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-3 sm:px-4 py-3 space-y-0.5"
-        style={{ fontFamily: "var(--font-mono)" }}
-        aria-live="polite"
-        aria-label="Agent A activity log"
-        role="log"
-      >
-        <AnimatePresence initial={false}>
-          {reversed.map((entry) => (
-            <motion.div
-              key={entry.id}
-              initial={{ opacity: 0, y: -12, height: 0 }}
-              animate={{ opacity: 1, y: 0, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ type: "spring", stiffness: 400, damping: 30 }}
-              className="flex items-start gap-2 sm:gap-3 py-1 px-2 rounded-md hover:bg-white/[0.02] transition-colors group"
-            >
-              <span
-                className="flex-shrink-0 mt-[1px] tabular-nums text-[10px] sm:text-[11px] pt-px"
-                style={{ color: "var(--color-fg-disabled)" }}
+      {!isCollapsed && (
+        <div
+          ref={containerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto px-3 sm:px-4 py-3 space-y-0.5"
+          style={{ fontFamily: "var(--font-mono)" }}
+          aria-live="polite"
+          aria-label="Agent A activity log"
+          role="log"
+        >
+          <AnimatePresence initial={false}>
+            {reversed.map((entry) => (
+              <motion.div
+                key={entry.id}
+                initial={{ opacity: 0, y: -12, height: 0 }}
+                animate={{ opacity: 1, y: 0, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                className="flex items-start gap-2 sm:gap-3 py-1 px-2 rounded-md hover:bg-white/[0.02] transition-colors group"
               >
-                {entry.timestamp.toLocaleTimeString("en-US", {
-                  hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit",
-                })}
-              </span>
-              <span
-                className={`flex-shrink-0 w-8 text-center font-bold text-[9px] sm:text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border ${levelStyles[entry.level].badge}`}
-              >
-                {levelLabels[entry.level]}
-              </span>
-              <span
-                className={`break-all text-[11px] sm:text-xs leading-relaxed ${levelStyles[entry.level].text}`}
-              >
-                {entry.message}
-              </span>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-        <div ref={bottomRef} />
-      </div>
+                <span
+                  className="flex-shrink-0 mt-[1px] tabular-nums text-[10px] sm:text-[11px] pt-px"
+                  style={{ color: "var(--color-fg-disabled)" }}
+                >
+                  {entry.timestamp.toLocaleTimeString("en-US", {
+                    hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit",
+                  })}
+                </span>
+                <span
+                  className={`flex-shrink-0 w-8 text-center font-bold text-[9px] sm:text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border ${levelStyles[entry.level].badge}`}
+                >
+                  {levelLabels[entry.level]}
+                </span>
+                <span
+                  className={`break-all text-[11px] sm:text-xs leading-relaxed ${levelStyles[entry.level].text}`}
+                >
+                  {entry.message}
+                </span>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+          <div ref={bottomRef} />
+        </div>
+      )}
     </div>
   );
 }

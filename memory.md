@@ -258,3 +258,29 @@ Hari ini kita melanjutkan pondasi backend Web3 untuk Agent B (The Vault) dan mem
 | `agent_b.py` | `/` | Implementasi modular ExecutorVault + fix syntax `raw_transaction` + penambahan `listen_for_tasks` async JSON. |
 
 **Status: ✅ PONDASI AGENT B TELAH DIBENTUK — SIAP UNTUK PENGEMBANGAN BERIKUTNYA.**
+
+---
+
+## Sesi 7 — 2026-06-18 | Bug Fixes & Peningkatan UX Dashboard
+
+### 📌 Ringkasan
+Fokus pada perbaikan bug UI/UX yang dilaporkan pada dashboard dan peningkatan stabilitas interaksi pengguna pada fitur log dan komponen data simulasi.
+
+### ✅ Hal yang Berhasil Dikerjakan
+
+| Item | Detail |
+|------|--------|
+| **Fix React Key Warning** | Mengganti *fragment* kosong (`<>`) dengan `React.Fragment` beserta properti `key` pada elemen *looping* tabel transaksi untuk menghilangkan peringatan (*warning*) dan error *parsing* React JSX. |
+| **Fix Hydration Mismatch** | Menambahkan state `mounted` pada global context (`DashboardContext`) untuk mencegah error *hydration* yang terjadi akibat data KPI yang di- *generate* secara acak antara Server-Side Rendering (SSR) dan Client-Side. |
+| **Fix Auto-Scroll Jump** | Mengganti metode `scrollIntoView()` (yang sebelumnya memaksa seluruh halaman bergulir ke bawah) dengan manipulasi nilai `scrollTop` container secara spesifik, sehingga halaman tidak tiba-tiba meloncat. |
+| **Peningkatan UX Live Log** | Menyempurnakan UX dengan mengubah ikon tombol jeda *auto-scroll* dari *chevron* (panah) menjadi ikon **Play/Pause**. Juga mengimplementasikan fungsionalitas sungguhan pada ikon *chevron* agar panel Live Log dapat di-*collapse* (disembunyikan) sesuai ekspektasi pengguna. |
+
+### ✏️ File yang DIUBAH
+
+| File | Lokasi | Detail Perubahan |
+|------|--------|-----------------|
+| `TransactionList.tsx` | `/dashboard/src/components/` | Penambahan import React dan perubahan tag `Fragment` untuk memastikan adanya `key` prop unik. |
+| `DashboardContext.tsx` | `/dashboard/src/components/` | Menambahkan perlindungan `if (!mounted) return null;` sebelum merender Context Provider untuk sinkronisasi rendering SSR dan Klien. |
+| `LiveLog.tsx` | `/dashboard/src/components/` | Perbaikan logika pengguliran, penambahan state `isCollapsed` beserta style CSS dinamis `h-80` vs *auto*, dan integrasi ikon Lucide baru (`Play`, `Pause`). |
+
+**Status: ✅ BUG TERATASI & UX DITINGKATKAN — DASHBOARD LEBIH STABIL & INTERAKTIF.**

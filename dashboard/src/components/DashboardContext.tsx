@@ -258,25 +258,35 @@ function genAgentConversation(): AgentMessage[] {
 }
 
 export function DashboardProvider({ children }: { children: React.ReactNode }) {
+  const [mounted, setMounted] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [agentAStatus, setAgentAStatus] = useState<AgentStatus>("online");
   const [agentBStatus, setAgentBStatus] = useState<AgentStatus>("online");
-  const [transactions, setTransactions] = useState<Transaction[]>(genInitialTransactions());
-  const [approvalQueue, setApprovalQueue] = useState<ApprovalItem[]>(genInitialApprovals());
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [approvalQueue, setApprovalQueue] = useState<ApprovalItem[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([
     { id: genId(), timestamp: new Date(), level: "INFO", message: "A2Z Dashboard initialized. Connecting to agents..." },
     { id: genId(), timestamp: new Date(), level: "SUCCESS", message: "Agent A (Scout) connected. vLLM/ROCm server online." },
     { id: genId(), timestamp: new Date(), level: "SUCCESS", message: "Agent B (Vault) connected. KMS handshake successful." },
   ]);
-  const [vectorMemory] = useState<VectorMemoryItem[]>(genInitialVectorMemory());
-  const [gasHistory] = useState<GasDataPoint[]>(genGasHistory());
-  const [tvlHistory] = useState<TvlDataPoint[]>(genTvlHistory());
-  const [successHistory] = useState<SuccessDataPoint[]>(genSuccessHistory());
+  const [vectorMemory, setVectorMemory] = useState<VectorMemoryItem[]>([]);
+  const [gasHistory, setGasHistory] = useState<GasDataPoint[]>([]);
+  const [tvlHistory, setTvlHistory] = useState<TvlDataPoint[]>([]);
+  const [successHistory, setSuccessHistory] = useState<SuccessDataPoint[]>([]);
   const [config, setConfig] = useState<DashboardConfig>(DEFAULT_CONFIG);
   const [agentMessages, setAgentMessages] = useState<AgentMessage[]>(genAgentConversation());
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const logCountRef = useRef(0);
 
+  useEffect(() => {
+    setTransactions(genInitialTransactions());
+    setApprovalQueue(genInitialApprovals());
+    setVectorMemory(genInitialVectorMemory());
+    setGasHistory(genGasHistory());
+    setTvlHistory(genTvlHistory());
+    setSuccessHistory(genSuccessHistory());
+    setMounted(true);
+  }, []);
   const addLog = useCallback((level: LogEntry["level"], message: string) => {
     setLogs((prev) => [{ id: genId(), timestamp: new Date(), level, message }, ...prev].slice(0, 100));
     logCountRef.current++;
@@ -419,6 +429,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     },
     [addLog]
   );
+
+  if (!mounted) return null;
 
   return (
     <DashboardContext.Provider
