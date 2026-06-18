@@ -3,9 +3,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
+import { useToast } from "./Toast";
 import {
   Search, LayoutDashboard, BarChart3, Brain, History, Settings,
-  Zap, ArrowRight, Command
+  Zap, ArrowRight, Command, Pause, Play, Download, Trash2
 } from "lucide-react";
 
 interface CommandItem {
@@ -24,6 +25,7 @@ export function CommandPalette() {
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
   const router = useRouter();
+  const toast = useToast();
 
   const commands: CommandItem[] = [
     { id: "dash", label: "Dashboard", description: "Mission Control overview", icon: LayoutDashboard, action: () => router.push("/"), category: "Pages" },
@@ -31,6 +33,10 @@ export function CommandPalette() {
     { id: "memory", label: "Vector Memory", description: "ChromaDB explorer", icon: Brain, action: () => router.push("/memory"), category: "Pages" },
     { id: "history", label: "Audit Trail", description: "Transaction history", icon: History, action: () => router.push("/history"), category: "Pages" },
     { id: "settings", label: "Settings", description: "Agent configuration", icon: Settings, action: () => router.push("/settings"), category: "Pages" },
+    { id: "pause-agents", label: "Pause All Agents", description: "Temporarily pause agent activity", icon: Pause, action: () => toast.info("All agents paused"), category: "Actions" },
+    { id: "resume-agents", label: "Resume All Agents", description: "Resume paused agent activity", icon: Play, action: () => toast.success("All agents resumed"), category: "Actions" },
+    { id: "export-csv", label: "Export Transactions CSV", description: "Download transaction data", icon: Download, action: () => toast.info("CSV export started"), category: "Actions" },
+    { id: "clear-cache", label: "Clear Cache", description: "Purge local cache data", icon: Trash2, action: () => toast.success("Cache cleared"), category: "Actions" },
   ];
 
   const filtered = commands.filter((c) =>

@@ -42,52 +42,6 @@ function StatusBadge({ status }: { status: Transaction["status"] }) {
   );
 }
 
-function ExpandableDetail({ tx }: { tx: Transaction }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, height: 0 }}
-      animate={{ opacity: 1, height: "auto" }}
-      exit={{ opacity: 0, height: 0 }}
-      transition={{ type: "spring", stiffness: 300, damping: 28 }}
-      className="overflow-hidden"
-    >
-      <div
-        className="px-4 sm:px-5 py-3"
-        style={{
-          background: "var(--color-neutral-secondary-medium)",
-          borderBottom: "1px solid var(--color-border-muted)",
-        }}
-      >
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-          <div className="flex gap-2">
-            <span className="flex-shrink-0 w-20" style={{ color: "var(--color-fg-disabled)" }}>Reason</span>
-            <span style={{ color: "var(--color-body)" }}>{tx.reason}</span>
-          </div>
-          <div className="flex gap-2">
-            <span className="flex-shrink-0 w-20" style={{ color: "var(--color-fg-disabled)" }}>Target</span>
-            <span style={{ color: "var(--color-body)", fontFamily: "var(--font-mono)" }} className="truncate">
-              {tx.targetAddress}
-            </span>
-          </div>
-          <div className="flex gap-2">
-            <span className="flex-shrink-0 w-20" style={{ color: "var(--color-fg-disabled)" }}>Gas Used</span>
-            <span className="flex items-center gap-1" style={{ color: "var(--color-body)", fontFamily: "var(--font-mono)" }}>
-              <Zap className="w-3 h-3" style={{ color: "var(--color-fg-warning)" }} />
-              {tx.gasUsedGwei} Gwei
-            </span>
-          </div>
-          <div className="flex gap-2">
-            <span className="flex-shrink-0 w-20" style={{ color: "var(--color-fg-disabled)" }}>Tx Hash</span>
-            <span style={{ color: "var(--color-body)", fontFamily: "var(--font-mono)" }} className="break-all">
-              {tx.txHash}
-            </span>
-          </div>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
 function TxCard({ tx, expanded, onToggle }: { tx: Transaction; expanded: boolean; onToggle: () => void }) {
   return (
     <motion.div
@@ -309,11 +263,6 @@ export default function TransactionList() {
                       </a>
                     </td>
                   </motion.tr>
-                  <AnimatePresence>
-                    {expanded === tx.id && (
-                      <ExpandableDetail tx={tx} />
-                    )}
-                  </AnimatePresence>
                 </motion.tbody>
               ))}
             </AnimatePresence>

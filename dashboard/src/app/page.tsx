@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "motion/react";
 import CircuitBreaker from "@/components/CircuitBreaker";
 import LiveLog from "@/components/LiveLog";
 import TransactionList from "@/components/TransactionList";
@@ -11,7 +12,12 @@ import { LayoutDashboard } from "lucide-react";
 
 export default function Home() {
   return (
-    <div className="space-y-6">
+    <motion.div
+      className="space-y-6"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
+    >
       <PageHeader
         title="Mission Control"
         description="Real-time overview of all autonomous agent activity on Base Network"
@@ -39,6 +45,6 @@ export default function Home() {
           <TransactionList />
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

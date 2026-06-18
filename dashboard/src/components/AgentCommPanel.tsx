@@ -1,6 +1,6 @@
 "use client";
 import { useDashboard, type AgentMessage, type MessageStatus } from "./DashboardContext";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Bot, Shield, Check, X, Loader2, Clock, Send, Radio,
@@ -55,6 +55,63 @@ function MetadataChips({ metadata }: { metadata: AgentMessage["metadata"] }) {
         </span>
       ))}
     </div>
+  );
+}
+
+// ── Typing indicator dots ──────────────────────────────────
+function TypingIndicator({ sender }: { sender: "agent_a" | "agent_b" }) {
+  const isAgentA = sender === "agent_a";
+  const senderLabel = isAgentA ? "The Scout" : "The Vault";
+  const SenderIcon = isAgentA ? Bot : Shield;
+  const iconBg = isAgentA ? "var(--color-accent-purple)" : "var(--color-brand-strong)";
+  const senderColor = isAgentA ? "var(--color-fg-purple)" : "var(--color-fg-cyan)";
+  const bubbleBg = isAgentA
+    ? "linear-gradient(135deg, var(--color-brand-softer) 0%, var(--color-brand-soft) 100%)"
+    : "linear-gradient(135deg, var(--color-brand) 0%, var(--color-brand-medium) 100%)";
+  const borderColor = isAgentA ? "var(--color-border-brand-subtle)" : "var(--color-border-brand)";
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      transition={{ duration: 0.2 }}
+      className={`flex gap-2.5 sm:gap-3 px-4 ${isAgentA ? "justify-start" : "justify-end"}`}
+    >
+      {isAgentA && (
+        <div className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center mt-1" style={{ background: iconBg }}>
+          <SenderIcon className="w-4 h-4 text-white" />
+        </div>
+      )}
+      <div className={`max-w-[80%] sm:max-w-[60%] ${isAgentA ? "" : "text-right"}`}>
+        <div className={`flex items-center gap-1.5 mb-1 ${isAgentA ? "" : "justify-end"}`}>
+          <span className="text-[11px] font-semibold" style={{ color: senderColor }}>{senderLabel}</span>
+        </div>
+        <div
+          className="px-4 py-3 rounded-2xl inline-flex items-center gap-1"
+          style={{
+            background: bubbleBg,
+            border: `1px solid ${borderColor}`,
+            borderRadius: isAgentA ? "4px 16px 16px 16px" : "16px 4px 16px 16px",
+          }}
+        >
+          {[0, 1, 2].map((i) => (
+            <motion.span
+              key={i}
+              className="w-1.5 h-1.5 rounded-full"
+              style={{ background: "var(--color-body)" }}
+              animate={{ scale: [1, 1.4, 1] }}
+              transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.2 }}
+            />
+          ))}
+        </div>
+      </div>
+      {!isAgentA && (
+        <div className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center mt-1" style={{ background: iconBg }}>
+          <SenderIcon className="w-4 h-4 text-white" />
+        </div>
+      )}
+    </motion.div>
   );
 }
 
@@ -171,11 +228,26 @@ function MessageBubble({ message, index }: { message: AgentMessage; index: numbe
   );
 }
 
-// ── Main component ──────────────────────────────────────────
+// ── Main component
 export default function AgentCommPanel() {
   const { agentMessages } = useDashboard();
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [typingAgent, setTypingAgent] = useState<"agent_a" | "agent_b" | null>(null);
+  const prevCountRef = useRef(agentMessages.length);
+
+  // Show typing indicator when new messages arrive
+  useEffect(() => {
+    if (agentMessages.length > prevCountRef.current) {
+      const lastMsg = agentMessages[agentMessages.length - 1];
+      if (lastMsg && lastMsg.sender !== "system") {
+        setTypingAgent(lastMsg.sender as "agent_a" | "agent_b");
+        const timer = setTimeout(() => setTypingAgent(null), 900);
+        return () => clearTimeout(timer);
+      }
+    }
+    prevCountRef.current = agentMessages.length;
+  }, [agentMessages]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -243,8 +315,9 @@ export default function AgentCommPanel() {
         role="log"
       >
         <AnimatePresence initial={false}>
+          {typingAgent && <TypingIndicator key="typing" sender={typingAgent} />}
           {agentMessages.map((msg, i) => (
-            <MessageBubble key={msg.id} message={msg} index={0} />
+            <MessageBubble key={msg.id} message={msg} index={i} />
           ))}
         </AnimatePresence>
 

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useDashboard } from "./DashboardContext";
+import { Tooltip } from "@/components/ui/Tooltip";
 import {
   LayoutDashboard, BarChart3, Brain, History, Settings,
   Activity, ShieldAlert, ChevronLeft, ChevronRight, X, Zap,
@@ -163,7 +164,9 @@ export default function Sidebar() {
                     <span className="text-xs font-medium text-[var(--color-body)] truncate">Agent A (Scout)</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <StatusDot status={agentAStatus} />
+                    <Tooltip content={agentAStatus === "online" ? "Online — actively scanning" : agentAStatus === "analyzing" ? "Analyzing signals..." : agentAStatus === "executing" ? "Executing transaction" : "Offline"} side="right">
+                      <StatusDot status={agentAStatus} />
+                    </Tooltip>
                     <span className="text-[11px] text-[var(--color-body-subtle)] capitalize">{agentAStatus}</span>
                   </div>
                 </div>
@@ -180,7 +183,9 @@ export default function Sidebar() {
                     <span className="text-xs font-medium text-[var(--color-body)] truncate">Agent B (Vault)</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <StatusDot status={isPaused ? "offline" : agentBStatus} />
+                    <Tooltip content={isPaused ? "Paused — human override" : agentBStatus === "online" ? "Online — awaiting payloads" : agentBStatus === "executing" ? "Executing on Base mainnet" : agentBStatus === "analyzing" ? "Verifying payload" : "Offline"} side="right">
+                      <StatusDot status={isPaused ? "offline" : agentBStatus} />
+                    </Tooltip>
                     <span className="text-[11px] text-[var(--color-body-subtle)] capitalize">
                       {isPaused ? "paused" : agentBStatus}
                     </span>
@@ -193,6 +198,21 @@ export default function Sidebar() {
               </div>
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Keyboard navigation hint */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="px-5 pb-2 text-[10px]"
+            style={{ color: "var(--color-fg-disabled)" }}
+          >
+            Press <kbd className="font-mono px-1 rounded" style={{ background: "var(--color-neutral-secondary-medium)" }}>1</kbd>-<kbd className="font-mono px-1 rounded" style={{ background: "var(--color-neutral-secondary-medium)" }}>5</kbd> to navigate
+          </motion.p>
         )}
       </AnimatePresence>
 
@@ -225,6 +245,7 @@ export default function Sidebar() {
 
       {/* Sidebar panel */}
       <motion.aside
+        data-sidebar="true"
         className={`
           fixed lg:sticky top-0 left-0 z-50 lg:z-auto
           flex flex-col h-screen

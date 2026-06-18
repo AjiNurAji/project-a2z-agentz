@@ -5,6 +5,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { History, Search, ChevronDown, ChevronRight, Hash, Clock, ExternalLink, Copy, FileText, CheckCircle2, XCircle, AlertTriangle, Download } from "lucide-react";
 import { exportToCSV } from "./ui/exportUtils";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 interface AuditEntry {
   id: string;
@@ -239,10 +240,11 @@ export default function AuditTrail() {
         </div>
 
         {pageEntries.length === 0 && (
-          <div className="p-12 text-center">
-            <FileText size={36} className="mx-auto mb-3" style={{ color: "var(--color-body-subtle)" }} />
-            <p className="text-sm" style={{ color: "var(--color-body-subtle)" }}>No audit entries found.</p>
-          </div>
+          <EmptyState
+            icon={History}
+            title="No audit entries"
+            description="No audit entries match your current search or filter criteria."
+          />
         )}
       </div>
 

@@ -2,6 +2,8 @@
 
 import { LucideIcon, TrendingUp, TrendingDown } from "lucide-react";
 import { motion } from "motion/react";
+import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 interface KpiCardProps {
   label: string;
@@ -12,6 +14,11 @@ interface KpiCardProps {
   trend?: "up" | "down" | "neutral";
   trendValue?: string;
   index?: number;
+  numericValue?: number;
+  counterPrefix?: string;
+  counterSuffix?: string;
+  counterDecimals?: number;
+  iconTooltip?: string;
 }
 
 const colorMap = {
@@ -44,6 +51,7 @@ const colorMap = {
 
 export default function KpiCard({
   label, value, subValue, icon: Icon, color = "accent", trend, trendValue, index = 0,
+  numericValue, counterPrefix, counterSuffix, counterDecimals, iconTooltip,
 }: KpiCardProps) {
   const c = colorMap[color];
   return (
@@ -59,7 +67,13 @@ export default function KpiCard({
           className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
           style={{ background: c.bg, border: `1px solid ${c.border}` }}
         >
-          <Icon className="w-5 h-5" style={{ color: c.icon }} aria-hidden="true" />
+          {iconTooltip ? (
+            <Tooltip content={iconTooltip} side="left">
+              <Icon className="w-5 h-5" style={{ color: c.icon }} aria-hidden="true" />
+            </Tooltip>
+          ) : (
+            <Icon className="w-5 h-5" style={{ color: c.icon }} aria-hidden="true" />
+          )}
         </div>
       </div>
       <div>
@@ -67,7 +81,16 @@ export default function KpiCard({
           className="text-2xl font-bold text-[var(--color-heading)] tabular-nums"
           style={{ fontFamily: "var(--font-serif)" }}
         >
-          {value}
+          {numericValue !== undefined ? (
+            <AnimatedCounter
+              value={numericValue}
+              prefix={counterPrefix}
+              suffix={counterSuffix}
+              decimals={counterDecimals ?? 0}
+            />
+          ) : (
+            value
+          )}
         </p>
         {subValue && <p className="text-xs text-[var(--color-body-subtle)] mt-0.5">{subValue}</p>}
       </div>
