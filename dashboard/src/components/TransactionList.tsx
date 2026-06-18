@@ -96,6 +96,7 @@ function TxCard({ tx, expanded, onToggle }: { tx: Transaction; expanded: boolean
       style={{
         background: "var(--color-neutral-primary-medium)",
         border: "1px solid var(--color-border-default)",
+        borderLeft: `3px solid ${tx.status === "success" ? "var(--color-success)" : tx.status === "failed" ? "var(--color-danger)" : "var(--color-warning)"}`,
       }}
     >
       <div
