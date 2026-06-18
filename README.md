@@ -1,28 +1,48 @@
-# 🤖 Autonomous Airdrop / Web3 Scavenger Agent (A2Z Agent)
+# 🤖 A2Z Agentz — Autonomous A2A Payment Agent on AMD
 
-Selamat datang di repositori **A2Z Agent**, sebuah proyek inovatif yang dibangun untuk **AMD Developer Hackathon Act II** dengan tema *Agent-to-Agent Payments*.
+Selamat datang di repositori **A2Z Agentz**, proyek **AMD Developer Hackathon: ACT II** dengan tema *Agent-to-Agent Payments*.
 
-Proyek ini mendemonstrasikan sistem *multi-agent* yang sepenuhnya otonom, berjalan di atas infrastruktur GPU **AMD MI300X** (dengan `vLLM` dan ROCm), dirancang untuk mencari peluang Web3 (Airdrop/DeFi) dan mengeksekusi pembayaran *gas fee* atau modal awal (Agent-to-Agent Payment) secara on-chain di jaringan **Base**.
+Sistem *multi-agent* otonom yang berjalan 100% di atas infrastruktur **AMD** — dari *fine-tuning* model LLM di **AMD AI Workbench**, *deployment* via **AMD Inference Microservice (AIM)**, hingga *inference* di-**serve** oleh **SGLang** di atas GPU **AMD Instinct™ MI300X** dengan **ROCm** runtime, semuanya di **AMD Developer Cloud**.
+
+Agen ini mencari peluang Web3 (DeFi/Airdrop) berkualitas, mengeksekusi pembayaran *gas fee* atau modal awal, dan meng-*settle* transaksi on-chain di jaringan **Base** — sepenuhnya otonom antar-agen (*Agent-to-Agent Payment*).
 
 ## 🌟 Konsep Utama
+
 Sistem ini terdiri dari dua agen utama yang bekerja secara asinkron menggunakan *framework* **LangGraph**:
-1. **Agent A (The Scout)**: Menggunakan model Llama 3 8B. Bertugas memindai (*scraping*) Farcaster, Twitter, dan data on-chain setiap 1 jam untuk mencari proyek Web3 berkualitas tinggi.
-2. **Agent B (The Vault)**: Eksekutor *smart contract* yang mengelola *wallet* (EOA) dengan sistem keamanan *Multi-RPC*, KMS, dan *Circuit Breaker*. Menerima instruksi terenkripsi dari Agent A untuk melakukan pembayaran.
+
+1. **Agent A (The Scout)** — Otak intelijen. Model **AIM-tuned LLM** (fine-tuned via **AMD AI Workbench** dari base Llama 3 8B untuk domain Web3 sentiment), di-serve via **SGLang** di **AMD Instinct MI300X**. Memindai Farcaster, Twitter/X, dan data on-chain setiap 1 jam.
+2. **Agent B (The Vault)** — Eksekutor *smart contract* yang mengelola *wallet* (EOA) dengan sistem keamanan *Multi-RPC*, KMS, dan *Circuit Breaker*. Menerima instruksi terenkripsi dari Agent A untuk melakukan pembayaran.
+
+## 🛠️ AMD-Native Tech Stack (Kewajiban Hackathon)
+
+| Layer | Teknologi AMD |
+|---|---|
+| **Cloud Platform** | AMD Developer Cloud ($100 credits) |
+| **GPU** | AMD Instinct™ MI300X (192GB HBM3) |
+| **Runtime GPU** | AMD ROCm 6.x |
+| **Fine-Tuning** | **AMD AI Workbench** (no-code GUI) |
+| **Model Deployment** | **AMD Inference Microservice (AIM)** |
+| **Inference Server** | **SGLang** (AMD-recommended) |
+| **Compute Marketplace** | Akash Systems (co-sponsor) |
 
 ## 📚 Dokumentasi
-Seluruh arsitektur, spesifikasi teknis, dan panduan instalasi telah kami dokumentasikan secara rapi di dalam folder `docs/`. Silakan baca secara berurutan untuk pemahaman maksimal:
 
-- [01. Arsitektur Sistem](docs/01-architecture.md) - Diagram Mermaid dan penjelasan *End-to-End*
-- [02. Agent A (The Scout)](docs/02-agent-a-scout.md) - OSINT, vLLM di AMD MI300X, dan Vector DB (Chroma)
-- [03. Agent B (The Vault)](docs/03-agent-b-vault.md) - Keamanan on-chain, Gas Oracle, dan Idempotensi
-- [04. Protokol Komunikasi](docs/04-communication-protocol.md) - Payload JSON, Signature, dan LangGraph
-- [05. Setup Guide](docs/05-setup-guide.md) - Panduan instalasi dan deployment
+Baca secara berurutan untuk pemahaman maksimal:
+
+- [01. Arsitektur Sistem](docs/01-architecture.md) — Diagram Mermaid end-to-end + integrasi AMD stack
+- [02. Agent A (The Scout)](docs/02-agent-a-scout.md) — Pipeline AMD AI Workbench fine-tune + AIM + SGLang inference
+- [03. Agent B (The Vault)](docs/03-agent-b-vault.md) — Keamanan on-chain, Gas Oracle, Idempotensi
+- [04. Protokol Komunikasi](docs/04-communication-protocol.md) — Payload JSON, Signature, LangGraph
+- [05. Setup Guide](docs/05-setup-guide.md) — Panduan end-to-end install di AMD Developer Cloud
+- [06. AMD Stack Alignment](docs/06-amd-stack.md) — Pemetaan detail ke tema & tooling wajib ACT II
 
 ## 🚀 Fitur Unggulan (Hackathon Highlights)
-- **Ultra-Low Latency**: Proses *Scraping* -> *Llama 3 Inference* -> *On-chain Tx* selesai dalam < 30 detik.
-- **Hardware Optimized**: Menjalankan Llama 3 8B menggunakan backend ROCm AMD di atas MI300X.
+
+- **AMD-Native Pipeline**: Fine-tune LLM di AMD AI Workbench → deploy sebagai AMD Inference Microservice (AIM) → serve via SGLang di MI300X. Sepenuhnya di AMD Developer Cloud.
+- **Ultra-Low Latency**: Scraping → AIM inference (SGLang-served) → on-chain Tx selesai dalam < 30 detik di MI300X.
 - **Bulletproof Security**: Verifikasi tanda tangan kriptografi, deteksi *double-spending* via PostgreSQL, dan *Emergency Pause* (Circuit Breaker).
-- **Web Dashboard**: Antarmuka Next.js + TailwindCSS untuk memantau aktivitas agen dan *Live Tx Hash*.
+- **Web Dashboard**: Antarmuka Next.js + TailwindCSS untuk memantau aktivitas agen dan *Live Tx Hash* di Base Network.
 
 ---
-*Dibuat untuk AMD Developer Hackathon Act II.*
+
+*Dibangun untuk AMD Developer Hackathon: ACT II — menggunakan 100% AMD stack (AI Workbench → AIM → SGLang → MI300X → ROCm).*

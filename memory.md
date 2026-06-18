@@ -1,4 +1,4 @@
-# 📋 Memory — Dokumentasi Perubahan Proyek A2Z Agent
+# 📋 Memory — Dokumentasi Perubahan Proyek A2Z Agentz
 
 Dokumen ini mencatat seluruh riwayat perubahan proyek secara kronologis, mencakup file yang ditambahkan, diubah, atau dihapus beserta alasan perubahannya.
 
@@ -7,150 +7,161 @@ Dokumen ini mencatat seluruh riwayat perubahan proyek secara kronologis, mencaku
 ## Sesi 1 — 2026-06-16 | Inisialisasi Dokumentasi & Arsitektur
 
 ### 📌 Ringkasan
-Sesi pertama berfokus pada pembangunan fondasi dokumentasi proyek berdasarkan konsep awal "Autonomous Airdrop / Web3 Scavenger Agent" yang akan diikutsertakan pada **AMD Developer Hackathon Act II** dengan tema *Agent-to-Agent Payments*.
+Sesi pertama berfokus pada pembangunan fondasi dokumentasi proyek berdasarkan konsep awal "Autonomous Airdrop / Web3 Scavenger Agent" untuk **AMD Developer Hackathon Act II** dengan tema *Agent-to-Agent Payments*. Stack awal: **Llama 3 8B + vLLM ROCm** (stack generik, sebelum alignment ke tema ACT II).
 
 ### ✅ File yang DITAMBAHKAN
 
 | File | Lokasi | Deskripsi |
 |------|--------|-----------|
-| `README.md` | `/` | Halaman muka repositori. Menjelaskan konsep utama, daftar dokumentasi, dan fitur unggulan proyek untuk hackathon |
-| `docs/01-architecture.md` | `/docs/` | Diagram arsitektur end-to-end menggunakan Mermaid. Menjelaskan alur dari Data Sources → AMD MI300X (Agent A) → Communication Layer → Agent B → Base Network → UI |
-| `docs/02-agent-a-scout.md` | `/docs/` | Spesifikasi Agent A (The Scout): pipeline cron job per jam, OSINT via Neynar API & Twitter, ChromaDB caching, dan Hybrid Scoring Engine (70% LLM + 30% TVL) |
-| `docs/03-agent-b-vault.md` | `/docs/` | Spesifikasi Agent B (The Vault): manajemen kunci via AWS KMS, strategi Gas Oracle, Multi-RPC Fallback, idempotensi PostgreSQL, Circuit Breaker, dan validasi anti-honeypot |
-| `docs/04-communication-protocol.md` | `/docs/` | Protokol komunikasi antar agen: format payload JSON REST API, verifikasi tanda tangan ECDSA, dan manajemen state LangGraph |
-| `docs/05-setup-guide.md` | `/docs/` | Panduan instalasi lengkap: setup vLLM ROCm di AMD MI300X, Docker Compose untuk PostgreSQL & ChromaDB, konfigurasi `.env`, dan cara menjalankan dashboard |
+| `README.md` | `/` | Halaman muka repositori |
+| `docs/01-architecture.md` | `/docs/` | Diagram arsitektur end-to-end Mermaid |
+| `docs/02-agent-a-scout.md` | `/docs/` | Spesifikasi Agent A (Scout) — pipeline cron, OSINT, ChromaDB, Hybrid Scoring |
+| `docs/03-agent-b-vault.md` | `/docs/` | Spesifikasi Agent B (Vault) — KMS, Gas Oracle, Multi-RPC, Circuit Breaker |
+| `docs/04-communication-protocol.md` | `/docs/` | Protokol komunikasi: payload JSON, ECDSA, LangGraph |
+| `docs/05-setup-guide.md` | `/docs/` | Panduan instalasi vLLM ROCm + Docker Compose + .env |
 
 ---
 
 ## Sesi 2 — 2026-06-16 | Pembangunan Frontend Phase 1 (Dashboard MVP)
 
 ### 📌 Ringkasan
-Membangun antarmuka web dashboard berbasis **Next.js 16** dengan **Tailwind CSS v4** untuk memvisualisasikan aktivitas Agent A dan Agent B secara real-time. Tema desain: *Sleek Dark Mode* dengan efek glassmorphism.
+Membangun antarmuka web dashboard **Next.js 16** + **Tailwind CSS v4** untuk visualisasi aktivitas Agent A & Agent B real-time. Tema desain: *Sleek Dark Mode* + glassmorphism.
 
 ### ✅ File yang DITAMBAHKAN
 
 | File | Lokasi | Deskripsi |
 |------|--------|-----------|
-| `package.json` | `/dashboard/` | Konfigurasi proyek Next.js 16 + React 19 + Tailwind v4 |
-| `globals.css` | `/dashboard/src/app/` | Design system: CSS variables brand color, font-family tokens, class `.glass`, `.glass-card`, dan custom keyframe animations (`pulse-glow`, `fade-in-up`, `fade-in-left`) |
-| `layout.tsx` | `/dashboard/src/app/` | Root layout dengan Google Fonts Inter + Outfit + Geist Mono dan metadata SEO dasar |
-| `page.tsx` | `/dashboard/src/app/` | Halaman utama dashboard dengan layout grid 3-kolom dan ambient glow background |
-| `Navbar.tsx` | `/dashboard/src/components/` | Navbar dengan branding A2Z Agent dan indikator ping status Agent A & Agent B |
-| `LiveLog.tsx` | `/dashboard/src/components/` | Terminal log real-time simulasi aktivitas scraping Agent A dengan auto-scroll |
-| `TransactionList.tsx` | `/dashboard/src/components/` | Tabel riwayat transaksi on-chain dengan status badge dan link Tx Hash ke Basescan |
-| `ApprovalQueue.tsx` | `/dashboard/src/components/` | Antrean transaksi > $2 USD yang membutuhkan persetujuan manual manusia |
-| `CircuitBreaker.tsx` | `/dashboard/src/components/` | Toggle switch darurat (Kill Switch) untuk membekukan semua aktivitas Agent B |
-
-### ✏️ File yang DIUBAH
-
-| File | Lokasi | Perubahan |
-|------|--------|-----------|
-| `globals.css` | `/dashboard/src/app/` | Ditambahkan animasi `@keyframes` kustom, utility `@utility animate-pulse-glow`, `fade-in`, `slide-in-from-bottom-*`, `slide-in-from-left-*` untuk mendukung micro-animation komponen |
+| `package.json` | `/dashboard/` | Next.js 16 + React 19 + Tailwind v4 |
+| `globals.css` | `/dashboard/src/app/` | Design system: CSS variables, font tokens, `.glass`, `.glass-card`, custom keyframes |
+| `layout.tsx` | `/dashboard/src/app/` | Root layout dengan Google Fonts (Inter, Outfit, Geist Mono) |
+| `page.tsx` | `/dashboard/src/app/` | Halaman utama dashboard 3-kolom + ambient glow |
+| `Navbar.tsx` | `/dashboard/src/components/` | Branding + ping indicator Agent A & B |
+| `LiveLog.tsx` | `/dashboard/src/components/` | Terminal log real-time simulasi scraping |
+| `TransactionList.tsx` | `/dashboard/src/components/` | Tabel tx on-chain + link Tx Hash ke Basescan |
+| `ApprovalQueue.tsx` | `/dashboard/src/components/` | Antrean tx > $2 butuh persetujuan manual |
+| `CircuitBreaker.tsx` | `/dashboard/src/components/` | Toggle darurat (Kill Switch) |
 
 ---
 
 ## Sesi 3 — 2026-06-16 | Peningkatan UI/UX Pro Max (Phase 1.5)
 
 ### 📌 Ringkasan
-Refaktor semua komponen berdasarkan standar **UI/UX Pro Max Skill** yang mencakup aksesibilitas (WCAG AA), area sentuh minimum 44×44px, animasi mikro haptik, dan aria semantics.
+Refaktor semua komponen berdasarkan standar **UI/UX Pro Max Skill**: aksesibilitas WCAG AA, area sentuh minimum 44×44px, animasi mikro haptik, aria semantics.
 
 ### ✏️ File yang DIUBAH
-
-| File | Lokasi | Detail Perubahan |
-|------|--------|-----------------|
-| `CircuitBreaker.tsx` | `/dashboard/src/components/` | Ditambahkan `aria-pressed`, `aria-label`, `focus-visible:ring-2`, `role="alert"` pada banner paused, dan micro-animation `active:scale-95` |
-| `ApprovalQueue.tsx` | `/dashboard/src/components/` | Ditambahkan **Empty State** dengan ilustrasi teks, tombol Approve/Reject diperluas ke minimum 44px, ditambahkan transisi fade masuk antrean baru |
-| `TransactionList.tsx` | `/dashboard/src/components/` | Ditambahkan animasi stagger entrance, penggunaan `tabular-nums` untuk angka, dan `focus-visible:ring` pada link eksternal |
-| `LiveLog.tsx` | `/dashboard/src/components/` | Ditambahkan `aria-live="polite"`, `role="log"`, dan penanganan auto-scroll interaktif yang dapat di-pause pengguna |
+- `CircuitBreaker.tsx` — `aria-pressed`, `aria-label`, `focus-visible:ring-2`, `role="alert"`, `active:scale-95`
+- `ApprovalQueue.tsx` — Empty State, tombol Approve/Reject ≥ 44px, transisi fade
+- `TransactionList.tsx` — Stagger entrance, `tabular-nums`, `focus-visible:ring`
+- `LiveLog.tsx` — `aria-live="polite"`, `role="log"`, pause auto-scroll interaktif
 
 ### ✅ Verifikasi
-- `npm run build` dijalankan dan **berhasil** tanpa error TypeScript maupun ESLint
-- Seluruh halaman ter-generate sebagai static content
+- `npm run build` PASSED, 0 errors, 0 warnings
+- 8/8 static pages generated
 
 ---
 
 ## Sesi 4 — 2026-06-16 | Pembuatan PRD.md
 
 ### 📌 Ringkasan
-Menganalisis semua file dalam folder `docs/` dan kodebase `dashboard/` untuk menyusun dokumen **Product Requirement Document** yang komprehensif dan lengkap.
+Menganalisis semua file `docs/` + `dashboard/` untuk menyusun **PRD** komprehensif (298 baris): latar belakang, diagram Mermaid, spesifikasi Agent A/B, protokol ECDSA, dashboard UI, NFR, setup guide, roadmap 4 fase.
 
 ### ✅ File yang DITAMBAHKAN
+- `PRD.md` — PRD lengkap
+
+---
+
+## Sesi 5 — 2026-06-16 | Perluasan Frontend Multi-Halaman (Phase 2)
+
+### 📌 Ringkasan
+Ekspansi dashboard single-page → multi-halaman. 9 komponen baru, 5 halaman baru, sistem state global via `DashboardContext`. Tambah `recharts` + `lucide-react`.
+
+### 📦 Dependensi Baru
+- `recharts` ^2.x — Library chart (TVL, gas, success rate)
+- `lucide-react` ^0.x — Icon SVG konsisten
+
+### ✅ File Baru (Komponen)
+- `DashboardContext.tsx` — Global state + data simulator real-time
+- `Sidebar.tsx` — Collapsible sidebar nav
+- `KpiCard.tsx` — Reusable metric card (5 varian warna)
+- `PageHeader.tsx` — Header halaman konsisten
+- `DashboardKpis.tsx` — 6 KPI cards (TVL, success rate, total tx, dll)
+- `AnalyticsCharts.tsx` — 3 Recharts (TVL area, gas line, success/fail bar)
+- `VectorMemoryExplorer.tsx` — ChromaDB cache viewer
+- `SettingsPanel.tsx` — Form config Agent A & B
+- `AuditTrail.tsx` — Log audit paginated (10/page) + search + filter
+
+### ✅ File Baru (Halaman)
+- `analytics/page.tsx` — `/analytics`
+- `memory/page.tsx` — `/memory`
+- `settings/page.tsx` — `/settings`
+- `history/page.tsx` — `/history`
+
+### ✏️ File DIUBAH
+- `Navbar.tsx` — Context-aware + AMD MI300X/ROCm badge
+- `CircuitBreaker.tsx` — Lucide icons + status badge ACTIVE/PAUSED
+- `LiveLog.tsx` — Color-coding 6 level log
+- `ApprovalQueue.tsx` — Context-aware + Inbox empty state
+- `TransactionList.tsx` — Expandable rows + Basescan link
+- `layout.tsx` — DashboardProvider + Sidebar
+- `page.tsx` — KPI + Circuit Breaker + grid 3-kolom
+
+---
+
+## Sesi 6 — 2026-06-17 | **AMD Stack Alignment — Migrasi ke Toolchain AMD-Native**
+
+### 📌 Ringkasan
+**CRITICAL REVISION.** Telaah mendalam terhadap tema ACT II + blog AMD menunjukkan bahwa stack sebelumnya (**Llama 3 8B + vLLM generik**) tidak optimal untuk ACT II. Hackathon eksplisit mendorong penggunaan:
+
+- **AMD AI Workbench** (no-code fine-tune LLM, fitur unggulan AMD)
+- **AMD Inference Microservice (AIM)** (format deployment hasil fine-tune)
+- **SGLang** (serving framework AMD-recommended di ROCm, pengganti vLLM)
+- **AMD Instinct MI300X** + **ROCm** di **AMD Developer Cloud**
+
+Penyelarasan ini menjadikan A2Z Agentz **100%契合 (cocok) dengan tema wajib ACT II** dan memberi kami keunggulan vs submission lain yang masih pakai OpenAI API atau stack generik.
+
+### ✏️ File yang DIUBAH (Major Revision)
+
+| File | Perubahan |
+|------|-----------|
+| `README.md` | Tambah section "AMD-Native Tech Stack" (tabel pemetaan). Swap vLLM → SGLang, tambah AMD AI Workbench + AIM. Tagline update: "100% AMD stack" |
+| `PRD.md` | Full rewrite. Section 2.2 ganti tech stack. Section 3.1 swap "Llama 3 8B via vLLM" → "AIM-tuned LLM via AMD AI Workbench → SGLang → MI300X". Tambah section 6.4 "AMD Stack Compliance". Update Fase 2-4 roadmap dengan milestone AMD |
+| `docs/01-architecture.md` | Mermaid diagram update: tambah subgraph AMD Developer Cloud (AI Workbench → AIM → SGLang). Tambah section "Alur AMD Pipeline" |
+| `docs/02-agent-a-scout.md` | Section 2 full rewrite: AMD AI Workbench fine-tune workflow + AIM packaging + SGLang serving. Tambah section "AMD Performance Advantage" (throughput, latency, cost) |
+| `docs/03-agent-b-vault.md` | Minor: tambah catatan "Agent B tidak menjalankan LLM" + context deployment di AMD Cloud |
+| `docs/04-communication-protocol.md` | Tambah section "Inference Endpoint Reference" — request format ke SGLang/AIM OpenAI-compatible |
+| `docs/05-setup-guide.md` | Full rewrite Langkah 1-3: AMD AI Workbench workspace → fine-tune Llama 3 8B → export AIM → serve via SGLang ROCm di MI300X |
+| `dashboard/README.md` | Minor: tambah badge AMD MI300X + ROCm |
+
+### ✅ File yang DITAMBAHKAN (Baru)
 
 | File | Lokasi | Deskripsi |
 |------|--------|-----------|
-| `PRD.md` | `/` | Dokumen persyaratan produk lengkap (298 baris) mencakup: latar belakang, diagram arsitektur Mermaid, spesifikasi fungsional Agent A & B, protokol komunikasi ECDSA, spesifikasi dashboard UI, persyaratan non-fungsional (latensi < 30 detik, keamanan KMS, keandalan multi-RPC), panduan setup Docker + vLLM + .env, dan roadmap 4 fase implementasi |
+| `docs/06-amd-stack.md` | `/docs/` | **Dokumen alignment khusus untuk juri hackathon** — pemetaan detail ke tema ACT II, demo flow 8-step, referensi eksternal AMD blogs |
+| `LICENSE` | `/` | MIT License (IP clarity untuk submission) |
+| `.gitignore` | `/` | Root .gitignore (sebelumnya hanya di `dashboard/`) |
+| `SUBMISSION.md` | `/` | Submission checklist untuk lablab.ai ACT II |
+
+### 📊 Ringkasan Sesi 6
+- **8 file markdown** di-update ke stack AMD-native
+- **4 file baru** ditambahkan (dokumen alignment + repo hygiene)
+- **0 file dihapus**
+- **Konsep & frontend tetap sama** — hanya stack AI yang dimigrasi
 
 ---
 
-## Sesi 5 — 2026-06-16 | Perluasan Frontend Kompleks Multi-Halaman (Phase 2)
-
-### 📌 Ringkasan
-Ekspansi besar dari dashboard single-page menjadi aplikasi multi-halaman yang kaya fitur. Dibangun 9 komponen baru, 5 halaman baru, dan sistem state global. Instalasi dependensi eksternal `recharts` dan `lucide-react`.
-
-### 📦 Dependensi yang DITAMBAHKAN
-
-| Paket | Versi | Fungsi |
-|-------|-------|--------|
-| `recharts` | ^2.x | Library grafik React untuk visualisasi TVL, Gas Price, dan Success Rate |
-| `lucide-react` | ^0.x | Library ikon SVG konsisten untuk seluruh komponen (menggantikan SVG inline) |
-
-### ✅ File yang DITAMBAHKAN
-
-#### Komponen Baru (`/dashboard/src/components/`)
-
-| File | Ukuran | Deskripsi |
-|------|--------|-----------|
-| `DashboardContext.tsx` | 12.7 KB | **Global state provider** utama. Mendefinisikan semua TypeScript types (`Transaction`, `ApprovalItem`, `LogEntry`, `VectorMemoryItem`, `KpiMetrics`, `DashboardConfig`), generator data simulasi real-time (update setiap 3 detik via `setInterval`), handler `handleApprove`, `handleReject`, `handleBlacklist`, `handleClearCache`, dan export `useDashboard()` hook |
-| `Sidebar.tsx` | 6.4 KB | Sidebar navigasi utama yang **dapat di-collapse**. Berisi 5 nav item dengan active page indicator bar, badge notifikasi jumlah approval pending, panel status Agent A & Agent B, dan tombol toggle collapse |
-| `KpiCard.tsx` | 2.2 KB | Komponen reusable kartu metrik KPI. Mendukung 5 varian warna (`accent`, `purple`, `green`, `amber`, `red`), trend indicator (↑ / ↓ / →), ikon Lucide, dan sub-value |
-| `PageHeader.tsx` | 999 B | Komponen header halaman konsisten. Menampilkan ikon, judul, deskripsi, dan slot children untuk action button |
-| `DashboardKpis.tsx` | 1.9 KB | Klien komponen yang merender 6 KPI cards: TVL Analyzed, Success Rate, Total Txs, Gas Saved, Projects Scanned, Active Alerts |
-| `AnalyticsCharts.tsx` | 5.8 KB | 3 chart interaktif menggunakan Recharts: (1) `AreaChart` tren TVL 30 hari dengan gradient fill, (2) `LineChart` harga gas 24 jam, (3) `BarChart` perbandingan transaksi sukses vs gagal mingguan. Dilengkapi `CustomTooltip` dengan glassmorphism style dan ringkasan statistik 4-kolom |
-| `VectorMemoryExplorer.tsx` | 9.7 KB | Tabel ChromaDB vector memory dengan: bar skor kemiripan berwarna (merah > 85%, amber > 70%, hijau lainnya), search filter real-time, filter dropdown status (indexed/processing/blacklisted), tombol blacklist dan clear cache per entri, dan baris statistik (total, aktif, blacklisted, rata-rata skor) |
-| `SettingsPanel.tsx` | 7.9 KB | Form konfigurasi interaktif dua seksi: **Agent A** (cron schedule, slider bobot sentimen vs TVL yang saling terkait, score threshold) dan **Agent B** (primary/fallback RPC URL, KMS region, slider autonomous cap, gas buffer%). Dilengkapi tombol Save (dengan konfirmasi "Saved!") dan Reset |
-| `AuditTrail.tsx` | 12.1 KB | Log audit paginated (10 per halaman) dari seluruh riwayat transaksi + approval. Fitur: search by project name, filter by status, baris expandable dengan raw JSON payload, tanda tangan kriptografis, dan navigasi halaman ← → |
-
-#### Halaman Baru (`/dashboard/src/app/`)
-
-| File | Route | Deskripsi |
-|------|-------|-----------|
-| `analytics/page.tsx` | `/analytics` | Halaman Analytics — memanggil `AnalyticsCharts` client component |
-| `memory/page.tsx` | `/memory` | Halaman Vector Memory Explorer — memanggil `VectorMemoryExplorer` |
-| `settings/page.tsx` | `/settings` | Halaman Configuration — memanggil `SettingsPanel` |
-| `history/page.tsx` | `/history` | Halaman Audit Trail — memanggil `AuditTrail` |
-
-### ✏️ File yang DIUBAH
-
-#### Komponen yang Direfaktor (`/dashboard/src/components/`)
-
-| File | Detail Perubahan |
-|------|-----------------|
-| `Navbar.tsx` | Dikerjakan ulang total: sekarang membaca dari `DashboardContext`. Menampilkan badge AMD MI300X + ROCm, indikator Base Network, ikon notifikasi bell dengan counter approval pending, dan status ping Agent A & B dengan warna dinamis |
-| `CircuitBreaker.tsx` | Dikerjakan ulang: menggunakan `useDashboard()` context, ikon Lucide `ShieldCheck`/`ShieldOff`, badge status `ACTIVE`/`PAUSED`, shadow glow merah saat paused, dan `AlertTriangle` banner dengan `animate-pulse` |
-| `LiveLog.tsx` | Dikerjakan ulang: membaca `logs` dari context, color-coding level log 6 jenis (INFO/WARN/SUCCESS/ERROR/AGENT_A/AGENT_B), toggle auto-scroll via `ChevronDown`/`ChevronUp`, `aria-live="polite"`, `role="log"` |
-| `ApprovalQueue.tsx` | Dikerjakan ulang: membaca `approvalQueue` dari context, menggunakan `handleApprove`/`handleReject`, empty state dengan ikon `Inbox`, badge "N pending", tombol Approve/Reject dengan ikon Lucide dan min-h `44px` |
-| `TransactionList.tsx` | Dikerjakan ulang: membaca `transactions` dari context, baris tabel dapat di-expand untuk detail (reason, address, gas, txHash), badge status dengan ikon, link Basescan via `ExternalLink` icon |
-
-#### Halaman & Layout (`/dashboard/src/app/`)
-
-| File | Detail Perubahan |
-|------|-----------------|
-| `layout.tsx` | Dikerjakan ulang total: membungkus seluruh app dengan `<DashboardProvider>`, menambahkan `<Sidebar>` di kiri dan `<Navbar>` di atas `<main>`, layout `flex h-screen overflow-hidden`, dan ambient glow background effects |
-| `page.tsx` | Dikerjakan ulang: menampilkan `<DashboardKpis>` (6 KPI cards), `<CircuitBreaker>`, dan grid layout `xl:grid-cols-3` dengan `<LiveLog>` + `<ApprovalQueue>` di kiri dan `<TransactionList>` di kanan |
-
----
-
-## 📊 Ringkasan Total Perubahan
+## 📊 Ringkasan Total Perubahan (Semua Sesi)
 
 | Kategori | Jumlah |
 |----------|--------|
-| File baru ditambahkan | **25 file** |
-| File yang diubah/direfaktor | **8 file** |
+| File baru ditambahkan | **29 file** |
+| File yang diubah/direfaktor | **11 file** |
 | File dihapus | **0 file** |
 | Dependensi baru | **2 paket** (`recharts`, `lucide-react`) |
-| Route/halaman baru | **4 route** (`/analytics`, `/memory`, `/settings`, `/history`) |
+| Route/halaman baru | **4 route** |
 | Komponen baru | **9 komponen** |
 | Komponen direfaktor | **5 komponen** |
+| **Dokumen alignment** | **1 file khusus juri** (`docs/06-amd-stack.md`) |
+| **Stack migrasi** | **1 sesi** (Sesi 6 — vLLM → AMD AI Workbench + AIM + SGLang) |
 
 ---
 
@@ -181,26 +192,30 @@ Route (app)
 
 ```
 project-a2z-agentz/
-├── README.md                          # [BARU] Dokumentasi utama repositori
-├── PRD.md                             # [BARU] Product Requirement Document lengkap
-├── memory.md                          # [BARU] Dokumen ini — riwayat perubahan
+├── README.md                          # AMD-stack branding
+├── PRD.md                             # Full PRD w/ AMD alignment
+├── memory.md                          # File ini
+├── SUBMISSION.md                      # Checklist lablab.ai ACT II
+├── LICENSE                            # MIT
+├── .gitignore                         # Root gitignore
 ├── docs/
-│   ├── 01-architecture.md             # [BARU] Diagram arsitektur sistem
-│   ├── 02-agent-a-scout.md            # [BARU] Spesifikasi Agent A
-│   ├── 03-agent-b-vault.md            # [BARU] Spesifikasi Agent B
-│   ├── 04-communication-protocol.md   # [BARU] Protokol komunikasi ECDSA
-│   └── 05-setup-guide.md              # [BARU] Panduan instalasi & deployment
+│   ├── 01-architecture.md             # Mermaid + AMD pipeline
+│   ├── 02-agent-a-scout.md            # AMD AI Workbench + AIM + SGLang
+│   ├── 03-agent-b-vault.md            # KMS, Gas, Multi-RPC
+│   ├── 04-communication-protocol.md   # ECDSA + SGLang endpoint
+│   ├── 05-setup-guide.md              # End-to-end AMD Cloud setup
+│   └── 06-amd-stack.md                # [BARU] Alignment khusus juri
 └── dashboard/
-    ├── package.json                   # [UBAH] Tambah recharts, lucide-react
+    ├── package.json
     └── src/
         ├── app/
-        │   ├── layout.tsx             # [UBAH] DashboardProvider + Sidebar + Navbar
-        │   ├── page.tsx               # [UBAH] KPI Cards + Circuit Breaker + Grid
-        │   ├── globals.css            # [UBAH] Animasi kustom & design tokens
-        │   ├── analytics/page.tsx     # [BARU] Halaman grafik interaktif
-        │   ├── memory/page.tsx        # [BARU] Halaman Vector Memory Explorer
-        │   ├── settings/page.tsx      # [BARU] Halaman konfigurasi agen
-        │   └── history/page.tsx       # [BARU] Halaman audit trail
+        │   ├── layout.tsx
+        │   ├── page.tsx
+        │   ├── globals.css
+        │   ├── analytics/page.tsx
+        │   ├── memory/page.tsx
+        │   ├── settings/page.tsx
+        │   └── history/page.tsx
         └── components/
             ├── DashboardContext.tsx   # [BARU] Global state + data simulator
             ├── Sidebar.tsx            # [BARU] Collapsible sidebar navigasi
@@ -216,6 +231,20 @@ project-a2z-agentz/
             ├── LiveLog.tsx            # [UBAH] Context + level colors + aria
             ├── ApprovalQueue.tsx      # [UBAH] Context + empty state + a11y
             └── TransactionList.tsx # [UBAH] Context + expandable + Basescan
+            ├── DashboardContext.tsx
+            ├── Sidebar.tsx
+            ├── KpiCard.tsx
+            ├── PageHeader.tsx
+            ├── DashboardKpis.tsx
+            ├── AnalyticsCharts.tsx
+            ├── VectorMemoryExplorer.tsx
+            ├── SettingsPanel.tsx
+            ├── AuditTrail.tsx
+            ├── Navbar.tsx
+            ├── CircuitBreaker.tsx
+            ├── LiveLog.tsx
+            ├── ApprovalQueue.tsx
+            └── TransactionList.tsx
 ```
 
 ## Sesi 6 — 2026-06-17 | Pondasi Modular Agent B, Fix raw_transaction, dan Async JSON Task Listener

@@ -1,36 +1,77 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# A2Z Agentz — Web Dashboard
 
-## Getting Started
+Frontend dashboard untuk **A2Z Agentz** (Autonomous A2A Payment Agent) — submission untuk **AMD Developer Hackathon: ACT II**.
 
-First, run the development server:
+Dibangun dengan **Next.js 16** + **React 19** + **Tailwind CSS v4** + **TypeScript**.
+
+> 🛠️ **Powered by AMD Instinct™ MI300X** — backend Agent A berjalan di GPU AMD via **SGLang** dengan **AMD Inference Microservice (AIM)** hasil fine-tune **AMD AI Workbench**.
+
+## Getting Started (Local Dev)
+
+Dashboard ini consume API dari Agent A & Agent B yang berjalan di AMD Developer Cloud. Untuk development lokal:
 
 ```bash
+# 1. Install dependencies
+npm install
+
+# 2. (Opsional) Setup env untuk point ke AMD Cloud endpoint
+echo "NEXT_PUBLIC_AGENT_A_API=https://your-amd-cloud/a2z-agent-a" > .env.local
+echo "NEXT_PUBLIC_AGENT_B_API=https://your-amd-cloud/a2z-agent-b" >> .env.local
+
+# 3. Run dev server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Buka [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Build
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+npm start
+```
 
-## Learn More
+## Stack
 
-To learn more about Next.js, take a look at the following resources:
+| Layer | Tools |
+|---|---|
+| Framework | Next.js 16 (App Router, Turbopack) |
+| UI | React 19, Tailwind CSS v4 |
+| Charts | Recharts |
+| Icons | Lucide React |
+| Fonts | Inter (data), Outfit (heading), Geist Mono (logs) |
+| Real-time | WebSocket (planned) / SSE (planned) |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Halaman
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `/` — Dashboard utama: KPI, Circuit Breaker, Live Log, Approval Queue, Transaction List
+- `/analytics` — Chart TVL, gas, success rate (Recharts)
+- `/memory` — ChromaDB vector memory explorer
+- `/settings` — Config Agent A (cron, weights) + Agent B (RPC, KMS, cap)
+- `/history` — Audit trail paginated
 
-## Deploy on Vercel
+## Aksesibilitas (a11y)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- WCAG AA compliance
+- Focus rings, `aria-label`, semantic roles
+- Touch target minimum 44×44px
+- `aria-live="polite"` di LiveLog
+- Reduced-motion support (planned)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Deployment
+
+Untuk production, deploy ke Vercel atau platform Next.js-compatible lain. Set environment variables untuk point ke AMD Cloud Agent A & Agent B endpoints.
+
+```bash
+# Deploy ke Vercel
+vercel deploy --prod
+
+# Atau build static export
+npm run build
+```
+
+Lihat dokumentasi lengkap di [`/docs/`](https://github.com/axzss/project-a2z-agentz/tree/develop/docs).
+
+---
+
+*Dibangun untuk AMD Developer Hackathon: ACT II.*

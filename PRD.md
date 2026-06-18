@@ -1,27 +1,30 @@
 # Product Requirement Document (PRD)
-## Project A2Z Agent: Autonomous Airdrop / Web3 Scavenger Agent
+## Project A2Z Agentz: Autonomous A2A Payment Agent on AMD
 
-Dokumen Persyaratan Produk (PRD) ini menjelaskan spesifikasi lengkap, arsitektur, dan fungsionalitas dari sistem **A2Z Agent**, sebuah platform *multi-agent* otonom yang dikembangkan untuk **AMD Developer Hackathon Act II** dengan fokus pada tema **Agent-to-Agent Payments**.
+Dokumen Persyaratan Produk (PRD) ini menjelaskan spesifikasi lengkap, arsitektur, dan fungsionalitas dari sistem **A2Z Agentz**, platform *multi-agent* otonom yang dikembangkan untuk **AMD Developer Hackathon: ACT II** dengan tema **Agent-to-Agent Payments**.
+
+**Diferensiasi utama:** A2Z Agentz menggunakan **100% AMD-native AI stack** — fine-tune via **AMD AI Workbench**, deploy sebagai **AMD Inference Microservice (AIM)**, serve via **SGLang** di **AMD Instinct™ MI300X** (ROCm), semuanya di **AMD Developer Cloud**.
 
 ---
 
 ## 1. Pendahuluan & Ringkasan Eksekutif
 
 ### 1.1 Latar Belakang
-Dalam ekosistem Web3, peluang seperti Airdrop dan peluncuran protokol DeFi baru bermunculan setiap hari. Namun, mencari peluang ini secara manual sangat memakan waktu, dan sering kali pengguna ketinggalan karena keterbatasan modal awal (*gas fee*) di jaringan tujuan atau keterlambatan informasi. 
+Dalam ekosistem Web3, peluang seperti Airdrop dan peluncuran protokol DeFi baru bermunculan setiap hari. Pencarian peluang secara manual sangat memakan waktu, dan pengguna sering ketinggalan karena keterbatasan modal awal (*gas fee*) di jaringan tujuan atau keterlambatan informasi.
 
-**A2Z Agent** memecahkan masalah ini dengan mengotomatisasi seluruh proses pencarian (*scraping*), analisis sentimen (AI), penyaringan, hingga eksekusi pembayaran on-chain secara otonom dari agen ke agen (Agent-to-Agent Payment) di jaringan **Base**.
+**A2Z Agentz** mengotomatisasi seluruh proses pencarian (*scraping*), analisis sentimen (AI), penyaringan, hingga eksekusi pembayaran on-chain secara otonom dari agen ke agen (*Agent-to-Agent Payment*) di jaringan **Base**.
 
 ### 1.2 Konsep Utama
-Sistem ini menggunakan arsitektur *Multi-Agent* yang berjalan secara asinkron menggunakan *framework* **LangGraph**:
-1. **Agent A (The Scout)**: Berjalan di server **AMD MI300X** berbasis **ROCm**, memindai media sosial terdesentralisasi (Farcaster via Neynar, Twitter/X) dan data on-chain untuk menganalisis proyek berkualitas tinggi dengan model **Llama 3 8B**.
-2. **Agent B (The Vault/Executor)**: Brankas eksekutor transaksi yang mengelola wallet (EOA) dengan tingkat keamanan tinggi (*KMS*, *Multi-RPC*, *Idempotency*), menerima instruksi terenkripsi dari Agent A untuk mentransfer dana modal awal (*gas fee*) ke *smart contract* target.
+Sistem ini menggunakan arsitektur *Multi-Agent* yang berjalan secara asinkron via **LangGraph**:
+
+1. **Agent A (The Scout)** — Berjalan di **AMD Instinct MI300X** (ROCm), menggunakan model **AIM-tuned LLM** (hasil fine-tune AMD AI Workbench dari Llama 3 8B Instruct). Memindai Farcaster, Twitter/X, dan data on-chain via Neynar API.
+2. **Agent B (The Vault/Executor)** — Brankas eksekutor transaksi yang mengelola wallet (EOA) dengan keamanan tinggi (KMS, Multi-RPC, Idempotency), menerima instruksi terenkripsi dari Agent A untuk mentransfer dana modal awal.
 
 ---
 
 ## 2. Arsitektur Sistem Terintegrasi
 
-Sistem diatur menggunakan orkestrasi graf dari **LangGraph** untuk mengelola status alur kerja (*state*) dan penanganan kegagalan (*retry mechanism*).
+Sistem diatur via orkestrasi **LangGraph** untuk mengelola status alur kerja dan penanganan kegagalan.
 
 ### 2.1 Diagram Arsitektur (End-to-End)
 
@@ -33,30 +36,34 @@ graph TD
         O[On-Chain Block Explorer]
     end
 
-    subgraph AMD MI300X Server (Agent A - The Scout)
-        Sc[Scraper / Headless Browser]
+    subgraph AMD Developer Cloud (Agent A - The Scout)
+        AW[AMD AI Workbench<br/>Fine-Tune Llama 3 8B]
+        AIM[AMD Inference Microservice<br/>A2Z-tuned model]
+        SGL[SGLang Server<br/>ROCm / MI300X]
         VDB[(ChromaDB - Memory)]
-        LLM[Llama 3 8B via vLLM ROCm]
+        Sc[Scraper]
         Scoring[Hybrid Scoring Engine]
-        
+
+        AW -->|fine-tuned weights| AIM
+        AIM --> SGL
         Data Sources --> Sc
         Sc -->|Raw Text| VDB
-        VDB -->|Context| LLM
-        LLM -->|70% Sentiment| Scoring
+        VDB -->|Context| SGL
+        SGL -->|70% Sentiment| Scoring
         O -->|30% TVL Metric| Scoring
     end
 
     subgraph Communication Layer
-        API[JSON REST API + Signature Verification]
+        API[JSON REST API + ECDSA Signature]
         DB[(PostgreSQL - Tx Logs)]
     end
 
     subgraph Blockchain Node (Agent B - The Vault)
         VaultCore[Vault Engine]
         KMS[AWS KMS / Key Rotation]
-        RPC[Multi-RPC: Alchemy -> Infura]
+        RPC[Multi-RPC: Alchemy → Infura]
         Oracle[Gas Station Oracle]
-        
+
         VaultCore <--> KMS
         VaultCore -->|Check Tx| DB
         Oracle --> VaultCore
@@ -79,141 +86,157 @@ graph TD
 ```
 
 ### 2.2 Komponen Teknologi Utama
-*   **Infrastruktur AI**: GPU AMD MI300X dengan ROCm runtime dan vLLM server.
-*   **AI Model**: Llama 3 8B Instruct (dioptimalkan untuk instruksi terstruktur).
-*   **Database**: 
-    *   *ChromaDB*: Sebagai Vector DB untuk penyimpanan memori semantik jangka panjang Agent A.
-    *   *PostgreSQL*: Untuk mencatat transaksi on-chain dan memastikan idempotensi transaksi Agent B.
-*   **Orkestrasi**: LangGraph Python Framework.
-*   **Blockchain**: Base Network (L2 Ethereum) untuk biaya transaksi yang murah dan finalitas yang cepat.
-*   **Keamanan**: AWS KMS / HashiCorp Vault untuk enkripsi private key, tanda tangan kriptografis (ECDSA) untuk komunikasi antar-agen.
-*   **Frontend**: Next.js 16, Tailwind CSS v4, TypeScript.
+
+- **AMD AI Stack (wajib ACT II)**:
+  - **AMD Developer Cloud** — Platform deployment utama ($100 credits).
+  - **AMD Instinct™ MI300X** — GPU 192GB HBM3 untuk training & inference.
+  - **ROCm 6.x** — Runtime GPU AMD.
+  - **AMD AI Workbench** — GUI no-code untuk fine-tune LLM.
+  - **AMD Inference Microservice (AIM)** — Format standar deployment hasil fine-tune AMD.
+  - **SGLang** — Serving framework LLM AMD-recommended (ROCm-native).
+- **AI Model**: Llama 3 8B Instruct (base) → **fine-tuned via AMD AI Workbench** pada dataset Web3 sentiment (output: "AIM-tuned LLM" / "A2Z-tuned model").
+- **Database**:
+  - **ChromaDB** — Vector DB memori semantik Agent A.
+  - **PostgreSQL** — Log transaksi on-chain + idempotency check Agent B.
+- **Orkestrasi**: LangGraph Python Framework.
+- **Blockchain**: Base Network (L2 Ethereum).
+- **Keamanan**: AWS KMS / HashiCorp Vault untuk enkripsi private key, ECDSA untuk signing komunikasi.
+- **Frontend**: Next.js 16, Tailwind CSS v4, TypeScript.
 
 ---
 
 ## 3. Spesifikasi Fungsional Komponen
 
-### 3.1 Agent A (The Scout) - Intelijen & Analisis
+### 3.1 Agent A (The Scout) — Intelijen & Analisis
 
-Agent A bertindak sebagai otak yang mengumpulkan informasi, melakukan analisis sentimen, menyaring proyek, dan memutuskan kelayakan proyek.
+Agent A adalah otak pengumpul informasi, analisis sentimen, dan penyaringan proyek.
 
-*   **Pipeline Pemrosesan**: Berjalan otomatis menggunakan *cron job* setiap 1 jam, namun harus menyelesaikan satu siklus pemrosesan di bawah 30 detik (*low latency*).
+*   **Pipeline Pemrosesan**: Cron job setiap 1 jam, target < 30 detik per siklus.
+*   **AMD-Native AI Stack**:
+    *   **Model**: AIM-tuned LLM (Llama 3 8B base, fine-tuned via AMD AI Workbench pada ~5.000–10.000 labeled examples dari Farcaster/Twitter/on-chain narrative).
+    *   **Deployment**: AMD Inference Microservice (AIM) di-serve via SGLang di AMD Instinct MI300X.
+    *   **Endpoint**: OpenAI-compatible (`POST /v1/chat/completions`) di SGLang.
 *   **OSINT & Scraping**:
-    *   Mengambil postingan dari Farcaster menggunakan Neynar API.
-    *   Mengambil postingan dari Twitter/X menggunakan API scraper.
-    *   Mengekstrak data dari web airdrop menggunakan Puppeteer/Selenium dengan *Stealth Plugin* untuk menghindari proteksi anti-bot dasar.
-*   **Vector DB (ChromaDB) Cache**:
-    *   Setiap proyek yang ditemukan diubah menjadi representasi embeddings.
-    *   Sebelum diproses oleh Llama 3, skor kemiripan (*similarity score*) dihitung terhadap data ChromaDB.
-    *   Jika kemiripan tinggi dengan proyek yang sudah didanai/ditolak sebelumnya, proses dihentikan (menghemat komputasi LLM).
+    *   Farcaster via Neynar API.
+    *   Twitter/X via API scraper.
+    *   Airdrop pages via Puppeteer/Selenium dengan Stealth Plugin.
+*   **Vector DB (ChromaDB) Cache**: Proyek diubah ke embeddings; similarity check sebelum inference (skip duplikat).
 *   **Hybrid Scoring Engine**:
-    *   **70% LLM Sentiment**: Llama 3 menganalisis konteks bahasa, keaktifan komunitas, kehadiran Key Opinion Leaders (KOL), dan keaslian proyek.
-    *   **30% On-chain Metrics**: Memverifikasi keberadaan Smart Contract di Basescan, status verifikasi source code, serta TVL minimum (misal: > $500,000).
-    *   **Threshold**: Jika total nilai > 85, Agent A menghasilkan *JSON Payload* transaksi, menandatanganinya menggunakan *Private Key* Agent A, lalu mengirimkannya ke Agent B.
+    *   **70% LLM Sentiment**: AIM-tuned LLM analisis konteks bahasa, KOL, keaslian proyek.
+    *   **30% On-chain Metrics**: Verifikasi smart contract di Basescan, TVL minimum (misal > $500k).
+    *   **Threshold**: Total > 85 → Agent A tanda tangani JSON payload → kirim ke Agent B.
 
-### 3.2 Agent B (The Vault) - Keamanan & Eksekusi On-Chain
+### 3.2 Agent B (The Vault) — Keamanan & Eksekusi On-Chain
 
-Agent B adalah eksekutor keuangan yang mengeksekusi transfer modal ke proyek yang disetujui. Fokus utamanya adalah keandalan transaksi dan keamanan dana.
+Agent B adalah eksekutor keuangan yang fokus pada keandalan & keamanan dana.
 
-*   **Manajemen Kunci (Key Management)**:
-    *   Menggunakan EOA (Externally Owned Account) untuk fungsionalitas cepat di hackathon.
-    *   Private key disimpan dan diproses secara aman menggunakan **AWS KMS** atau **HashiCorp Vault**. Private key tidak boleh disimpan secara plaintext di dalam `.env`.
+*   **Manajemen Kunci**:
+    *   EOA (Externally Owned Account) untuk kecepatan hackathon.
+    *   Private key via **AWS KMS** atau **HashiCorp Vault** — tidak pernah di `.env` plaintext.
 *   **Keandalan RPC & Gas**:
-    *   **Gas Station Oracle**: Melakukan estimasi biaya gas real-time (+15% dari rata-rata pasar) untuk menghindari transaksi menggantung (*stuck*).
-    *   **Multi-RPC Fallback**: Eksekusi utama dikirim via Alchemy. Jika gagal/timeout, sistem otomatis berpindah ke Infura atau RPC Publik Base.
+    *   **Gas Station Oracle**: Real-time estimation +15% buffer.
+    *   **Multi-RPC Fallback**: Alchemy → Infura → Public Base RPC.
 *   **Pencegahan Double-Spending & Idempotensi**:
-    *   Sebelum mengirimkan transaksi, hash unik yang berasal dari kombinasi `(AgentA_ID, Project_Address, Timestamp)` dicatat ke database **PostgreSQL**.
-    *   Jika Agent A mengirim payload ganda akibat retry jaringan, Agent B akan menolak transaksi tersebut secara lokal berdasarkan catatan unik di database PostgreSQL.
+    *   Hash unik `(AgentA_ID, Project_Address, Timestamp)` dicatat ke **PostgreSQL** sebelum broadcast.
+    *   Payload duplikat di-reject lokal.
 *   **Circuit Breaker & Transaksi Cap**:
-    *   **Limit Otomatis**: Batas transaksi otonom (tanpa campur tangan manusia) dibatasi keras antara $1 hingga $2 USD per transaksi.
-    *   **Manual Approval Queue**: Jika kebutuhan dana transaksi > $2 USD, status transaksi masuk ke antrean persetujuan manual di Next.js Web Dashboard.
-    *   **Emergency Pause (Kill Switch)**: Tombol darurat global yang dapat diaktifkan melalui Web Dashboard untuk membekukan semua transaksi jika terdeteksi anomali pada LLM.
+    *   Hard-cap $1-2 per transaksi otonom.
+    *   > $2 → masuk antrean manual approval di Dashboard.
+    *   Emergency Pause (Kill Switch) via Web Dashboard.
 *   **Validasi Anti-Honeypot**:
-    *   Sebelum transaksi sesungguhnya di-broadcast ke mempool, Agent B menjalankan simulasi lokal (*dry-run*) melalui Tenderly atau *forge script* (mem-fork state Base). Jika simulasi mendeteksi transaksi akan gagal (*revert*) atau menguras dana di luar batas aman, transaksi dibatalkan seketika.
+    *   Dry-run simulasi via **Foundry Anvil fork** atau **Tenderly**.
+    *   Transaksi yang akan *revert* atau drain token di luar ekspektasi → dibatalkan.
 
 ---
 
 ## 4. Protokol Komunikasi Antar Agen
 
-Komunikasi antar-agen harus aman dari serangan *Man-in-the-Middle* (MitM) dan manipulasi data.
-
 ### 4.1 Spesifikasi Payload REST API
-Agen berkomunikasi menggunakan payload JSON yang ditandatangani secara kriptografis menggunakan skema tanda tangan ECDSA.
 
-*   **Endpoint**: `POST /api/v1/vault/execute`
-*   **Payload Schema**:
-    ```json
-    {
-      "timestamp": 1718500000,
-      "project_target_address": "0x1234567890abcdef1234567890abcdef12345678",
-      "amount_usd": 1.50,
-      "reason": "High positive sentiment on Farcaster + Verified TVL > 500k",
-      "signature": "0xabc123...def456"
-    }
-    ```
-*   **Verifikasi Tanda Tangan**:
-    1. Agent A membuat hash dari string JSON payload (tanpa kolom `signature`).
-    2. Agent A menandatangani hash tersebut menggunakan private key miliknya.
-    3. Agent B menerima payload, mendekripsinya, memverifikasi tanda tangan menggunakan public key Agent A yang terdaftar di whitelist.
-    4. Jika valid dan nilai `timestamp` masih berlaku (dalam rentang waktu aman), transaksi diproses.
+```json
+POST /api/v1/vault/execute
+{
+  "timestamp": 1718500000,
+  "project_target_address": "0x1234567890abcdef1234567890abcdef12345678",
+  "amount_usd": 1.50,
+  "reason": "High positive sentiment on Farcaster + Verified TVL > 500k",
+  "signature": "0xabc123...def456"
+}
+```
 
-### 4.2 Manajemen State LangGraph
-Alur koordinasi antar agen dikelola dalam LangGraph State:
-*   **State Variable**: `current_step` (`"Scraping"` | `"Analyzing"` | `"Approval"` | `"Executing"`)
-*   **State Variable**: `transaction_status` (`"Pending"` | `"Success"` | `"Failed"`)
-*   **Retry Policy**: Jika Agent B mengalami timeout atau kesalahan konektivitas RPC, LangGraph memicu **Exponential Backoff** retry (2s, 4s, 8s) sebelum akhirnya menandai transaksi sebagai `"Failed"`.
+### 4.2 Verifikasi Tanda Tangan
+1. Agent A hash payload (tanpa `signature`).
+2. Agent A sign hash dengan private key-nya (ECDSA).
+3. Agent B verify signature dengan public key Agent A (whitelist).
+4. Cek `timestamp` masih fresh → proses.
+
+### 4.3 Inference Endpoint (Agent A → AIM)
+Agent A panggil **SGLang** yang me-load **AMD Inference Microservice**:
+```json
+POST {SGLANG_MI300X_ENDPOINT}/v1/chat/completions
+{
+  "model": "a2z-web3-tuned",
+  "messages": [...],
+  "temperature": 0.1
+}
+```
+
+### 4.4 Manajemen State LangGraph
+- **State Variable**: `current_step` (`"Scraping"` | `"Analyzing"` | `"Approval"` | `"Executing"`)
+- **State Variable**: `transaction_status` (`"Pending"` | `"Success"` | `"Failed"`)
+- **Retry Policy**: Exponential backoff (2s, 4s, 8s) jika Agent B timeout/fail.
 
 ---
 
 ## 5. Spesifikasi Dashboard UI (Next.js)
 
-Web Dashboard berfungsi sebagai pusat kendali visual bagi pengguna dan tim penilai untuk mengamati operasional otonom secara *real-time*.
-
 ### 5.1 Desain Visual & Aksesibilitas
-*   **Aesthetics**: Menggunakan desain bernuansa gelap (*sleek dark mode*), efek kaca (*glassmorphism*), gradasi warna modern (Purple & Cyan Accent), dan animasi mikro haptik (`active:scale-95`).
-*   **Typography**: Menggunakan font *Inter* untuk keterbacaan data numerik/tabel dan *Outfit* untuk heading.
-*   **Accessibility (a11y)**: Setiap elemen interaktif dilengkapi dengan indikator fokus keyboard (*focus rings*), atribut `aria-label`, peran semantik, dan area sentuh minimal 44x44 piksel untuk kemudahan penggunaan di perangkat seluler.
+*   Dark mode, glassmorphism, gradient Purple & Cyan, micro-animation `active:scale-95`.
+*   Font Inter (data) + Outfit (heading).
+*   A11y: focus rings, `aria-label`, semantic roles, touch target min 44×44px.
 
 ### 5.2 Komponen Halaman Utama
-1.  **Navbar**:
-    *   Logo & Branding Proyek.
-    *   Indikator status koneksi (ping) real-time untuk **Agent A (The Scout)** dan **Agent B (The Vault)**.
-2.  **Circuit Breaker (Emergency Switch)**:
-    *   Sakelar kontrol global untuk menangguhkan seluruh eksekusi transaksi secara instan jika terdeteksi perilaku abnormal.
-    *   Dilengkapi dengan feedback visual yang mencolok saat berstatus paused (warna merah membara).
-3.  **Live Log Feed (Terminal AI)**:
-    *   Streaming log real-time dari aktivitas scraping, embeddings, pemrosesan Llama 3, dan keputusan scoring dari Agent A.
-    *   Dilengkapi dengan fitur auto-scroll otomatis yang dapat dinonaktifkan secara interaktif dan area `aria-live` untuk pembaca layar.
-4.  **Approval Queue (Antrean Persetujuan)**:
-    *   Daftar transaksi yang membutuhkan otorisasi manual karena nominalnya melebihi batas otonom ($2 USD).
-    *   Menampilkan detail target, alasan penilaian LLM, jumlah nominal, dan tombol "Approve" atau "Reject" yang responsif.
-5.  **Transaction List (Riwayat Transaksi)**:
-    *   Tabel interaktif yang menampilkan transaksi yang sukses dieksekusi oleh Agent B.
-    *   Informasi kolom: Target Project, Amount (USD), Timestamp, Status (Success/Failed), dan link eksternal Tx Hash ke Basescan Explorer.
+1. **Navbar** — Branding + ping indicator Agent A & Agent B + **badge AMD MI300X + ROCm** + Base Network status.
+2. **Circuit Breaker** — Kill switch global dengan feedback visual merah membara saat paused.
+3. **Live Log Feed** — Real-time log scraping, embeddings, AIM inference, scoring, tx.
+4. **Approval Queue** — Antrean tx > $2 yang butuh approval manusia.
+5. **Transaction List** — Tabel tx sukses + link ke Basescan.
+
+### 5.3 Halaman Tambahan
+- `/analytics` — Chart TVL, gas price, success rate.
+- `/memory` — ChromaDB vector memory explorer.
+- `/settings` — Config Agent A (cron, weights) + Agent B (RPC, KMS, cap).
+- `/history` — Audit trail paginated.
 
 ---
 
-## 6. Persyaratan Non-Fungsional (Non-Functional Requirements)
+## 6. Persyaratan Non-Fungsional
 
 ### 6.1 Performa & Latensi
-*   Siklus lengkap dari deteksi media sosial hingga pengiriman transaksi ke blockchain harus diselesaikan dalam waktu kurang dari 30 detik pada server AMD MI300X.
-*   Kecepatan inferensi model Llama 3 8B menggunakan vLLM-ROCm minimal harus mencapai 50 tokens per detik.
+*   End-to-end (scraping → tx broadcast) < 30 detik di MI300X.
+*   AIM inference via SGLang: minimal 100 tokens/s untuk single request, > 2000 tokens/s batched.
 
 ### 6.2 Keamanan & Integritas
-*   Kunci privat (Private key) eksekusi transaksi tidak boleh bocor ke internet atau disimpan dalam kode sumber.
-*   Semua data payload eksekusi wajib divalidasi tanda tangannya sebelum memicu pengiriman dana.
-*   Simulasi Tenderly/forge harus dijalankan untuk mendeteksi *honeypot contract* yang sengaja dibuat untuk menguras dana agen.
+*   Private key **tidak pernah** di `.env` plaintext — wajib via KMS.
+*   Semua payload diverifikasi ECDSA sebelum execution.
+*   Dry-run Foundry Anvil wajib sebelum broadcast ke mempool.
 
 ### 6.3 Skalabilitas & Keandalan
-*   Database relasional PostgreSQL harus mendukung pencatatan transaksi unik hingga jutaan entri tanpa hambatan performa.
-*   Penanganan kegagalan RPC wajib mendukung fail-over otomatis ke minimal 3 RPC provider yang berbeda.
+*   PostgreSQL support jutaan entri tx log tanpa degradasi.
+*   RPC fail-over minimal 3 provider.
+
+### 6.4 AMD Stack Compliance (khusus ACT II)
+*   100% workload AI di AMD Developer Cloud (MI300X).
+*   Fine-tune via AMD AI Workbench (no custom training loop).
+*   Deploy via AMD Inference Microservice (AIM).
+*   Serve via SGLang ROCm backend.
+*   Tidak ada fallback ke non-AMD cloud untuk inference.
 
 ---
 
-## 7. Panduan Setup & Instalasi (Setup & Installation)
+## 7. Panduan Setup & Instalasi
 
 ### 7.1 Docker Services (docker-compose.yml)
-Menjalankan PostgreSQL dan ChromaDB secara kontainerisasi di server.
 ```yaml
 version: '3.8'
 services:
@@ -240,58 +263,79 @@ volumes:
   chromadata:
 ```
 
-### 7.2 Menjalankan vLLM pada AMD MI300X
-Perintah untuk menginstalisasi pustaka ROCm dan menjalankan model Llama 3:
-```bash
-# Instalasi vLLM khusus AMD ROCm
-pip install vllm-rocm
+### 7.2 Fine-Tune di AMD AI Workbench
+Akses AI Workbench via AMD Developer Cloud console:
+1. Pilih base: `meta-llama/Meta-Llama-3-8B-Instruct`
+2. Import dataset Web3 sentiment (JSONL)
+3. Set: LoRA rank=16, alpha=32, lr=2e-4, epochs=3
+4. Train di MI300X → export sebagai AIM
 
-# Menjalankan server Llama 3 8B
-python -m vllm.entrypoints.openai.api_server \
-  --model meta-llama/Meta-Llama-3-8B-Instruct \
-  --tensor-parallel-size 1 \
-  --device rocm
+### 7.3 Serve AIM via SGLang
+```bash
+docker run -d \
+  --name a2z-aim-server \
+  --device=/dev/kfd --device=/dev/dri \
+  --group-add video --cap-add=SYS_PTRACE \
+  --security-opt seccomp=unconfined \
+  -p 8000:8000 \
+  -v /opt/a2z/aim-model:/model \
+  rocm/sglang:latest \
+  python -m sglang.launch_server \
+    --model-path /model --port 8000 \
+    --tensor-parallel-size 1 --device rocm --quantization fp8
 ```
 
-### 7.3 Konfigurasi File Lingkungan (.env)
-*   **agent-a/.env**:
-    ```env
-    NEYNAR_API_KEY=api_key_farcaster_anda
-    VLLM_ENDPOINT=http://localhost:8000/v1
-    AGENT_A_PRIVATE_KEY=kunci_privat_penandatangan_payload
-    ```
-*   **agent-b/.env**:
-    ```env
-    BASE_RPC_URL_PRIMARY=https://base-mainnet.g.alchemy.com/v2/your_alchemy_key
-    BASE_RPC_URL_FALLBACK=https://mainnet.base.org
-    KMS_REGION=us-east-1
-    POSTGRES_URI=postgresql://a2z_admin:secure_password@localhost:5432/a2z_transactions
-    AGENT_A_PUBLIC_KEY=kunci_publik_verifikasi_whitelist
-    ```
+### 7.4 Konfigurasi Environment (.env)
+```env
+# agent-a/.env
+NEYNAR_API_KEY=your_key
+SGLANG_MI300X_ENDPOINT=http://a2z-aim-server:8000/v1
+AGENT_A_PRIVATE_KEY=signer_keypair
+
+# agent-b/.env
+BASE_RPC_URL_PRIMARY=https://base-mainnet.g.alchemy.com/v2/your_key
+BASE_RPC_URL_FALLBACK=https://mainnet.base.org
+KMS_REGION=us-east-1
+POSTGRES_URI=postgresql://a2z_admin:***@localhost:5432/a2z_transactions
+AGENT_A_PUBLIC_KEY=public_key_verifikasi
+```
 
 ---
 
 ## 8. Rencana Implementasi & Roadmap
 
 ### Fase 1: Frontend & Prototipe UI (Selesai)
-*   [x] Inisialisasi proyek Next.js & konfigurasi Tailwind CSS v4.
-*   [x] Pembuatan komponen visual `Navbar`, `LiveLog`, `TransactionList`, `ApprovalQueue`, dan `CircuitBreaker`.
-*   [x] Optimalisasi UI/UX kelas premium (animasi mikro, transisi mulus, keramahan keyboard, target klik).
-*   [x] Verifikasi build statis Next.js.
+- [x] Next.js 16 + Tailwind v4 init
+- [x] Komponen: Navbar, LiveLog, TransactionList, ApprovalQueue, CircuitBreaker
+- [x] UI/UX premium: animasi, transisi, a11y
+- [x] Build statis Next.js verified
+- [x] Multi-page dashboard (analytics, memory, settings, history)
 
-### Fase 2: Backend & AI Engine (Sedang Berjalan)
-*   [ ] Konfigurasi backend Python dengan `LangGraph` untuk orkestrasi graf kerja.
-*   [ ] Penyetelan server `vLLM` pada hardware AMD MI300X dengan framework ROCm.
-*   [ ] Implementasi scraper Puppeteer/Selenium Stealth dan integrasi Neynar API.
-*   [ ] Integrasi ChromaDB untuk *caching* embeddings sentimen proyek.
+### Fase 2: Backend & AI Engine (Sedang Berjalan) — AMD Stack Focus
+- [ ] Konfigurasi **AMD AI Workbench** workspace di AMD Developer Cloud
+- [ ] Persiapan dataset Web3 sentiment (~5.000-10.000 examples)
+- [ ] Fine-tune Llama 3 8B di **MI300X** via AMD AI Workbench
+- [ ] Export sebagai **AMD Inference Microservice (AIM)**
+- [ ] Deploy & serve AIM via **SGLang** di MI300X (ROCm)
+- [ ] Implementasi scraper Farcaster (Neynar API) + ChromaDB integration
+- [ ] LangGraph state + retry policy
 
 ### Fase 3: Eksekusi Transaksi & Keamanan (Segera)
-*   [ ] Pembuatan modul transaksi web3 dengan integrasi AWS KMS.
-*   [ ] Penyusunan skema verifikasi tanda tangan kriptografi antar agen.
-*   [ ] Integrasi pengecekan idempotensi pada PostgreSQL dan simulasi Tenderly *dry-run*.
-*   [ ] Implementasi sistem *Circuit Breaker* on-chain dan pembatasan nominal transaksi.
+- [ ] Smart contract Solidity (Pausable + onlyOwner) deploy di Base Sepolia
+- [ ] Agent B: KMS abstraction, multi-RPC manager, signer
+- [ ] ECDSA signature verification end-to-end
+- [ ] PostgreSQL idempotency check
+- [ ] Foundry Anvil dry-run untuk honeypot detection
+- [ ] Circuit Breaker on-chain + transaction cap
 
 ### Fase 4: Integrasi End-to-End & Uji Coba (Segera)
-*   [ ] Menghubungkan log server Python real-time ke Dashboard UI via WebSockets/SSE.
-*   [ ] Pengujian menyeluruh skenario kegagalan RPC dan penanganan retry otomatis.
-*   [ ] Pitching video dan demo produk akhir untuk AMD Developer Hackathon Act II.
+- [ ] WebSocket/SSE: Agent B → Dashboard live logs
+- [ ] E2E test happy path + honeypot + RPC failure
+- [ ] Deploy public demo URL di AMD Developer Cloud
+- [ ] Pitching video (3 menit) untuk ACT II submission
+- [ ] Slide deck + cover image
+- [ ] Submit ke lablab.ai ACT II
+
+---
+
+*Dokumen ini living document — akan di-update seiring progress sprint.*
