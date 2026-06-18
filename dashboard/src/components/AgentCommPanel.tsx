@@ -181,6 +181,12 @@ export default function AgentCommPanel() {
   useEffect(() => {
     if (containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
+      const timeoutId = setTimeout(() => {
+        if (containerRef.current) {
+          containerRef.current.scrollTop = containerRef.current.scrollHeight;
+        }
+      }, 350);
+      return () => clearTimeout(timeoutId);
     }
   }, [agentMessages]);
 

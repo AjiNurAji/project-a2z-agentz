@@ -284,3 +284,30 @@ Fokus pada perbaikan bug UI/UX yang dilaporkan pada dashboard dan peningkatan st
 | `LiveLog.tsx` | `/dashboard/src/components/` | Perbaikan logika pengguliran, penambahan state `isCollapsed` beserta style CSS dinamis `h-80` vs *auto*, dan integrasi ikon Lucide baru (`Play`, `Pause`). |
 
 **Status: ✅ BUG TERATASI & UX DITINGKATKAN — DASHBOARD LEBIH STABIL & INTERAKTIF.**
+
+---
+
+## Sesi 8 — 2026-06-18 | Lanjutan Perbaikan Bug UI & Hydration Dashboard
+
+### 📌 Ringkasan
+Melakukan perbaikan dan penyempurnaan lanjutan terhadap isu-isu visual dan layout yang muncul pada dashboard Next.js + Tailwind v4. Fokus utama pada styling, sinkronisasi animasi dengan auto-scroll, dan perbaikan struktur HTML untuk mencegah error Hydration.
+
+### ✅ Hal yang Berhasil Dikerjakan
+
+| Item | Detail |
+|------|--------|
+| **Fix Tailwind v4 CSS Variables** | Mengubah direktif `@theme` menjadi `:root` pada `globals.css`. Hal ini menyelesaikan masalah tema "hitam putih" karena variabel `var(--color-...)` kini terekspos secara global ke seluruh elemen DOM. |
+| **Fix Layout & Scroll AgentCommPanel** | Mengganti tinggi dari `minHeight` menjadi fixed `h-[400px]` untuk mencegah kotak memanjang tak terbatas. Selain itu, mengubah logika `scrollIntoView()` menjadi manipulasi `scrollTop` untuk menghilangkan efek loncat (*glitch*) pada halaman. |
+| **Penyempurnaan LiveLog & Sinkronisasi Animasi** | Menghapus total fitur *collapse* pada LiveLog dan mengatur tingginya menjadi konstan `h-[400px]` agar sejajar dengan AgentCommPanel. Menambahkan `setTimeout` 350ms pada logika *auto-scroll* LiveLog dan AgentCommPanel untuk mengompensasi jeda animasi `framer-motion`, sehingga baris terbawah log tidak lagi terpotong. |
+| **Fix React Hydration Error (Nested `<tbody>`)** | Menghapus tag pembungkus luar `<tbody>` pada `TransactionList` yang membungkus elemen `<motion.tbody>` dari perulangan *map*. Memisahkan *empty state* ke dalam `<tbody>` tersendiri agar struktur HTML valid. |
+
+### ✏️ File yang DIUBAH
+
+| File | Lokasi | Detail Perubahan |
+|------|--------|-----------------|
+| `globals.css` | `/dashboard/src/app/` | Blok `@theme` diubah ke `:root`. |
+| `AgentCommPanel.tsx` | `/dashboard/src/components/` | Perbaikan styling tinggi elemen `h-[400px]`, manipulasi `scrollTop`, penambahan `setTimeout` 350ms. |
+| `LiveLog.tsx` | `/dashboard/src/components/` | Penghapusan fitur *collapse*, penerapan `h-[400px]`, penambahan sinkronisasi *auto-scroll*. |
+| `TransactionList.tsx` | `/dashboard/src/components/` | Penghapusan tag `<tbody>` bersarang yang menyalahi standar struktur tabel HTML. |
+
+**Status: ✅ TAMPILAN DASHBOARD SEMPURNA & HYDRATION ERROR TERTANGANI.**

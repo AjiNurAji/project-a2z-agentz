@@ -26,6 +26,12 @@ export default function LiveLog() {
   useEffect(() => {
     if (autoScroll && containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
+      const timeoutId = setTimeout(() => {
+        if (containerRef.current) {
+          containerRef.current.scrollTop = containerRef.current.scrollHeight;
+        }
+      }, 350);
+      return () => clearTimeout(timeoutId);
     }
   }, [logs, autoScroll]);
 
