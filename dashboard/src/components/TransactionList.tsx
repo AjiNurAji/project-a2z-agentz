@@ -5,7 +5,10 @@ import { motion, AnimatePresence } from "motion/react";
 import {
   CheckCircle2, XCircle, Clock, ArrowUpRight,
   ChevronDown, ChevronRight, Zap,
+  Download,
 } from "lucide-react";
+import { EmptyState } from "./ui/EmptyState";
+import { exportToCSV } from "./ui/exportUtils";
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }> = {
   success: {
@@ -195,6 +198,18 @@ export default function TransactionList() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const displayed = transactions.slice(0, 10);
 
+  const handleExport = () => {
+    const data = transactions.map((tx) => ({
+      project: tx.projectName,
+      amount_usd: tx.amountUsd,
+      status: tx.status,
+      tx_hash: tx.txHash,
+      gas_gwei: tx.gasUsedGwei,
+      timestamp: tx.timestamp.toISOString(),
+    }));
+    exportToCSV(data, `a2z-transactions-${Date.now()}`);
+  };
+
   return (
     <div
       className="card flex flex-col h-full"
@@ -219,9 +234,22 @@ export default function TransactionList() {
             {transactions.length} total
           </span>
         </div>
-        <div className="flex items-center gap-1.5 text-[11px]" style={{ color: "var(--color-fg-success)" }}>
-          <span className="w-1.5 h-1.5 rounded-full animate-pulse-glow" style={{ background: "var(--color-fg-success)" }} />
-          Live
+        <div className="flex items-center gap-2">
+          {transactions.length > 0 && (
+            <button
+              onClick={handleExport}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors hover:bg-[var(--color-neutral-secondary-medium)]"
+              style={{ color: "var(--color-body-subtle)", border: "1px solid var(--color-border-default)" }}
+              aria-label="Export transactions as CSV"
+            >
+              <Download className="w-3 h-3" />
+              Export
+            </button>
+          )}
+          <div className="flex items-center gap-1.5 text-[11px]" style={{ color: "var(--color-fg-success)" }}>
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse-glow" style={{ background: "var(--color-fg-success)" }} />
+            Live
+          </div>
         </div>
       </div>
 

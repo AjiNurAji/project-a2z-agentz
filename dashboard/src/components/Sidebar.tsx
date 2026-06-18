@@ -156,26 +156,39 @@ export default function Sidebar() {
               Agent Status
             </p>
             <div className="card p-3 space-y-2.5">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Activity className="w-3.5 h-3.5 text-[var(--color-fg-brand)]" aria-hidden="true" />
-                  <span className="text-xs text-[var(--color-body)] truncate">Agent A (Scout)</span>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Activity className="w-3.5 h-3.5 text-[var(--color-fg-brand)]" aria-hidden="true" />
+                    <span className="text-xs font-medium text-[var(--color-body)] truncate">Agent A (Scout)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <StatusDot status={agentAStatus} />
+                    <span className="text-[11px] text-[var(--color-body-subtle)] capitalize">{agentAStatus}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <StatusDot status={agentAStatus} />
-                  <span className="text-[11px] text-[var(--color-body-subtle)] capitalize">{agentAStatus}</span>
+                <div className="flex items-center justify-between pl-5">
+                  <span className="text-[10px] text-[var(--color-fg-disabled)]">Farcaster Scanner</span>
+                  <span className="text-[10px] tabular-nums text-[var(--color-fg-disabled)]">~180ms</span>
                 </div>
               </div>
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <ShieldAlert className="w-3.5 h-3.5 text-[var(--color-fg-purple)]" aria-hidden="true" />
-                  <span className="text-xs text-[var(--color-body)] truncate">Agent B (Vault)</span>
+              <div className="h-px" style={{ background: "var(--color-border-default)" }} />
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert className="w-3.5 h-3.5 text-[var(--color-fg-purple)]" aria-hidden="true" />
+                    <span className="text-xs font-medium text-[var(--color-body)] truncate">Agent B (Vault)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <StatusDot status={isPaused ? "offline" : agentBStatus} />
+                    <span className="text-[11px] text-[var(--color-body-subtle)] capitalize">
+                      {isPaused ? "paused" : agentBStatus}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <StatusDot status={isPaused ? "offline" : agentBStatus} />
-                  <span className="text-[11px] text-[var(--color-body-subtle)] capitalize">
-                    {isPaused ? "paused" : agentBStatus}
-                  </span>
+                <div className="flex items-center justify-between pl-5">
+                  <span className="text-[10px] text-[var(--color-fg-disabled)]">Base Network (8453)</span>
+                  <span className="text-[10px] tabular-nums text-[var(--color-fg-disabled)]">Connected</span>
                 </div>
               </div>
             </div>
