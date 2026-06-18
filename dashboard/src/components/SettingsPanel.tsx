@@ -1,211 +1,268 @@
 "use client";
-import { useDashboard } from "./DashboardContext";
+
+import { useDashboard, type DashboardConfig } from "./DashboardContext";
 import { useState } from "react";
-import { Bot, ShieldAlert, Save, RotateCcw, Info } from "lucide-react";
-
-interface InputFieldProps {
-  id: string;
-  label: string;
-  helper?: string;
-  type?: string;
-  value: string | number;
-  onChange: (v: string) => void;
-  min?: number;
-  max?: number;
-  step?: number;
-}
-
-function InputField({ id, label, helper, type = "text", value, onChange, min, max, step }: InputFieldProps) {
-  return (
-    <div className="space-y-1.5">
-      <label htmlFor={id} className="block text-sm font-medium text-slate-300">{label}</label>
-      <input
-        id={id}
-        type={type}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        min={min}
-        max={max}
-        step={step}
-        className="w-full px-3 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-accent focus:border-transparent transition-colors"
-      />
-      {helper && <p className="text-xs text-slate-500 flex items-center gap-1"><Info className="w-3 h-3" aria-hidden="true" />{helper}</p>}
-    </div>
-  );
-}
-
-function SectionCard({ title, icon: Icon, iconColor, children }: { title: string; icon: React.FC<{ className?: string }>; iconColor: string; children: React.ReactNode }) {
-  return (
-    <div className="glass-card p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center flex-shrink-0">
-          <Icon className={`w-5 h-5 ${iconColor}`} />
-        </div>
-        <h2 className="font-heading text-base font-semibold text-white">{title}</h2>
-      </div>
-      <div className="space-y-5">{children}</div>
-    </div>
-  );
-}
-
-function SliderField({ id, label, value, min, max, onChange, unit }: { id: string; label: string; value: number; min: number; max: number; onChange: (v: number) => void; unit?: string }) {
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <label htmlFor={id} className="text-sm font-medium text-slate-300">{label}</label>
-        <span className="text-sm font-mono font-semibold text-brand-accent tabular-nums">{value}{unit}</span>
-      </div>
-      <input
-        id={id}
-        type="range"
-        min={min}
-        max={max}
-        value={value}
-        onChange={e => onChange(Number(e.target.value))}
-        className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-brand-accent focus:outline-none focus:ring-2 focus:ring-brand-accent"
-      />
-      <div className="flex justify-between text-xs text-slate-600">
-        <span>{min}{unit}</span>
-        <span>{max}{unit}</span>
-      </div>
-    </div>
-  );
-}
+import { motion, AnimatePresence } from "motion/react";
+import { Settings, Save, RotateCcw, Sliders, Server, Shield, Zap, Check } from "lucide-react";
 
 export default function SettingsPanel() {
   const { config, setConfig } = useDashboard();
-  const [localConfig, setLocalConfig] = useState(config);
+  const [local, setLocal] = useState<DashboardConfig>({ ...config });
   const [saved, setSaved] = useState(false);
 
-  const handleSave = () => {
-    setConfig(localConfig);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+  const updateA = <K extends keyof DashboardConfig["agentA"]>(key: K, value: DashboardConfig["agentA"][K]) => {
+    setLocal((prev) => ({ ...prev, agentA: { ...prev.agentA, [key]: value } }));
   };
 
-  const handleReset = () => setLocalConfig(config);
+  const updateB = <K extends keyof DashboardConfig["agentB"]>(key: K, value: DashboardConfig["agentB"][K]) => {
+    setLocal((prev) => ({ ...prev, agentB: { ...prev.agentB, [key]: value } }));
+  };
 
-  const updateAgentA = (key: string, val: string | number) =>
-    setLocalConfig(prev => ({ ...prev, agentA: { ...prev.agentA, [key]: val } }));
+  const handleSentimentChange = (val: number) => {
+    setLocal((prev) => ({
+      ...prev,
+      agentA: { ...prev.agentA, sentimentWeight: val, tvlWeight: 100 - val },
+    }));
+  };
 
-  const updateAgentB = (key: string, val: string | number) =>
-    setLocalConfig(prev => ({ ...prev, agentB: { ...prev.agentB, [key]: val } }));
+  const handleSave = () => {
+    setConfig(local);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleReset = () => {
+    setLocal({ ...config });
+  };
+
+  const inputStyle: React.CSSProperties = {
+    background: "var(--color-neutral-secondary-medium)",
+    border: "1px solid var(--color-border-default-medium)",
+    color: "var(--color-heading)",
+  };
+
+  const labelStyle: React.CSSProperties = { color: "var(--color-heading)" };
+  const subtleStyle: React.CSSProperties = { color: "var(--color-body-subtle)" };
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      {/* Agent A */}
-      <SectionCard title="Agent A — Scout Configuration" icon={Bot} iconColor="text-brand-accent">
-        <InputField
-          id="cronSchedule"
-          label="Cron Schedule"
-          helper='Standard cron format. Default "0 * * * *" runs every hour.'
-          value={localConfig.agentA.cronSchedule}
-          onChange={v => updateAgentA("cronSchedule", v)}
-        />
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <SliderField
-            id="sentimentWeight"
-            label="LLM Sentiment Weight"
-            value={localConfig.agentA.sentimentWeight}
-            min={0}
-            max={100}
-            unit="%"
-            onChange={v => {
-              updateAgentA("sentimentWeight", v);
-              updateAgentA("tvlWeight", 100 - v);
-            }}
-          />
-          <SliderField
-            id="tvlWeight"
-            label="On-Chain TVL Weight"
-            value={localConfig.agentA.tvlWeight}
-            min={0}
-            max={100}
-            unit="%"
-            onChange={v => {
-              updateAgentA("tvlWeight", v);
-              updateAgentA("sentimentWeight", 100 - v);
-            }}
-          />
-        </div>
-        <SliderField
-          id="scoreThreshold"
-          label="Score Threshold (min to trigger Agent B)"
-          value={localConfig.agentA.scoreThreshold}
-          min={50}
-          max={100}
-          onChange={v => updateAgentA("scoreThreshold", v)}
-        />
-      </SectionCard>
-
-      {/* Agent B */}
-      <SectionCard title="Agent B — Vault Configuration" icon={ShieldAlert} iconColor="text-brand-purple">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <InputField
-            id="primaryRpc"
-            label="Primary RPC Endpoint"
-            helper="Alchemy Base Mainnet recommended"
-            value={localConfig.agentB.primaryRpc}
-            onChange={v => updateAgentB("primaryRpc", v)}
-          />
-          <InputField
-            id="fallbackRpc"
-            label="Fallback RPC Endpoint"
-            helper="Used if primary RPC times out"
-            value={localConfig.agentB.fallbackRpc}
-            onChange={v => updateAgentB("fallbackRpc", v)}
-          />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <InputField
-            id="kmsRegion"
-            label="AWS KMS Region"
-            helper="Region where private key is stored"
-            value={localConfig.agentB.kmsRegion}
-            onChange={v => updateAgentB("kmsRegion", v)}
-          />
-          <SliderField
-            id="autonomousCap"
-            label="Autonomous Transaction Cap"
-            value={localConfig.agentB.autonomousCap}
-            min={0.5}
-            max={10}
-            unit=" USD"
-            onChange={v => updateAgentB("autonomousCap", v)}
-          />
-        </div>
-        <SliderField
-          id="gasBuffer"
-          label="Gas Buffer Above Market Rate"
-          value={localConfig.agentB.gasBuffer}
-          min={5}
-          max={50}
-          unit="%"
-          onChange={v => updateAgentB("gasBuffer", v)}
-        />
-      </SectionCard>
-
-      {/* Actions */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={handleSave}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent min-h-[44px] ${
-            saved
-              ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-              : "bg-brand-accent/15 text-brand-accent border border-brand-accent/30 hover:bg-brand-accent/25"
-          }`}
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Agent A Config */}
+        <motion.div
+          className="card p-5 space-y-5"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
         >
-          <Save className="w-4 h-4" aria-hidden="true" />
-          {saved ? "Saved!" : "Save Configuration"}
-        </button>
+          <div className="flex items-center gap-3 mb-1">
+            <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "var(--color-brand-softer)", color: "var(--color-fg-brand-strong)" }}>
+              <Sliders size={16} />
+            </div>
+            <div>
+              <h4 className="font-serif" style={labelStyle}>Agent A — The Scout</h4>
+              <p className="text-xs" style={subtleStyle}>Signal detection & scoring configuration</p>
+            </div>
+          </div>
+
+          {/* Cron Schedule */}
+          <div>
+            <label className="block text-sm font-medium mb-2" style={labelStyle}>Cron Schedule</label>
+            <input
+              type="text"
+              value={local.agentA.cronSchedule}
+              onChange={(e) => updateA("cronSchedule", e.target.value)}
+              className="w-full px-3 py-2.5 text-sm rounded-lg focus:outline-none focus:ring-1"
+              style={inputStyle}
+            />
+            <p className="text-xs mt-1" style={subtleStyle}>Current: every hour</p>
+          </div>
+
+          {/* Sentiment / TVL Weight */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium" style={labelStyle}>Sentiment Weight</label>
+              <span className="text-sm font-mono tabular-nums" style={{ color: "var(--color-fg-brand-strong)" }}>{local.agentA.sentimentWeight}%</span>
+            </div>
+            <input
+              type="range"
+              min={10}
+              max={90}
+              value={local.agentA.sentimentWeight}
+              onChange={(e) => handleSentimentChange(Number(e.target.value))}
+              className="w-full h-2 rounded-full appearance-none cursor-pointer"
+              style={{ background: "var(--color-neutral-tertiary)" }}
+            />
+            <div className="flex justify-between text-xs mt-1" style={subtleStyle}>
+              <span>Sentiment: {local.agentA.sentimentWeight}%</span>
+              <span>TVL: {local.agentA.tvlWeight}%</span>
+            </div>
+          </div>
+
+          {/* Score Threshold */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium" style={labelStyle}>Score Threshold</label>
+              <span className="text-sm font-mono tabular-nums" style={{ color: "var(--color-fg-brand-strong)" }}>{local.agentA.scoreThreshold}/100</span>
+            </div>
+            <input
+              type="range"
+              min={50}
+              max={99}
+              value={local.agentA.scoreThreshold}
+              onChange={(e) => updateA("scoreThreshold", Number(e.target.value))}
+              className="w-full h-2 rounded-full appearance-none cursor-pointer"
+              style={{ background: "var(--color-neutral-tertiary)" }}
+            />
+          </div>
+
+          {/* Sources */}
+          <div>
+            <label className="block text-sm font-medium mb-2" style={labelStyle}>Data Sources</label>
+            <div className="flex flex-wrap gap-2">
+              {local.agentA.sources.map((src) => (
+                <span
+                  key={src}
+                  className="text-xs font-medium px-3 py-1.5 rounded-full"
+                  style={{ background: "var(--color-brand-softer)", border: "1px solid var(--color-border-brand-subtle)", color: "var(--color-fg-brand-strong)" }}
+                >
+                  {src}
+                </span>
+              ))}
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Agent B Config */}
+        <motion.div
+          className="card p-5 space-y-5"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15, duration: 0.4 }}
+        >
+          <div className="flex items-center gap-3 mb-1">
+            <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "var(--color-brand-softer)", color: "var(--color-fg-brand-strong)" }}>
+              <Shield size={16} />
+            </div>
+            <div>
+              <h4 className="font-serif" style={labelStyle}>Agent B — The Vault</h4>
+              <p className="text-xs" style={subtleStyle}>Execution & security configuration</p>
+            </div>
+          </div>
+
+          {/* Primary RPC */}
+          <div>
+            <label className="block text-sm font-medium mb-2" style={labelStyle}>Primary RPC</label>
+            <input
+              type="text"
+              value={local.agentB.primaryRpc}
+              onChange={(e) => updateB("primaryRpc", e.target.value)}
+              className="w-full px-3 py-2.5 text-sm rounded-lg font-mono focus:outline-none focus:ring-1"
+              style={inputStyle}
+            />
+          </div>
+
+          {/* Fallback RPC */}
+          <div>
+            <label className="block text-sm font-medium mb-2" style={labelStyle}>Fallback RPC</label>
+            <input
+              type="text"
+              value={local.agentB.fallbackRpc}
+              onChange={(e) => updateB("fallbackRpc", e.target.value)}
+              className="w-full px-3 py-2.5 text-sm rounded-lg font-mono focus:outline-none focus:ring-1"
+              style={inputStyle}
+            />
+          </div>
+
+          {/* KMS Region */}
+          <div>
+            <label className="block text-sm font-medium mb-2" style={labelStyle}>KMS Region</label>
+            <select
+              value={local.agentB.kmsRegion}
+              onChange={(e) => updateB("kmsRegion", e.target.value)}
+              className="w-full px-3 py-2.5 text-sm rounded-lg cursor-pointer focus:outline-none"
+              style={inputStyle}
+            >
+              <option value="us-east-1">US East (N. Virginia)</option>
+              <option value="us-west-2">US West (Oregon)</option>
+              <option value="eu-west-1">EU (Ireland)</option>
+              <option value="ap-southeast-1">Asia Pacific (Singapore)</option>
+            </select>
+          </div>
+
+          {/* Autonomous Cap & Gas Buffer */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-2" style={labelStyle}>Autonomous Cap</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  step="0.1"
+                  value={local.agentB.autonomousCap}
+                  onChange={(e) => updateB("autonomousCap", Number(e.target.value))}
+                  className="w-full px-3 py-2.5 text-sm rounded-lg focus:outline-none focus:ring-1"
+                  style={inputStyle}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs" style={subtleStyle}>ETH</span>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2" style={labelStyle}>Gas Buffer</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  value={local.agentB.gasBuffer}
+                  onChange={(e) => updateB("gasBuffer", Number(e.target.value))}
+                  className="w-full px-3 py-2.5 text-sm rounded-lg focus:outline-none focus:ring-1"
+                  style={inputStyle}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs" style={subtleStyle}>%</span>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Action Buttons */}
+      <motion.div
+        className="flex flex-col sm:flex-row gap-3 justify-end"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.3 }}
+      >
         <button
           onClick={handleReset}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 min-h-[44px]"
+          className="flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-lg transition-colors"
+          style={{
+            background: "var(--color-neutral-primary-soft)",
+            border: "1px solid var(--color-border-default)",
+            color: "var(--color-body)",
+            borderRadius: "var(--radius-base)",
+          }}
         >
-          <RotateCcw className="w-4 h-4" aria-hidden="true" />
-          Reset
+          <RotateCcw size={15} /> Reset Changes
         </button>
-      </div>
+        <button
+          onClick={handleSave}
+          className="flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-lg transition-all btn-glint relative overflow-hidden"
+          style={{
+            background: "var(--color-brand)",
+            color: "#fff",
+            borderRadius: "var(--radius-base)",
+          }}
+        >
+          <AnimatePresence mode="wait">
+            {saved ? (
+              <motion.span key="saved" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} className="flex items-center gap-2">
+                <Check size={15} /> Saved!
+              </motion.span>
+            ) : (
+              <motion.span key="save" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2">
+                <Save size={15} /> Save Configuration
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </button>
+      </motion.div>
     </div>
   );
 }

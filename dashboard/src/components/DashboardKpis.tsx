@@ -1,4 +1,5 @@
 "use client";
+
 import { useDashboard } from "./DashboardContext";
 import KpiCard from "./KpiCard";
 import { Activity, TrendingUp, Zap, Fuel, ScanSearch, AlertTriangle } from "lucide-react";
@@ -12,7 +13,7 @@ function formatTvl(n: number) {
 export default function DashboardKpis() {
   const { kpiMetrics } = useDashboard();
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       <KpiCard
         label="TVL Analyzed"
         value={formatTvl(kpiMetrics.totalTvlAnalyzed)}
@@ -20,6 +21,7 @@ export default function DashboardKpis() {
         color="accent"
         trend="up"
         trendValue="Live tracking"
+        index={0}
       />
       <KpiCard
         label="Success Rate"
@@ -28,6 +30,7 @@ export default function DashboardKpis() {
         color="green"
         trend="up"
         trendValue="vs 72% avg"
+        index={1}
       />
       <KpiCard
         label="Total Txs"
@@ -35,6 +38,7 @@ export default function DashboardKpis() {
         subValue="on Base Network"
         icon={Zap}
         color="purple"
+        index={2}
       />
       <KpiCard
         label="Gas Saved"
@@ -44,6 +48,7 @@ export default function DashboardKpis() {
         color="amber"
         trend="up"
         trendValue="+15% efficiency"
+        index={3}
       />
       <KpiCard
         label="Projects Scanned"
@@ -51,6 +56,7 @@ export default function DashboardKpis() {
         subValue="Farcaster + Twitter"
         icon={ScanSearch}
         color="accent"
+        index={4}
       />
       <KpiCard
         label="Active Alerts"
@@ -60,6 +66,7 @@ export default function DashboardKpis() {
         color={kpiMetrics.activeAlerts > 0 ? "red" : "green"}
         trend={kpiMetrics.activeAlerts > 0 ? "down" : "neutral"}
         trendValue={kpiMetrics.activeAlerts > 0 ? "Action needed" : "All clear"}
+        index={5}
       />
     </div>
   );

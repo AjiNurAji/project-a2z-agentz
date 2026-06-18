@@ -1,20 +1,42 @@
 "use client";
+
 import { useDashboard } from "./DashboardContext";
-import { Bell, Cpu } from "lucide-react";
+import { Bell, Cpu, Menu, Activity } from "lucide-react";
+import { motion } from "motion/react";
 
 export default function Navbar() {
-  const { kpiMetrics, agentAStatus, agentBStatus } = useDashboard();
+  const { kpiMetrics, agentAStatus, agentBStatus, setSidebarOpen } = useDashboard();
+
   return (
-    <header className="sticky top-0 z-40 w-full bg-slate-950/80 backdrop-blur-md border-b border-slate-800/60 px-6 py-3">
+    <motion.header
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="sticky top-0 z-30 w-full backdrop-blur-md border-b border-[var(--color-border-default)] px-4 md:px-6 py-3"
+      style={{ background: "color-mix(in srgb, var(--color-surface) 85%, transparent)" }}
+    >
       <div className="flex items-center justify-between max-w-screen-2xl mx-auto">
-        {/* Left: AMD badge */}
+        {/* Left: hamburger + badges */}
         <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/80 border border-slate-700/50 text-xs text-slate-400">
-            <Cpu className="w-3.5 h-3.5 text-brand-accent" aria-hidden="true" />
+          {/* Mobile hamburger */}
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="lg:hidden p-2 -ml-2 rounded-xl text-[var(--color-body-subtle)] hover:text-[var(--color-heading)] hover:bg-[var(--color-neutral-secondary-medium)] focus-ring transition-colors"
+            aria-label="Open sidebar menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full text-xs text-[var(--color-body-subtle)]"
+            style={{ background: "var(--color-neutral-secondary-medium)", border: "1px solid var(--color-border-default)" }}
+          >
+            <Cpu className="w-3.5 h-3.5 text-[var(--color-fg-brand)]" aria-hidden="true" />
             <span>AMD MI300X · ROCm · vLLM</span>
           </div>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800/80 border border-slate-700/50 text-xs text-slate-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" aria-hidden="true" />
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs text-[var(--color-body-subtle)]"
+            style={{ background: "var(--color-neutral-secondary-medium)", border: "1px solid var(--color-border-default)" }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "var(--color-success)" }} aria-hidden="true" />
             <span>Base Network</span>
           </div>
         </div>
@@ -22,28 +44,78 @@ export default function Navbar() {
         {/* Right: alerts + agent pings */}
         <div className="flex items-center gap-4">
           {kpiMetrics.activeAlerts > 0 && (
-            <div className="relative" aria-label={`${kpiMetrics.activeAlerts} pending approvals`}>
-              <Bell className="w-5 h-5 text-slate-400" aria-hidden="true" />
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full text-white text-[9px] flex items-center justify-center font-bold">
+            <button
+              className="relative p-1.5 rounded-xl hover:bg-[var(--color-neutral-secondary-medium)] focus-ring transition-colors"
+              aria-label={`${kpiMetrics.activeAlerts} pending approvals`}
+            >
+              <Bell className="w-5 h-5 text-[var(--color-body-subtle)]" aria-hidden="true" />
+              <span
+                className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full text-[var(--color-heading)] text-[9px] flex items-center justify-center font-bold"
+                style={{ background: "var(--color-warning)" }}
+              >
                 {kpiMetrics.activeAlerts}
               </span>
-            </div>
+            </button>
           )}
           <div className="flex items-center gap-3 text-xs">
             <div className="flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-full ${agentAStatus === "online" ? "bg-emerald-400" : agentAStatus === "analyzing" ? "bg-amber-400 animate-pulse" : "bg-slate-600"}`} aria-hidden="true" />
-              <span className="text-slate-400 hidden md:inline">Agent A</span>
-              <span className={`font-medium capitalize ${agentAStatus === "online" ? "text-emerald-400" : "text-amber-400"}`}>{agentAStatus}</span>
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  agentAStatus === "online" ? "" : agentAStatus === "analyzing" ? "animate-pulse" : ""
+                }`}
+                style={{
+                  background: agentAStatus === "online"
+                    ? "var(--color-success)"
+                    : agentAStatus === "analyzing"
+                    ? "var(--color-warning)"
+                    : "var(--color-gray)",
+                }}
+                aria-hidden="true"
+              />
+              <span className="text-[var(--color-body-subtle)] hidden md:inline">Agent A</span>
+              <span
+                className="font-medium capitalize"
+                style={{
+                  color: agentAStatus === "online"
+                    ? "var(--color-fg-success)"
+                    : agentAStatus === "analyzing"
+                    ? "var(--color-fg-warning)"
+                    : "var(--color-fg-brand)",
+                }}
+              >
+                {agentAStatus}
+              </span>
             </div>
-            <div className="w-px h-4 bg-slate-700" aria-hidden="true" />
+            <div className="w-px h-4" style={{ background: "var(--color-border-default)" }} aria-hidden="true" />
             <div className="flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-full ${agentBStatus === "online" ? "bg-emerald-400" : agentBStatus === "executing" ? "bg-brand-accent animate-pulse" : "bg-slate-600"}`} aria-hidden="true" />
-              <span className="text-slate-400 hidden md:inline">Agent B</span>
-              <span className={`font-medium capitalize ${agentBStatus === "online" ? "text-emerald-400" : "text-brand-accent"}`}>{agentBStatus}</span>
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  agentBStatus === "online" ? "" : agentBStatus === "executing" ? "animate-pulse" : ""
+                }`}
+                style={{
+                  background: agentBStatus === "online"
+                    ? "var(--color-success)"
+                    : agentBStatus === "executing"
+                    ? "var(--color-fg-brand)"
+                    : "var(--color-gray)",
+                }}
+                aria-hidden="true"
+              />
+              <span className="text-[var(--color-body-subtle)] hidden md:inline">Agent B</span>
+              <span
+                className="font-medium capitalize"
+                style={{
+                  color: agentBStatus === "online"
+                    ? "var(--color-fg-success)"
+                    : "var(--color-fg-brand)",
+                }}
+              >
+                {agentBStatus}
+              </span>
             </div>
           </div>
         </div>
       </div>
-    </header>
+    </motion.header>
   );
 }

@@ -1,223 +1,282 @@
 "use client";
-import { useDashboard, Transaction, ApprovalItem } from "./DashboardContext";
-import { useState, useMemo } from "react";
-import { CheckCircle2, XCircle, Clock, ChevronDown, ChevronRight, Search, Filter } from "lucide-react";
 
-type HistoryEntry = (Transaction | ApprovalItem) & {
-  entryType: "transaction" | "approval";
-  auditStatus: "success" | "failed" | "approved" | "rejected" | "pending";
-};
+import { useDashboard } from "./DashboardContext";
+import { useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { History, Search, ChevronDown, ChevronRight, Hash, Clock, ExternalLink, Copy, FileText, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 
-const STATUS_STYLES = {
-  success:  "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-  failed:   "bg-brand-red/10 text-brand-red border-brand-red/20",
-  approved: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-  rejected: "bg-brand-red/10 text-brand-red border-brand-red/20",
-  pending:  "bg-amber-500/10 text-amber-400 border-amber-500/20",
-};
-
-function genFakeHistory(): HistoryEntry[] {
-  const PROJECTS = ["ZeroGravity Protocol","NeuralFi","BaseSwap V3","OmniLayer DAO","CryptoNest","DeFi Nexus","ChainLink Base"];
-  const statuses: HistoryEntry["auditStatus"][] = ["success","failed","approved","rejected","pending"];
-  function genAddress() { return "0x" + Array.from({ length: 40 }, () => "0123456789abcdef"[Math.floor(Math.random()*16)]).join(""); }
-  function genHash() { return "0x" + Array.from({ length: 64 }, () => "0123456789abcdef"[Math.floor(Math.random()*16)]).join(""); }
-  return Array.from({ length: 25 }, (_, i) => {
-    const status = statuses[i % statuses.length];
-    const projectName = PROJECTS[i % PROJECTS.length];
-    const ts = new Date(Date.now() - i * 7 * 60000);
-    const base = {
-      id: `hist-${i}`,
-      projectName,
-      targetAddress: genAddress(),
-      amountUsd: +(Math.random() * 4 + 0.5).toFixed(2),
-      reason: "Llama 3 score: " + (80 + i % 20) + "/100. High Farcaster engagement + verified TVL.",
-      timestamp: ts,
-      createdAt: ts,
-      signature: genHash().slice(0, 42) + "...",
-    };
-    if (status === "success" || status === "failed") {
-      return { ...base, entryType: "transaction" as const, auditStatus: status,
-        txHash: genHash(), status: status as "success" | "failed", gasUsedGwei: 35 + i % 30 };
-    }
-    return { ...base, entryType: "approval" as const, auditStatus: status, llmScore: 80 + i % 20 };
-  });
+interface AuditEntry {
+  id: string;
+  type: "transaction" | "approval";
+  projectName: string;
+  timestamp: Date;
+  status: string;
+  detail: Record<string, string>;
 }
 
-const HISTORY_DATA = genFakeHistory();
+const STATUS_STYLES: Record<string, { bg: string; border: string; text: string; icon: React.ElementType }> = {
+  success: { bg: "var(--color-success-soft)", border: "var(--color-border-success-subtle)", text: "var(--color-fg-success-strong)", icon: CheckCircle2 },
+  failed: { bg: "var(--color-danger-soft)", border: "var(--color-border-danger-subtle)", text: "var(--color-fg-danger-strong)", icon: XCircle },
+  pending: { bg: "var(--color-warning-soft)", border: "var(--color-border-warning-subtle)", text: "var(--color-fg-warning)", icon: AlertTriangle },
+  approved: { bg: "var(--color-success-soft)", border: "var(--color-border-success-subtle)", text: "var(--color-fg-success-strong)", icon: CheckCircle2 },
+  rejected: { bg: "var(--color-danger-soft)", border: "var(--color-border-danger-subtle)", text: "var(--color-fg-danger-strong)", icon: XCircle },
+};
 
 export default function AuditTrail() {
   const { transactions, approvalQueue } = useDashboard();
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [query, setQuery] = useState("");
-  const [filterStatus, setFilterStatus] = useState<string>("all");
-  const PER_PAGE = 10;
+  const [page, setPage] = useState(0);
+  const perPage = 10;
 
-  const allEntries = useMemo((): HistoryEntry[] => {
-    const txEntries: HistoryEntry[] = transactions.map(tx => ({
-      ...tx,
-      createdAt: tx.timestamp,
-      llmScore: 90,
-      signature: tx.txHash.slice(0, 42) + "...",
-      entryType: "transaction",
-      auditStatus: tx.status,
-    }));
-    const approvalEntries: HistoryEntry[] = approvalQueue.map(ap => ({
-      ...ap,
-      timestamp: ap.createdAt,
-      txHash: "",
-      status: "pending" as const,
-      gasUsedGwei: 0,
-      entryType: "approval",
-      auditStatus: "pending",
-    }));
-    return [...txEntries, ...approvalEntries, ...HISTORY_DATA].sort((a, b) => {
-      const aTime = "timestamp" in a ? a.timestamp : a.createdAt;
-      const bTime = "timestamp" in b ? b.timestamp : b.createdAt;
-      return bTime.getTime() - aTime.getTime();
-    });
-  }, [transactions, approvalQueue]);
+  // Merge transactions + approvals into unified audit entries
+  const allEntries: AuditEntry[] = [
+    ...transactions.map((tx) => ({
+      id: tx.id,
+      type: "transaction" as const,
+      projectName: tx.projectName,
+      timestamp: tx.timestamp,
+      status: tx.status,
+      detail: {
+        Amount: `$${tx.amountUsd}`,
+        "Tx Hash": tx.txHash,
+        Address: tx.targetAddress,
+        Gas: `${tx.gasUsedGwei} Gwei`,
+        Reason: tx.reason,
+      },
+    })),
+    ...approvalQueue.map((a) => ({
+      id: a.id,
+      type: "approval" as const,
+      projectName: a.projectName,
+      timestamp: a.createdAt,
+      status: "pending",
+      detail: {
+        Amount: `$${a.amountUsd}`,
+        "LLM Score": `${a.llmScore}/100`,
+        Address: a.targetAddress,
+        Signature: a.signature,
+        Reason: a.reason,
+      },
+    })),
+  ].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
-  const filtered = useMemo(() => {
-    return allEntries.filter(e => {
-      const matchQ = e.projectName.toLowerCase().includes(query.toLowerCase());
-      const matchS = filterStatus === "all" || e.auditStatus === filterStatus;
-      return matchQ && matchS;
-    });
-  }, [allEntries, query, filterStatus]);
+  const filtered = allEntries.filter((e) => {
+    const matchSearch = e.projectName.toLowerCase().includes(search.toLowerCase());
+    const matchStatus = statusFilter === "all" || e.status === statusFilter;
+    return matchSearch && matchStatus;
+  });
 
-  const paginated = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  const totalPages = Math.ceil(filtered.length / perPage);
+  const pageEntries = filtered.slice(page * perPage, (page + 1) * perPage);
+
+  const stats = {
+    total: allEntries.length,
+    success: allEntries.filter((e) => e.status === "success").length,
+    failed: allEntries.filter((e) => e.status === "failed").length,
+    pending: allEntries.filter((e) => e.status === "pending").length,
+  };
+
+  const timeAgo = (d: Date) => {
+    const sec = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (sec < 60) return `${sec}s ago`;
+    if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
+    return `${Math.floor(sec / 3600)}h ago`;
+  };
 
   return (
-    <div className="space-y-5">
-      {/* Summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+    <div className="space-y-6">
+      {/* Stats */}
+      <motion.div
+        className="grid grid-cols-2 sm:grid-cols-4 gap-4"
+        initial="hidden"
+        animate="visible"
+        variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}
+      >
         {[
-          { label: "Total Events", value: allEntries.length },
-          { label: "Successful", value: allEntries.filter(e => e.auditStatus === "success" || e.auditStatus === "approved").length },
-          { label: "Failed/Rejected", value: allEntries.filter(e => e.auditStatus === "failed" || e.auditStatus === "rejected").length },
-          { label: "Pending", value: allEntries.filter(e => e.auditStatus === "pending").length },
-        ].map(({ label, value }) => (
-          <div key={label} className="glass-card p-4 text-center">
-            <p className="font-heading text-2xl font-bold text-white tabular-nums">{value}</p>
-            <p className="text-xs text-slate-500 mt-1">{label}</p>
-          </div>
+          { label: "Total Entries", value: stats.total, color: "var(--color-brand)" },
+          { label: "Successful", value: stats.success, color: "var(--color-success)" },
+          { label: "Failed", value: stats.failed, color: "var(--color-danger)" },
+          { label: "Pending", value: stats.pending, color: "var(--color-warning)" },
+        ].map((s) => (
+          <motion.div
+            key={s.label}
+            className="card p-4"
+            variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
+          >
+            <p className="text-xs mb-1" style={{ color: "var(--color-body-subtle)" }}>{s.label}</p>
+            <p className="text-2xl font-semibold tabular-nums" style={{ color: s.color }}>{s.value}</p>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
 
-      {/* Filters */}
-      <div className="glass-card p-4 flex flex-col sm:flex-row gap-3">
+      {/* Search & Filter */}
+      <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" aria-hidden="true" />
-          <label htmlFor="audit-search" className="sr-only">Search audit trail</label>
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--color-body-subtle)" }} />
           <input
-            id="audit-search"
-            type="search"
+            type="text"
             placeholder="Search by project name..."
-            value={query}
-            onChange={e => { setQuery(e.target.value); setPage(1); }}
-            className="w-full pl-10 pr-4 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+            className="w-full pl-10 pr-4 py-2.5 text-sm rounded-lg focus:outline-none"
+            style={{
+              background: "var(--color-neutral-secondary-medium)",
+              border: "1px solid var(--color-border-default-medium)",
+              color: "var(--color-heading)",
+            }}
           />
         </div>
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-slate-500" aria-hidden="true" />
-          <label htmlFor="audit-filter" className="sr-only">Filter by status</label>
-          <select
-            id="audit-filter"
-            value={filterStatus}
-            onChange={e => { setFilterStatus(e.target.value); setPage(1); }}
-            className="px-3 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-accent cursor-pointer"
-          >
-            <option value="all">All</option>
-            <option value="success">Success</option>
-            <option value="failed">Failed</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-            <option value="pending">Pending</option>
-          </select>
-        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
+          className="px-4 py-2.5 text-sm rounded-lg cursor-pointer focus:outline-none"
+          style={{
+            background: "var(--color-neutral-secondary-medium)",
+            border: "1px solid var(--color-border-default-medium)",
+            color: "var(--color-heading)",
+          }}
+        >
+          <option value="all">All Status</option>
+          <option value="success">Success</option>
+          <option value="failed">Failed</option>
+          <option value="pending">Pending</option>
+        </select>
       </div>
 
-      {/* Entries */}
-      <div className="glass-card overflow-hidden divide-y divide-slate-800/50">
-        {paginated.map((entry) => {
-          const isExpanded = expandedId === entry.id;
-          const entryTime = "timestamp" in entry ? entry.timestamp : entry.createdAt;
-          const txHash = "txHash" in entry ? entry.txHash : "";
-          return (
-            <div key={entry.id}>
-              <button
-                className="w-full text-left px-4 py-3.5 flex items-center gap-3 hover:bg-slate-800/20 transition-colors focus-visible:outline-none focus-visible:ring-inset focus-visible:ring-2 focus-visible:ring-brand-accent"
-                onClick={() => setExpandedId(isExpanded ? null : entry.id)}
-                aria-expanded={isExpanded}
-              >
-                <span className="text-slate-600 flex-shrink-0">
-                  {isExpanded ? <ChevronDown className="w-4 h-4" aria-hidden="true" /> : <ChevronRight className="w-4 h-4" aria-hidden="true" />}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-sm text-slate-200">{entry.projectName}</span>
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-medium ${STATUS_STYLES[entry.auditStatus]}`}>
-                      {(entry.auditStatus === "success" || entry.auditStatus === "approved") && <CheckCircle2 className="w-3 h-3" aria-hidden="true" />}
-                      {(entry.auditStatus === "failed" || entry.auditStatus === "rejected") && <XCircle className="w-3 h-3" aria-hidden="true" />}
-                      {entry.auditStatus === "pending" && <Clock className="w-3 h-3" aria-hidden="true" />}
-                      {entry.auditStatus}
-                    </span>
-                    <span className="text-xs text-slate-600 capitalize">{entry.entryType}</span>
-                  </div>
-                </div>
-                <div className="flex-shrink-0 text-right">
-                  <p className="text-sm font-mono font-semibold text-amber-400 tabular-nums">${entry.amountUsd}</p>
-                  <p className="text-xs text-slate-600 mt-0.5">{entryTime.toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
-                </div>
-              </button>
-              {isExpanded && (
-                <div className="px-4 pb-4 pt-1 bg-slate-900/40">
-                  <div className="space-y-2 text-xs rounded-lg border border-slate-800 p-3 bg-slate-900/60">
-                    <div className="flex gap-2"><span className="text-slate-500 w-28 flex-shrink-0">Reason:</span><span className="text-slate-300">{entry.reason}</span></div>
-                    <div className="flex gap-2"><span className="text-slate-500 w-28 flex-shrink-0">Target Address:</span><span className="text-slate-300 font-mono break-all">{entry.targetAddress}</span></div>
-                    {"signature" in entry && entry.signature && (
-                      <div className="flex gap-2"><span className="text-slate-500 w-28 flex-shrink-0">Signature:</span><span className="text-slate-300 font-mono break-all">{String(entry.signature)}</span></div>
-                    )}
-                    {txHash && <div className="flex gap-2"><span className="text-slate-500 w-28 flex-shrink-0">Tx Hash:</span><span className="text-brand-accent font-mono break-all">{txHash}</span></div>}
-                    <div className="flex gap-2"><span className="text-slate-500 w-28 flex-shrink-0">Raw JSON:</span>
-                      <code className="text-slate-400 break-all">{JSON.stringify({ id: entry.id, project: entry.projectName, amount: entry.amountUsd, status: entry.auditStatus }, null, 2)}</code>
+      {/* Accordion Entries */}
+      <div className="card overflow-hidden">
+        <div
+          className="divide-y"
+          style={{ borderColor: "var(--color-border-default)" }}
+        >
+          <AnimatePresence>
+            {pageEntries.map((entry, i) => {
+              const isOpen = expandedId === entry.id;
+              const st = STATUS_STYLES[entry.status] || STATUS_STYLES.pending;
+              const StatusIcon = st.icon;
+
+              return (
+                <motion.div
+                  key={entry.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ delay: i * 0.03 }}
+                >
+                  {/* Trigger */}
+                  <button
+                    onClick={() => setExpandedId(isOpen ? null : entry.id)}
+                    className="w-full flex items-center gap-3 px-5 py-3.5 text-left transition-colors"
+                    style={{ background: isOpen ? "var(--color-neutral-tertiary-soft)" : "transparent" }}
+                  >
+                    <motion.div animate={{ rotate: isOpen ? 90 : 0 }} transition={{ duration: 0.15 }}>
+                      <ChevronRight size={16} style={{ color: "var(--color-body-subtle)" }} />
+                    </motion.div>
+                    <StatusIcon size={16} style={{ color: st.text }} />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium truncate block" style={{ color: "var(--color-heading)" }}>{entry.projectName}</span>
                     </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-        {paginated.length === 0 && (
-          <div className="px-4 py-10 text-center text-slate-500 text-sm">No audit entries match your filter.</div>
+                    <span className="text-xs capitalize px-2 py-0.5 rounded-md shrink-0" style={{ background: st.bg, border: `1px solid ${st.border}`, color: st.text }}>
+                      {entry.status}
+                    </span>
+                    <span className="text-xs shrink-0 flex items-center gap-1" style={{ color: "var(--color-body-subtle)" }}>
+                      <Clock size={12} /> {timeAgo(entry.timestamp)}
+                    </span>
+                  </button>
+
+                  {/* Panel */}
+                  <AnimatePresence>
+                    {isOpen && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.25 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="px-5 py-4 space-y-2" style={{ background: "var(--color-neutral-primary-soft)", borderTop: "1px solid var(--color-border-default)" }}>
+                          {Object.entries(entry.detail).map(([key, val]) => (
+                            <div key={key} className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3">
+                              <span className="text-xs font-medium shrink-0 w-24" style={{ color: "var(--color-body-subtle)" }}>{key}</span>
+                              <span className="text-xs font-mono break-all" style={{ color: "var(--color-body)" }}>{val}</span>
+                            </div>
+                          ))}
+                          <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3">
+                            <span className="text-xs font-medium shrink-0 w-24" style={{ color: "var(--color-body-subtle)" }}>Type</span>
+                            <span className="text-xs capitalize" style={{ color: "var(--color-body)" }}>{entry.type}</span>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+        </div>
+
+        {pageEntries.length === 0 && (
+          <div className="p-12 text-center">
+            <FileText size={36} className="mx-auto mb-3" style={{ color: "var(--color-body-subtle)" }} />
+            <p className="text-sm" style={{ color: "var(--color-body-subtle)" }}>No audit entries found.</p>
+          </div>
         )}
       </div>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-slate-500">Showing {Math.min((page-1)*PER_PAGE+1, filtered.length)}–{Math.min(page*PER_PAGE, filtered.length)} of {filtered.length}</p>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setPage(p => Math.max(1, p-1))}
-            disabled={page === 1}
-            className="px-3 py-1.5 text-xs rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:border-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors min-h-[44px] min-w-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent"
-            aria-label="Previous page"
-          >
-            ←
-          </button>
-          <span className="px-3 py-1.5 text-xs text-slate-400">Page {page}/{totalPages}</span>
-          <button
-            onClick={() => setPage(p => Math.min(totalPages, p+1))}
-            disabled={page === totalPages}
-            className="px-3 py-1.5 text-xs rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:border-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors min-h-[44px] min-w-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent"
-            aria-label="Next page"
-          >
-            →
-          </button>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs" style={{ color: "var(--color-body-subtle)" }}>
+            Showing {page * perPage + 1}–{Math.min((page + 1) * perPage, filtered.length)} of {filtered.length}
+          </p>
+          <div className="flex items-center gap-1" style={{ fontSize: 14 }}>
+            <button
+              disabled={page === 0}
+              onClick={() => setPage((p) => p - 1)}
+              className="px-3 py-1.5 rounded-l-lg text-sm font-medium disabled:opacity-40 transition-colors"
+              style={{
+                background: "var(--color-neutral-secondary-medium)",
+                border: "1px solid var(--color-border-default-medium)",
+                color: "var(--color-body)",
+                borderRadius: "var(--radius-base) 0 0 var(--radius-base)",
+              }}
+            >
+              Prev
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => (
+              <button
+                key={i}
+                onClick={() => setPage(i)}
+                className="w-9 h-9 flex items-center justify-center text-sm font-medium transition-colors"
+                style={{
+                  background: i === page ? "var(--color-neutral-tertiary-medium)" : "var(--color-neutral-secondary-medium)",
+                  color: i === page ? "var(--color-fg-brand)" : "var(--color-body)",
+                  border: "1px solid var(--color-border-default-medium)",
+                  marginLeft: i === 0 ? 0 : -1,
+                }}
+              >
+                {i + 1}
+              </button>
+            ))}
+            <button
+              disabled={page >= totalPages - 1}
+              onClick={() => setPage((p) => p + 1)}
+              className="px-3 py-1.5 rounded-r-lg text-sm font-medium disabled:opacity-40 transition-colors"
+              style={{
+                background: "var(--color-neutral-secondary-medium)",
+                border: "1px solid var(--color-border-default-medium)",
+                color: "var(--color-body)",
+                borderRadius: "0 var(--radius-base) var(--radius-base) 0",
+                marginLeft: -1,
+              }}
+            >
+              Next
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
