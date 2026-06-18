@@ -21,6 +21,8 @@ export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
   const router = useRouter();
 
   const commands: CommandItem[] = [
@@ -48,11 +50,15 @@ export function CommandPalette() {
     setQuery("");
   }, []);
 
+  // Global hotkey: Cmd/Ctrl+K toggles, Escape closes
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
-        setOpen((prev) => !prev);
+        setOpen((prev) => {
+          if (!prev) triggerRef.current = document.activeElement as HTMLElement;
+          return !prev;
+        });
       }
       if (e.key === "Escape") setOpen(false);
     };
@@ -60,11 +66,38 @@ export function CommandPalette() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
+  // Focus trap + return focus on close
   useEffect(() => {
-    if (open) {
-      setQuery("");
-      setTimeout(() => inputRef.current?.focus(), 50);
+    if (!open) {
+      triggerRef.current?.focus();
+      return;
     }
+
+    setQuery("");
+    setTimeout(() => inputRef.current?.focus(), 50);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Tab" || !containerRef.current) return;
+
+      const focusable = containerRef.current.querySelectorAll<HTMLElement>(
+        'input, button, [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, [open]);
 
   return (
@@ -77,8 +110,12 @@ export function CommandPalette() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[9998] bg-black/60 backdrop-blur-sm"
             onClick={() => setOpen(false)}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Command palette"
           />
           <motion.div
+            ref={containerRef}
             initial={{ opacity: 0, scale: 0.95, y: -20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -20 }}
@@ -98,6 +135,7 @@ export function CommandPalette() {
                   placeholder="Search pages, actions..."
                   className="flex-1 bg-transparent text-sm outline-none placeholder:text-[var(--color-fg-disabled)]"
                   style={{ color: "var(--color-heading)" }}
+                  aria-label="Command palette"
                 />
                 <kbd className="text-[10px] px-1.5 py-0.5 rounded-md font-mono" style={{ background: "var(--color-neutral-secondary-medium)", color: "var(--color-body-subtle)" }}>
                   ESC
