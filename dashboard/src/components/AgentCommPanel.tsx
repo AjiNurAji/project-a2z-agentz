@@ -179,8 +179,8 @@ export default function AgentCommPanel() {
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
-    if (bottomRef.current) {
-      bottomRef.current.scrollIntoView({ behavior: "smooth" });
+    if (containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
   }, [agentMessages]);
 
@@ -190,8 +190,8 @@ export default function AgentCommPanel() {
 
   return (
     <div
-      className="card flex flex-col"
-      style={{ borderRadius: "var(--radius-base)", minHeight: "400px" }}
+      className="card flex flex-col h-[400px]"
+      style={{ borderRadius: "var(--radius-base)" }}
     >
       {/* Header */}
       <div
