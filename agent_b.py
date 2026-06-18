@@ -35,10 +35,9 @@ class ExecutorVault:
         tx_hash = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
         return tx_hash.hex()
 
-    @classmethod
-    def get_contract(cls, address, abi):
-        """Contract factory method"""
-        return cls.w3.eth.contract(address=address, abi=abi)
+    def get_contract(self, address, abi):
+        """Load and return a contract instance"""
+        return self.w3.eth.contract(address=address, abi=abi)
 
     def listen_for_tasks(self, task_filepath="tasks.json", poll_interval=1.0):
         """

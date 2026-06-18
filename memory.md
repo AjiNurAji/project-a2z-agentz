@@ -230,21 +230,7 @@ project-a2z-agentz/
             ├── CircuitBreaker.tsx     # [UBAH] Context + Lucide + premium states
             ├── LiveLog.tsx            # [UBAH] Context + level colors + aria
             ├── ApprovalQueue.tsx      # [UBAH] Context + empty state + a11y
-            └── TransactionList.tsx # [UBAH] Context + expandable + Basescan
-            ├── DashboardContext.tsx
-            ├── Sidebar.tsx
-            ├── KpiCard.tsx
-            ├── PageHeader.tsx
-            ├── DashboardKpis.tsx
-            ├── AnalyticsCharts.tsx
-            ├── VectorMemoryExplorer.tsx
-            ├── SettingsPanel.tsx
-            ├── AuditTrail.tsx
-            ├── Navbar.tsx
-            ├── CircuitBreaker.tsx
-            ├── LiveLog.tsx
-            ├── ApprovalQueue.tsx
-            └── TransactionList.tsx
+            └── TransactionList.tsx     # [UBAH] Context + expandable + Basescan
 ```
 
 ## Sesi 6 — 2026-06-17 | Pondasi Modular Agent B, Fix raw_transaction, dan Async JSON Task Listener
