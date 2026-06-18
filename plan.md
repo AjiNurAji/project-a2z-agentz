@@ -1,153 +1,175 @@
-# 🚀 A2Z Agent Dashboard — Frontend Overhaul Plan
+# 🚀 A2Z Agent Dashboard — Visual Overhaul Plan v2
 
-> Generated: 2026-06-19 | Status: ✅ COMPLETED
-> Current: 48 files, 5,295 lines, 37+ components | Rating: 7.5/10 → 9.5/10 ✅
-
----
-
-## 📊 Audit Findings Summary
-
-| Category | Issues Found | Severity |
-|---|---|---|
-| Critical Bugs | 6 fixed | ✅ All resolved |
-| Dead/Unused Code | 4 wired up | ✅ All integrated |
-| Visual Gaps | 6 fixed | ✅ All polished |
-| Polish Items | 5 addressed | ✅ Done |
+> Generated: 2026-06-19 | Status: EXECUTING
+> Focus: Visual impact, interactivity, "wow factor" for hackathon demo
 
 ---
 
-## Phase 1: 🔴 Critical Bug Fixes (Demo-Breakers) — ✅ COMPLETED 2026-06-18
+## 📊 Problem Statement
 
-### 1.1 Fix Breadcrumbs Import
-- **File:** `components/ui/Breadcrumbs.tsx`
-- **Bug:** `import { motion } from "framer-motion"` — should be `"motion/react"`
-- **Impact:** Runtime error if framer-motion not installed separately
-- **Status:** ✅ Fixed — import updated to `motion/react`
+Current dashboard rating: **7.5/10** — functional but feels generic. Judges will see dozens of dark dashboards. We need **signature visual elements** that make A2Z Agent memorable.
 
-### 1.2 Fix CommandCenter Data Attributes
-- **File:** `components/ui/CommandCenter.tsx`
-- **Bug:** Queries `document.querySelector("[data-sidebar]")` and `"[data-navbar]"` but those attributes don't exist
-- **Fix:** Add `data-sidebar` to Sidebar's `<aside>`, `data-navbar` to Navbar's `<header>`
-- **Status:** ✅ Fixed — data attributes added to Sidebar and Navbar
-
-### 1.3 Fix AgentCommPanel Stagger Animation
-- **File:** `components/AgentCommPanel.tsx`
-- **Bug:** `index={0}` hardcoded — all messages animate simultaneously
-- **Fix:** Pass `index={i}` from `.map()` callback
-- **Status:** ✅ Fixed — dynamic index passed from map callback
+Target: **9.5/10** — a dashboard that makes judges stop and say "this is impressive."
 
 ---
 
-## Phase 2: 🟡 Wire Up Built-But-Unused Components — ✅ COMPLETED 2026-06-18
+## Phase 1: 🎨 Theme System (Light/Dark Toggle)
 
-### 2.1 AnimatedCounter → KpiCard
-- **Current:** Static `{value}` display
-- **Fix:** Replace with `<AnimatedCounter value={...} prefix="$" />` for TVL, success rate, transaction counts
-- **Impact:** HUGE demo wow-factor — numbers spring-animate on mount
-- **Status:** ✅ Integrated — KpiCard now uses AnimatedCounter
+### 1.1 Light Theme CSS Variables
+- Create `[data-theme="light"]` selector in `globals.css`
+- NOT an invert of dark — designed from scratch:
+  - Surface: warm white `#FAF9F7` (not pure white)
+  - Card: `#FFFFFF` with subtle warm shadow
+  - Text: dark charcoal `#1A1625` (not pure black)
+  - Brand: more vibrant `#6B4F8A` (lighter purple)
+  - Borders: soft `#E8E5EE`
+  - Status colors: slightly more saturated for light bg
+  - Shadows: actual box-shadows (dark theme uses borders instead)
 
-### 2.2 Tooltip → KpiCard + Status Indicators
-- **Current:** Zero tooltips anywhere
-- **Fix:** Wrap KpiCard icons, gas values, status badges with `<Tooltip>`
-- **Impact:** Shows attention to detail, better UX
-- **Status:** ✅ Integrated — Tooltips on KpiCards and status badges
+### 1.2 Theme Toggle Component
+- Create `components/ui/ThemeToggle.tsx`
+- Sun/Moon icon toggle with rotation animation
+- Uses `motion/react` for smooth icon transition
+- Persists to `localStorage` key `a2z-theme`
+- Reads `data-theme` attribute on `<html>` element
+- On mount: check localStorage → apply theme
 
-### 2.3 Skeleton → Loading States
-- **Current:** DashboardContext returns `null` before mounted
-- **Fix:** Show skeleton grid on mount, skeleton charts on analytics, skeleton bubbles on agent comm
-- **Impact:** Professional loading experience
-- **Status:** ✅ Integrated — Skeleton shown during SSR hydration
+### 1.3 Theme Provider Integration
+- Create `hooks/useTheme.ts` — manages theme state + localStorage
+- Integrate into `layout.tsx` — add script to prevent FOUC (flash of unstyled content)
+- Add `<ThemeToggle />` to Navbar (next to existing controls)
+- Add smooth CSS transition: `transition: background-color 0.3s, color 0.3s`
 
-### 2.4 EmptyState → VectorMemoryExplorer + AuditTrail
-- **Current:** Inline "no data" text
-- **Fix:** Use shared `<EmptyState>` with icon + CTA
-- **Impact:** Consistent empty states across all components
-- **Status:** ✅ Integrated — EmptyState used in VectorMemoryExplorer and AuditTrail
-
----
-
-## Phase 3: 🎨 Visual Impact Boosters — ✅ COMPLETED 2026-06-18
-
-### 3.1 Page Transition Animations
-- **Current:** Pages pop in instantly on navigation
-- **Fix:** Wrap page children in `motion.div` with fade-slide-up
-- **File:** `app/layout.tsx` — add transition wrapper around `{children}`
-- **Status:** ✅ Implemented — motion.div fade-slide-up on layout children
-
-### 3.2 Fix LiveLog Hardcoded Colors
-- **File:** `components/LiveLog.tsx`
-- **Current:** `text-[#7F94AD]`, `bg-[#7F94AD]/10` etc.
-- **Fix:** Replace with `var(--color-body-subtle)`, `var(--color-neutral-tertiary-soft)` etc.
-- **Status:** ✅ Fixed — all hardcoded hex replaced with CSS design tokens
-
-### 3.3 Fix AnalyticsCharts Hardcoded Colors
-- **File:** `components/AnalyticsCharts.tsx`
-- **Current:** Hardcoded chart hex colors
-- **Fix:** Use CSS variables for chart colors
-- **Status:** ✅ Fixed — chart colors use CSS variables
-
-### 3.4 Keyboard Shortcut Hints
-- **Current:** KeyboardNav exists but user doesn't know about it
-- **Fix:** Add subtle "⌘K" hint in search bar, "1-5" hint in sidebar footer
-- **Status:** ✅ Implemented — hints added to search bar and sidebar
-
-### 3.5 Mobile Sidebar Default State
-- **Current:** `sidebarOpen: true` on mount = overlay on mobile
-- **Fix:** Default to `false`, detect mobile via `window.innerWidth < 1024`
-- **Status:** ✅ Fixed — mobile-aware default state
-
-### 3.6 AgentCommPanel Typing Indicator
-- **Current:** New messages just appear
-- **Fix:** Show "Agent is typing..." with animated dots before new message appears
-- **Impact:** Feels like real chat — very impressive for demo
-- **Status:** ✅ Implemented — animated typing indicator before new messages
+### 1.4 Chart Theme Adaptation
+- AnalyticsCharts needs to detect theme and adjust colors
+- Define CHART_COLORS_DARK and CHART_COLORS_LIGHT
+- Use `useTheme()` hook to pick correct palette
 
 ---
 
-## Phase 4: 🧹 Code Quality — ✅ COMPLETED 2026-06-18
+## Phase 2: ✨ Dashboard "Feels Alive"
 
-### 4.1 Fix handleBlacklist
-- **File:** `DashboardContext.tsx`
-- **Current:** Only console.log, doesn't update state
-- **Fix:** Actually update `vectorMemory` status to "blacklisted"
-- **Status:** ✅ Fixed — state properly updated on blacklist action
+### 2.1 KPI Glow on Update
+- In `KpiCard.tsx`: detect when `numericValue` changes
+- Add brief glow/pulse effect (border glow or background flash)
+- Use `motion` `animate` with `key` change trigger
+- Duration: 600ms glow, then settle back
 
-### 4.2 Delete Dead ExpandableDetail
-- **File:** `TransactionList.tsx`
-- **Current:** `ExpandableDetail` component defined but never rendered
-- **Fix:** Remove dead code
-- **Status:** ✅ Fixed — dead code removed
+### 2.2 Trend Arrow Animation
+- KpiCard already shows trend (up/down arrow)
+- Animate the arrow: bounce up when trend is positive, shake down when negative
+- Use spring animation on trend indicator
 
-### 4.3 Update Documentation
-- **Files:** `memory.md`, `README.md`, `dashboard/README.md`
-- **Fix:** Document all new features, bugs fixed, component integration
-- **Status:** ✅ Completed — all documentation updated
+### 2.3 Live Activity Pulse
+- In `DashboardKpis.tsx`: add a subtle pulse ring on the "most active" KPI
+- Determined by which KPI changed most recently
+- CSS animation: expanding ring that fades out
 
 ---
 
-## Execution Order
+## Phase 3: 📊 Charts Level-Up
+
+### 3.1 Area Charts with Gradient Fill
+- Replace line charts with `<AreaChart>` in recharts
+- Add `<defs>` with `<linearGradient>` for each area
+- Gradient: brand color → transparent
+- Stacked areas for multi-series data
+
+### 3.2 Animated Data Points
+- Add `<Scatter>` dots on area charts that appear with delay
+- Use recharts `animationDuration={2000}` and `animationEasing="ease-out"`
+- Custom dot component with pulse animation on hover
+
+### 3.3 Chart Hover Enhancement
+- Custom tooltip with glassmorphism style
+- Show exact value + percentage change on hover
+- Animated crosshair on hover
+
+---
+
+## Phase 4: 🎬 Hero Moment — Staggered Entrance
+
+### 4.1 Dashboard Stagger Sequence
+- In `page.tsx`: wrap sections in staggered motion containers
+- Sequence:
+  1. PageHeader fades in (0ms delay)
+  2. KPI cards stagger in (100ms delay each, 6 cards = 600ms)
+  3. CircuitBreaker slides in (700ms delay)
+  4. AgentComm + LiveLog fade in (800ms delay)
+  5. ApprovalQueue + TransactionList fade in (900ms delay)
+- Use `motion` `variants` with `staggerChildren`
+
+### 4.2 Subtle Section Reveal
+- Each section has `initial={{ opacity: 0, y: 20 }}` → `animate={{ opacity: 1, y: 0 }}`
+- Spring transition for natural feel
+
+---
+
+## Phase 5: 🔥 Sidebar Life
+
+### 5.1 Active Page Pulse Ring
+- In `Sidebar.tsx`: active nav item gets a subtle pulsing dot/ring
+- CSS animation: `@keyframes pulse-ring` — scale 1→1.5, opacity 1→0
+- Brand color ring behind the active icon
+
+### 5.2 Agent Activity Sparkline
+- In sidebar agent status section: add a tiny sparkline (last 10 data points)
+- Use recharts `<Sparklines>` or custom SVG path
+- Shows agent activity over time (heartbeat-style)
+
+### 5.3 Nav Item Hover Enhancement
+- On hover: subtle left border slide-in + background tint
+- Use `motion` `whileHover` with `layoutId` for smooth transitions
+
+---
+
+## Phase 6: 🤖 Agent Comm Panel Enhancement
+
+### 6.1 Code Block Styling
+- In `AgentCommPanel.tsx`: detect hash/tx patterns (0x..., long hex strings)
+- Render in `<code>` block with monospace font, copy button
+- Style: `bg-[var(--color-neutral-primary)]`, rounded, border, subtle syntax colors
+
+### 6.2 Typing Speed Variation
+- Currently: fixed 900ms typing delay
+- Change: random delay between 600-1500ms per message
+- Longer messages = longer typing delay (proportional)
+- Add occasional "thinking..." state before complex messages
+
+### 6.3 Message Entrance Enhancement
+- Current: fade + slide from side
+- Add: slight scale bounce (0.95 → 1.0) for more "pop"
+- Timestamp fade-in with 200ms delay after message appears
+
+---
+
+## Phase 7: 🌟 Visual Differentiator — Signature Elements
+
+### 7.1 Gradient Mesh Background
+- Replace current static gradient blobs with animated mesh gradient
+- Use CSS `@keyframes` to slowly move/rotate gradient positions
+- 3-4 color stops that animate position over 20-30 seconds
+- Very subtle (opacity 0.06-0.1) — not distracting
+
+### 7.2 Glassmorphism Cards (Optional)
+- Add `backdrop-filter: blur(12px)` to cards on hover
+- Subtle border glow on hover: `box-shadow: 0 0 20px rgba(66, 52, 75, 0.15)`
+- Only on hover — not always visible (performance)
+
+### 7.3 Ambient Particle Effect (Optional)
+- Very subtle floating particles in background
+- 5-8 small dots that drift slowly
+- Use `motion` with `animate` loop
+- Only on dashboard page (not all pages)
+
+---
+
+## Execution Plan
 
 ```
-✅ DONE — Phase 1 (3 fixes) → Phase 2 (4 integrations) → Phase 3 (6 polish) → Phase 4 (3 cleanup)
-Total: 16 items, ~15 files modified, +300/-100 lines
+Phase 1 (Theme) → Phase 2 (Alive) → Phase 3 (Charts) → Phase 4 (Stagger)
+→ Phase 5 (Sidebar) → Phase 6 (Agent) → Phase 7 (Differentiator)
 ```
 
-**Constraints:**
-- Chunked write protocol (max 300 lines per write)
-- No heavy builds on T440
-- TypeScript verification after each phase
-- Single commit per phase
-- User tests on laptop utama
-
----
-
-## Success Criteria — ✅ ALL MET
-
-- [x] Zero TypeScript errors — ✅ Verified via `npm run build`
-- [x] All 4 UI utils (AnimatedCounter, Tooltip, Skeleton, EmptyState) actively used — ✅
-- [x] All 6 critical bugs fixed (3 original + 3 additional discovered) — ✅
-- [x] Page transitions smooth (fade-slide-up via motion.div) — ✅
-- [x] Agent comm feels like real chat (typing indicator + stagger) — ✅
-- [x] KPI numbers animate on mount (AnimatedCounter in KpiCard) — ✅
-- [x] Consistent design tokens everywhere (no hardcoded hex) — ✅
-- [x] Mobile sidebar doesn't overlay on mount — ✅
+**Total estimated:** 7 phases, ~20 files modified, +600/-200 lines
+**Constraint:** Chunked writes, no heavy builds on T440, TypeScript verify after each phase
