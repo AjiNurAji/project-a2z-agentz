@@ -85,24 +85,30 @@ npm start
 - **OG Image** — `opengraph-image.tsx` (1200×630 branded social preview)
 - **SEO** — `robots.ts` + `sitemap.ts` (dynamic generation)
 
-## 🎨 UI/UX Features (16 Fitur)
+## 🎨 UI/UX Features (22 Fitur)
 
 1. **Loading Skeletons** — `Skeleton.tsx` + 5× `loading.tsx` per-route
 2. **Toast Notifications** — `Toast.tsx` (success/error/info, auto-dismiss)
 3. **Error Boundaries** — `ErrorBoundary.tsx` (crash recovery)
-4. **Empty States** — `EmptyState.tsx` (icon + message + CTA)
-5. **Command Palette** — `CommandPalette.tsx` (⌘+K)
-6. **Command Center** — `CommandCenter.tsx` (grouped actions)
+4. **Empty States** — `EmptyState.tsx` (icon + message + CTA) — 🟢 actively used in VectorMemoryExplorer + AuditTrail
+5. **Command Palette** — `CommandPalette.tsx` (⌘+K) — 🟢 wired with real navigation & actions
+6. **Command Center** — `CommandCenter.tsx` (grouped actions) — 🟢 data attributes fixed
 7. **Keyboard Navigation** — `KeyboardNavWrapper.tsx` + `useKeyboardNav.ts`
-8. **Animated Counters** — `AnimatedCounter.tsx` (tween morph)
-9. **Tooltips** — `Tooltip.tsx` (accessible)
-10. **Breadcrumbs** — `Breadcrumbs.tsx` (route-aware)
+8. **Animated Counters** — `AnimatedCounter.tsx` (tween morph) — 🟢 actively used in KpiCard
+9. **Tooltips** — `Tooltip.tsx` (accessible) — 🟢 actively used on KpiCards & status badges
+10. **Breadcrumbs** — `Breadcrumbs.tsx` (route-aware) — 🟢 import fixed (motion/react)
 11. **Route Progress** — `RouteProgress.tsx` (top loading bar)
 12. **Scroll to Top** — `ScrollToTop.tsx` (floating button)
 13. **Skip to Content** — `SkipToContent.tsx` (a11y)
 14. **PWA Support** — `PWARegister.tsx` + manifest + SW
 15. **Export Utilities** — `exportUtils.ts` (CSV/JSON)
 16. **Reduced Motion** — `useReducedMotion.ts`
+17. **Page Transitions** — `motion.div` fade-slide-up wrapper on layout children
+18. **Typing Indicator** — Animated "Agent is typing..." dots in AgentCommPanel
+19. **Keyboard Shortcut Hints** — "⌘K" in search bar, "1-5" in sidebar footer
+20. **CommandPalette Actions** — Real navigation & actions wired to command palette
+21. **Design Tokens (LiveLog)** — All hardcoded hex replaced with CSS variables
+22. **Design Tokens (AnalyticsCharts)** — Chart colors use CSS variables
 
 ## 📦 Komponen Inventori (30+)
 
@@ -144,6 +150,8 @@ npm start
 - `PWARegister.tsx` — PWA service worker registration
 - `exportUtils.ts` — CSV/JSON export utilities
 - `useKeyboardNav.ts` — Keyboard navigation hook
+
+> **🟢 Actively Used:** `AnimatedCounter` (in KpiCard), `Tooltip` (KpiCard + status badges), `Skeleton` (SSR hydration loading), `EmptyState` (VectorMemoryExplorer + AuditTrail), `CommandPalette` (wired with real actions), `KeyboardNavWrapper` (with visible hints)
 
 ### Hooks
 - `useReducedMotion.ts` — `prefers-reduced-motion` detection
