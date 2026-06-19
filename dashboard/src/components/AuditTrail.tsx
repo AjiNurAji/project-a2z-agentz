@@ -3,7 +3,7 @@
 import { useDashboard } from "./DashboardContext";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { History, Search, ChevronRight, Clock, CheckCircle2, XCircle, AlertTriangle, Download } from "lucide-react";
+import { History, Search, ChevronRight, Clock, CheckCircle2, XCircle, AlertTriangle, Download, LucideIcon } from "lucide-react";
 import { exportToCSV } from "./ui/exportUtils";
 import { EmptyState } from "@/components/ui/EmptyState";
 
@@ -16,7 +16,7 @@ interface AuditEntry {
   detail: Record<string, string>;
 }
 
-const STATUS_STYLES: Record<string, { bg: string; border: string; text: string; icon: React.ElementType }> = {
+const STATUS_STYLES: Record<string, { bg: string; border: string; text: string; icon: LucideIcon }> = {
   success: { bg: "var(--color-success-soft)", border: "var(--color-border-success-subtle)", text: "var(--color-fg-success-strong)", icon: CheckCircle2 },
   failed: { bg: "var(--color-danger-soft)", border: "var(--color-border-danger-subtle)", text: "var(--color-fg-danger-strong)", icon: XCircle },
   pending: { bg: "var(--color-warning-soft)", border: "var(--color-border-warning-subtle)", text: "var(--color-fg-warning)", icon: AlertTriangle },

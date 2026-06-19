@@ -3,7 +3,7 @@
 import { useDashboard } from "./DashboardContext";
 import { useChartColors } from "@/hooks/useChartColors";
 import { motion } from "motion/react";
-import { BarChart3, TrendingUp, Activity, Zap } from "lucide-react";
+import { BarChart3, TrendingUp, Activity, Zap, LucideIcon } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -35,7 +35,7 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 }
 
 /* ── Summary Stat ───────────────────────────── */
-function StatCard({ label, value, icon: Icon, color }: { label: string; value: string; icon: React.ElementType; color: string }) {
+function StatCard({ label, value, icon: Icon, color }: { label: string; value: string; icon: LucideIcon; color: string }) {
   return (
     <div
       className="card flex items-center gap-3 p-4"

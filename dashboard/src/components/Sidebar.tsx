@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Sparkline } from "@/components/ui/Sparkline";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/agents", label: "Agents", icon: Bot },
   { href: "/memory", label: "Vector Memory", icon: Brain },
