@@ -1,133 +1,277 @@
-from web3 import Web3
+"""
+A2Z Agentz - Agent B: FastAPI REST Gateway (Vault Executor)
+Binds 0.0.0.0:8080. Wires together database.py + web3_client.py.
+
+Env:
+    AGENT_A_PUBLIC_KEY   - 0x-prefixed address that signs each execute request.
+    ETH_USD_RATE         - USD per ETH used for amount_usd -> wei conversion.
+                           (hackathon default: 3000)
+    BASE_RPC_URL_PRIMARY / BASE_RPC_URL_FALLBACK / PRIVATE_KEY / POSTGRES_URI
+                           - forwarded to web3_client.py and database.py.
+
+Run:
+    python agent_b.py
+    # or:  uvicorn agent_b:app --host 0.0.0.0 --port 8080
+"""
+
+from __future__ import annotations
+
+import hashlib
+import logging
 import os
-import json
-import time
-from dotenv import load_dotenv
+from typing import Optional, Union
 
-class ExecutorVault:
-    """
-    Web3 executed vault implementing direct on-chain execution capabilities
-    for the A2Z trading agent system.
-    """
-    def __init__(self, rpc_endpoint):
-        """Initialize RPC provider connection to Base Network"""
-        self.w3 = Web3(Web3.HTTPProvider(rpc_endpoint))
-        self.basechain_id = 8453
+from eth_account import Account
+from eth_account.messages import encode_defunct
+from fastapi import FastAPI, HTTPException, status
+from pydantic import BaseModel, Field, field_validator
 
-    def load_private_key(self, env_var_name="PRIVATE_KEY"):
-        """Safely load private key from environment"""
-        load_dotenv() # Load from .env if not set globally
-        private_key = os.getenv(env_var_name)
-        if not private_key:
-            raise ValueError(f"No private key found in {env_var_name}")
-        return private_key
+from database import (
+    check_idempotency,
+    close_pool,
+    insert_execution_log,
+    is_blacklisted,
+)
+from web3_client import simulate_and_execute_tx
 
-    def send_transaction(self, tx_params):
-        """Send ETH or contract interaction transaction"""
-        private_key = self.load_private_key()
-        account = self.w3.eth.account.from_key(private_key)
-        tx = tx_params.copy()
-        tx.update({
-            "chainId": self.basechain_id,
-            "nonce": self.w3.eth.get_transaction_count(account.address)
-        })
-        signed_tx = self.w3.eth.account.sign_transaction(tx, private_key)
-        tx_hash = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
-        return tx_hash.hex()
 
+# ----------------------------------------------------------------------------
+# Logger
+# ----------------------------------------------------------------------------
+logger = logging.getLogger("a2z.agent_b")
+if not logger.handlers:
+    _h = logging.StreamHandler()
+    _h.setFormatter(logging.Formatter("[%(asctime)s] %(levelname)s a2z.b: %(message)s"))
+    logger.addHandler(_h)
+logger.setLevel(logging.INFO)
+
+
+# ----------------------------------------------------------------------------
+# Config
+# ----------------------------------------------------------------------------
+AGENT_A_PUBLIC_KEY: str = os.getenv("AGENT_A_PUBLIC_KEY", "").strip()
+ETH_USD_RATE: float = float(os.getenv("ETH_USD_RATE", "3000"))
+AUTONOMOUS_CAP_USD: float = 2.0
+
+
+# ----------------------------------------------------------------------------
+# Pydantic schemas
+# ----------------------------------------------------------------------------
+class VaultExecuteRequest(BaseModel):
+    timestamp: Union[str, int, float]
+    project_target_address: str = Field(..., min_length=42, max_length=42)
+    amount_usd: float = Field(..., gt=0, le=10_000_000)
+    reason: str = Field(..., min_length=1, max_length=500)
+    signature: str = Field(..., min_length=130, max_length=132)
+
+    @field_validator("project_target_address")
     @classmethod
-    def get_contract(cls, address, abi):
-        """Contract factory method"""
-        return cls.w3.eth.contract(address=address, abi=abi)
+    def _addr_prefixed(cls, v: str) -> str:
+        if not v.lower().startswith("0x"):
+            raise ValueError("project_target_address must be 0x-prefixed")
+        return v
 
-    def listen_for_tasks(self, task_filepath="tasks.json", poll_interval=1.0):
-        """
-        Simple task listener for A2A (Agent-to-Agent) workflow.
+    @field_validator("signature")
+    @classmethod
+    def _sig_prefixed(cls, v: str) -> str:
+        if not v.lower().startswith("0x"):
+            raise ValueError("signature must be 0x-prefixed hex")
+        return v
 
-        Polls `task_filepath` for new transaction instructions from Agent A and
-        automatically executes them via `send_transaction` until an explicit stop
-        signal is encountered.
 
-        Expected JSON structure:
-        {
-          "tasks": [
-            {
-              "task_id": "...",
-              "status": "pending" | "processing" | "done" | "error",
-              "tx_params": {
-                "to": "0x...",
-                "value": web3.to_wei(0.01, "ether"),
-                "gas": 21000,
-                "gasPrice": web3.to_wei("50", "gwei"),
-                "data": "0x..."
-              }
-            }
-          ],
-          "meta": {
-            "loop": "run" | "stop"
-          }
-        }
-        """
-        if not os.path.exists(task_filepath):
-            raise FileNotFoundError(
-                f"Task file not found: {task_filepath}. "
-                "Agent A must create this file before polling."
+class VaultExecuteResponse(BaseModel):
+    status: str
+    tx_hash: Optional[str] = None
+    message: str
+
+
+# ----------------------------------------------------------------------------
+# Helpers
+# ----------------------------------------------------------------------------
+def _canonical_message(req: VaultExecuteRequest) -> str:
+    """Deterministic human-readable payload signed by Agent A."""
+    return (
+        f"project_target_address={req.project_target_address}\n"
+        f"timestamp={req.timestamp}\n"
+        f"amount_usd={req.amount_usd}\n"
+        f"reason={req.reason}"
+    )
+
+
+def _verify_signature(req: VaultExecuteRequest) -> bool:
+    if not AGENT_A_PUBLIC_KEY:
+        logger.error("AGENT_A_PUBLIC_KEY env var is not set")
+        return False
+    if not AGENT_A_PUBLIC_KEY.lower().startswith("0x"):
+        logger.error("AGENT_A_PUBLIC_KEY must be 0x-prefixed")
+        return False
+    try:
+        msg = encode_defunct(text=_canonical_message(req))
+        signer = Account.recover_message(msg, signature=req.signature)
+        ok = signer.lower() == AGENT_A_PUBLIC_KEY.lower()
+        if not ok:
+            logger.warning(
+                "Signature mismatch: signer=%s expected=%s…",
+                signer, AGENT_A_PUBLIC_KEY[:10],
+            )
+        return ok
+    except Exception as exc:
+        logger.warning("Signature verification raised: %s", exc)
+        return False
+
+
+def _idempotency_key(addr: str, ts) -> str:
+    """Mirror database._compute_idempotency_hash without leaking internals."""
+    return hashlib.sha256(
+        f"{addr.strip().lower()}:{ts}".encode("utf-8")
+    ).hexdigest()
+
+
+def _usd_to_wei(amount_usd: float) -> int:
+    if ETH_USD_RATE <= 0:
+        raise RuntimeError("ETH_USD_RATE must be > 0")
+    return int((float(amount_usd) / ETH_USD_RATE) * 10**18)
+
+
+# ----------------------------------------------------------------------------
+# FastAPI app
+# ----------------------------------------------------------------------------
+app = FastAPI(
+    title="A2Z Agentz — Vault Executor (Agent B)",
+    version="1.0.0",
+)
+
+
+@app.get("/healthz")
+def healthz() -> dict:
+    return {"status": "ok"}
+
+
+@app.post(
+    "/api/v1/vault/execute",
+    response_model=VaultExecuteResponse,
+)
+def vault_execute(req: VaultExecuteRequest) -> VaultExecuteResponse:
+    # ---- (1) ECDSA signature verification ----
+    if not _verify_signature(req):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid signature",
+        )
+
+    # ---- (2) Blacklist check ----
+    if is_blacklisted(req.project_target_address):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Target address is blacklisted",
+        )
+
+    # ---- (3) Idempotency check ----
+    if check_idempotency(req.project_target_address, req.timestamp):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Duplicate request (idempotency hit) — already processed",
+        )
+
+    log_key = _idempotency_key(req.project_target_address, req.timestamp)
+
+    # ---- (4) Autonomous cap branch ----
+    if req.amount_usd <= AUTONOMOUS_CAP_USD:
+        # Below cap: execute on-chain.
+        try:
+            value_wei = _usd_to_wei(req.amount_usd)
+        except Exception as exc:
+            logger.error("USD->wei conversion failed: %s", exc)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Conversion error: {exc}",
             )
 
-        while True:
-            try:
-                with open(task_filepath, "r") as f:
-                    payload = json.load(f)
+        try:
+            tx_hash = simulate_and_execute_tx(
+                req.project_target_address, value_wei
+            )
+        except Exception as exc:
+            # simulate_and_execute_tx already raised on revert (honeypot)
+            # or RPC failure. Surface as 502; nothing broadcast.
+            logger.error("simulate_and_execute_tx failed: %s", exc)
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"On-chain execution aborted: {exc}",
+            )
 
-                meta = payload.get("meta", {})
-                if meta.get("loop") == "stop":
-                    print("[Listener] Stop signal received. Exiting polling loop.")
-                    break
+        # Record SUCCESS keyed by the same idempotency hash so a retry
+        # of the exact same payload will be caught by step (3).
+        try:
+            insert_execution_log(
+                tx_hash_id=log_key,
+                address=req.project_target_address,
+                amount=req.amount_usd,
+                status="SUCCESS",
+            )
+        except Exception as exc:
+            logger.error("DB log failed after SUCCESS broadcast: %s", exc)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    f"TX broadcast ({tx_hash}) succeeded but DB logging failed: {exc}"
+                ),
+            )
 
-                tasks = payload.get("tasks", [])
-                updated = False
+        return VaultExecuteResponse(
+            status="SUCCESS",
+            tx_hash=tx_hash,
+            message=(
+                f"Autonomous execution OK within ${AUTONOMOUS_CAP_USD} cap "
+                f"(amount=${req.amount_usd})."
+            ),
+        )
 
-                for task in tasks:
-                    if task.get("status") != "pending":
-                        continue
+    # Above cap: queue for manual approval, no on-chain action.
+    try:
+        insert_execution_log(
+            tx_hash_id=log_key,
+            address=req.project_target_address,
+            amount=req.amount_usd,
+            status="PENDING_APPROVAL",
+        )
+    except Exception as exc:
+        logger.error("DB log failed for PENDING_APPROVAL: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to queue for approval: {exc}",
+        )
 
-                    task_id = task.get("task_id", "unknown")
-                    print(f"[Listener] Processing task '{task_id}'...")
-                    task["status"] = "processing"
-                    updated = True
+    return VaultExecuteResponse(
+        status="PENDING_APPROVAL",
+        tx_hash=None,
+        message=(
+            f"Amount ${req.amount_usd} exceeds autonomous cap "
+            f"(${AUTONOMOUS_CAP_USD}); queued for manual approval."
+        ),
+    )
 
-                    try:
-                        tx_params = task.get("tx_params")
-                        if not tx_params:
-                            raise ValueError("Missing 'tx_params' in task.")
 
-                        tx_hash = self.send_transaction(tx_params)
-                        task["tx_hash"] = tx_hash
-                        task["status"] = "done"
-                        print(
-                            f"[Listener] Task '{task_id}' executed. "
-                            f"Tx hash: {tx_hash}"
-                        )
-                    except Exception as exc:  # noqa: BLE001
-                        task["status"] = "error"
-                        task["error"] = str(exc)
-                        print(
-                            f"[Listener] Task '{task_id}' failed: {exc}"
-                        )
-                    updated = True
+# ----------------------------------------------------------------------------
+# Process lifecycle
+# ----------------------------------------------------------------------------
+@app.on_event("shutdown")
+def _on_shutdown() -> None:
+    try:
+        close_pool()
+    except Exception:  # pragma: no cover
+        pass
 
-                if updated:
-                    with open(task_filepath, "w") as f:
-                        json.dump(payload, f, indent=2)
 
-                time.sleep(poll_interval)
-
-            except FileNotFoundError:
-                print(
-                    f"[Listener] {task_filepath} disappeared mid-run. "
-                    "Waiting for it to reappear..."
-                )
-                time.sleep(poll_interval)
-            except json.JSONDecodeError as exc:
-                print(f"[Listener] Invalid JSON in {task_filepath}: {exc}")
-                time.sleep(poll_interval)
+# ----------------------------------------------------------------------------
+# Entry point
+# ----------------------------------------------------------------------------
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "agent_b:app",
+        host="0.0.0.0",
+        port=8080,
+        reload=False,
+        log_level="info",
+    )
