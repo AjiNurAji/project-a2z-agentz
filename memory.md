@@ -456,3 +456,58 @@ project-a2z-agentz/
         ├── hooks/                     # Custom react hooks
         └── components/                # React components & UI
 ```
+
+---
+
+## Sesi 14 — 2026-06-19 | Implementasi Core Backend & Database (Starlette)
+
+### 📌 Ringkasan
+Sesi ini berfokus pada implementasi jembatan backend antara sistem agen Python (Agent A/B) dengan dashboard Next.js. Backend ini awalnya dirancang menggunakan FastAPI, namun di-*refactor* ke **Starlette murni** demi menghindari isu kompilasi dependensi `pydantic-core` berbasis Rust di environment **Python 3.14** yang belum disupport penuh oleh ekosistem.
+
+### ✅ Hal yang Berhasil Dikerjakan
+
+| Item | Detail |
+|------|--------|
+| **Setup Docker Compose** | Menyusun `docker-compose.yml` untuk menjalankan PostgreSQL 15-alpine lokal beserta _auto-migration_ skema `database_schema.sql`. |
+| **Starlette API Core** | Mengganti *engine* FastAPI ke Starlette untuk kompatibilitas penuh dengan Python 3.14. Membuat REST API endpoints (`/api/stats`, `/api/targets`, `/api/transactions`, `/api/circuit-breaker`). |
+| **Real-time WebSockets** | Membangun `ConnectionManager` dan sistem *polling* database (5 detik) untuk mendorong (*push*) update log transaksi `execution_logs` secara instan ke dashboard. |
+| **Agent Scheduler** | Mengintegrasikan `APScheduler` (BackgroundScheduler) ke dalam *lifecycle* Starlette untuk menjalankan loop Agent A (setiap 5 menit) dan Agent B (setiap 1 menit). |
+| **Environment Fix** | Mengatasi konflik port mapping internal Docker dan merapikan sistem module import Python. |
+
+### ✏️ File yang DITAMBAHKAN / DIUBAH
+
+| File | Lokasi | Detail Perubahan |
+|------|--------|-----------------|
+| `docker-compose.yml` | `/` | File orkestrasi container untuk database PostgreSQL `a2z_db`. |
+| `main.py` | `/backend/` | *Entry point* Starlette server, CORS middleware, mounting API & WebSocket router, dan inisialisasi *scheduler*. |
+| `api.py` | `/backend/routes/` | Kumpulan *route* REST yang melakukan _query_ ke `database.py`. |
+| `websockets.py` | `/backend/routes/` | Handler `ws://` dan *background task* polling DB untuk disiarkan ke client. |
+| `agent_runner.py` | `/backend/scheduler/` | Pengaturan cron/interval `APScheduler` untuk simulasi _agent background loop_. |
+| `requirements.txt` | `/backend/` | Daftar dependensi `starlette`, `uvicorn`, `psycopg2-binary`, dll (tanpa strict versioning untuk Pydantic/FastAPI). |
+| `.env.example` | `/backend/` | _Template_ variabel lingkungan. |
+
+**Status: ✅ BACKEND API & WEBSOCKETS LIVE — KOMPATIBEL DENGAN PYTHON 3.14.**
+
+---
+
+## 🗂️ Struktur Direktori Akhir (Update Sesi 14)
+
+```
+project-a2z-agentz/
+├── README.md                          # AMD-stack branding
+├── docker-compose.yml                 # Database orchestration
+├── agent_b.py                         # Web3 executor
+├── database.py                        # DB Connection pooling
+├── database_schema.sql                # PostgreSQL SQL schema
+├── backend/                           # Backend API
+│   ├── main.py                        # Starlette entrypoint
+│   ├── requirements.txt               # Backend dependencies
+│   ├── .env.example                   # Env vars template
+│   ├── routes/
+│   │   ├── api.py                     # REST endpoints
+│   │   └── websockets.py              # WebSocket handlers
+│   └── scheduler/
+│       └── agent_runner.py            # APScheduler cron jobs
+├── docs/                              # Project Documentation
+└── dashboard/                         # Next.js Frontend
+```
