@@ -1,115 +1,161 @@
 "use client";
-import { useDashboard } from "./DashboardContext";
+
+import { useDashboard, type GasDataPoint, type TvlDataPoint, type SuccessDataPoint } from "./DashboardContext";
+import { motion } from "motion/react";
+import { BarChart3, TrendingUp, Activity, Zap } from "lucide-react";
 import {
   AreaChart, Area, LineChart, Line, BarChart, Bar,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 
-const CHART_COLORS = {
-  accent: "#38bdf8",
-  purple: "#8a2be2",
-  green: "#34d399",
-  red: "#ff2a2a",
-  amber: "#fbbf24",
-};
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function CustomTooltip({ active, payload, label, unit }: any) {
+/* ── Custom Tooltip ─────────────────────────── */
+function DarkTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; name: string; color: string }>; label?: string }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-slate-900 border border-slate-700 rounded-lg p-3 shadow-xl text-xs">
-      <p className="text-slate-400 mb-1.5 font-medium">{label}</p>
-      {payload.map((p: { name: string; value: number; color: string }, i: number) => (
-        <div key={i} className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
-          <span className="text-slate-300 capitalize">{p.name}:</span>
-          <span className="font-mono font-semibold text-white">{p.value}{unit ?? ""}</span>
-        </div>
+    <div
+      className="rounded-lg px-3 py-2 shadow-lg text-xs"
+      style={{
+        background: "var(--color-card)",
+        border: "1px solid var(--color-border-default)",
+      }}
+    >
+      <p className="font-medium mb-1" style={{ color: "var(--color-heading)" }}>{label}</p>
+      {payload.map((p, i) => (
+        <p key={i} style={{ color: p.color }}>
+          {p.name}: {typeof p.value === "number" ? p.value.toLocaleString() : p.value}
+        </p>
       ))}
     </div>
   );
 }
 
-function ChartCard({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
+/* ── Summary Stat ───────────────────────────── */
+function StatCard({ label, value, icon: Icon, color }: { label: string; value: string; icon: React.ElementType; color: string }) {
   return (
-    <div className="glass-card p-5">
-      <div className="mb-4">
-        <h3 className="font-heading text-base font-semibold text-white">{title}</h3>
-        <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>
+    <div
+      className="card flex items-center gap-3 p-4"
+    >
+      <div
+        className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+        style={{ backgroundColor: `${color}20`, color }}
+      >
+        <Icon size={18} />
       </div>
-      {children}
+      <div>
+        <p className="text-xs" style={{ color: "var(--color-body-subtle)" }}>{label}</p>
+        <p className="text-lg font-semibold" style={{ color: "var(--color-heading)" }}>{value}</p>
+      </div>
     </div>
   );
 }
 
+/* ── Main Component ─────────────────────────── */
 export default function AnalyticsCharts() {
-  const { tvlHistory, gasHistory, successHistory } = useDashboard();
+  const { gasHistory, tvlHistory, successHistory } = useDashboard();
+
+  const latestGas = gasHistory[gasHistory.length - 1]?.gwei ?? 0;
+  const latestTvl = tvlHistory[tvlHistory.length - 1]?.tvl ?? 0;
+  const totalSuccess = successHistory.reduce((s, d) => s + d.success, 0);
+  const totalFailed = successHistory.reduce((s, d) => s + d.failed, 0);
+  const successRate = totalSuccess + totalFailed > 0
+    ? Math.round((totalSuccess / (totalSuccess + totalFailed)) * 100)
+    : 0;
 
   return (
     <div className="space-y-6">
-      {/* TVL Area Chart */}
-      <ChartCard title="TVL Trend Analysis" subtitle="Total Value Locked across all tracked Web3 projects (30 days)">
-        <ResponsiveContainer width="100%" height={220}>
-          <AreaChart data={tvlHistory} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-            <defs>
-              <linearGradient id="tvlGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={CHART_COLORS.accent} stopOpacity={0.25} />
-                <stop offset="100%" stopColor={CHART_COLORS.accent} stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-            <XAxis dataKey="time" tick={{ fill: "#64748b", fontSize: 10 }} axisLine={false} tickLine={false} interval={4} />
-            <YAxis tickFormatter={(v) => `$${(v / 1000000).toFixed(1)}M`} tick={{ fill: "#64748b", fontSize: 10 }} axisLine={false} tickLine={false} width={55} />
-            <Tooltip content={<CustomTooltip />} />
-            <Area type="monotone" dataKey="tvl" name="TVL" stroke={CHART_COLORS.accent} strokeWidth={2} fill="url(#tvlGrad)" dot={false} activeDot={{ r: 4, fill: CHART_COLORS.accent }} />
-          </AreaChart>
-        </ResponsiveContainer>
-      </ChartCard>
+      {/* Summary Stats */}
+      <motion.div
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+        initial="hidden"
+        animate="visible"
+        variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}
+      >
+        <motion.div variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}>
+          <StatCard label="Latest Gas" value={`${latestGas} Gwei`} icon={Zap} color="#D49A5A" />
+        </motion.div>
+        <motion.div variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}>
+          <StatCard label="Current TVL" value={`$${(latestTvl / 1_000_000).toFixed(2)}M`} icon={TrendingUp} color="#6E9C7E" />
+        </motion.div>
+        <motion.div variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}>
+          <StatCard label="Weekly Success" value={totalSuccess.toString()} icon={BarChart3} color="#42344B" />
+        </motion.div>
+        <motion.div variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}>
+          <StatCard label="Success Rate" value={`${successRate}%`} icon={Activity} color="#6E5A7C" />
+        </motion.div>
+      </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Gas Price Line Chart */}
-        <ChartCard title="Gas Price Tracker" subtitle="Real-time Base Network gas prices (last 24 hours)">
-          <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={gasHistory} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-              <XAxis dataKey="time" tick={{ fill: "#64748b", fontSize: 9 }} axisLine={false} tickLine={false} interval={3} />
-              <YAxis tick={{ fill: "#64748b", fontSize: 10 }} axisLine={false} tickLine={false} width={40} />
-              <Tooltip content={<CustomTooltip unit=" Gwei" />} />
-              <Line type="monotone" dataKey="gwei" name="Gas" stroke={CHART_COLORS.amber} strokeWidth={2} dot={false} activeDot={{ r: 4, fill: CHART_COLORS.amber }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        {/* Success/Fail Bar Chart */}
-        <ChartCard title="Transaction Success Rate" subtitle="Weekly breakdown of successful vs. failed on-chain transactions">
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={successHistory} margin={{ top: 5, right: 10, left: 0, bottom: 5 }} barGap={4}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-              <XAxis dataKey="time" tick={{ fill: "#64748b", fontSize: 10 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: "#64748b", fontSize: 10 }} axisLine={false} tickLine={false} width={30} />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend wrapperStyle={{ fontSize: "11px", color: "#94a3b8", paddingTop: "8px" }} />
-              <Bar dataKey="success" name="Success" fill={CHART_COLORS.green} radius={[3, 3, 0, 0]} />
-              <Bar dataKey="failed" name="Failed" fill={CHART_COLORS.red} radius={[3, 3, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-      </div>
-
-      {/* Summary Stats Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {[
-          { label: "Avg Gas Price", value: "42 Gwei", delta: "−8% vs last week" },
-          { label: "Peak TVL (30d)", value: "$9.2M", delta: "+134% growth" },
-          { label: "Best Day", value: "Friday", delta: "24 successful txs" },
-          { label: "LLM Accuracy", value: "91.4%", delta: "Score > 85 threshold" },
-        ].map((stat) => (
-          <div key={stat.label} className="glass-card p-4">
-            <p className="text-xs text-slate-500">{stat.label}</p>
-            <p className="font-heading text-lg font-bold text-white mt-1">{stat.value}</p>
-            <p className="text-xs text-emerald-400 mt-0.5">{stat.delta}</p>
+      {/* Charts Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* TVL Area Chart */}
+        <motion.div
+          className="card p-5"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.4 }}
+        >
+          <h4 className="mb-4 font-serif" style={{ color: "var(--color-heading)" }}>TVL Trend (30 Days)</h4>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={tvlHistory}>
+                <defs>
+                  <linearGradient id="tvlGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#42344B" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#42344B" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#221F2B" />
+                <XAxis dataKey="time" tick={{ fill: "#A8A3B0", fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "#A8A3B0", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `$${(v / 1_000_000).toFixed(1)}M`} />
+                <Tooltip content={<DarkTooltip />} />
+                <Area type="monotone" dataKey="tvl" stroke="#42344B" strokeWidth={2} fill="url(#tvlGrad)" name="TVL" />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
-        ))}
+        </motion.div>
+
+        {/* Gas Line Chart */}
+        <motion.div
+          className="card p-5"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35, duration: 0.4 }}
+        >
+          <h4 className="mb-4 font-serif" style={{ color: "var(--color-heading)" }}>Gas Price (24h)</h4>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={gasHistory}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#221F2B" />
+                <XAxis dataKey="time" tick={{ fill: "#A8A3B0", fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "#A8A3B0", fontSize: 11 }} axisLine={false} tickLine={false} unit=" Gwei" />
+                <Tooltip content={<DarkTooltip />} />
+                <Line type="monotone" dataKey="gwei" stroke="#D49A5A" strokeWidth={2} dot={false} name="Gas" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </motion.div>
+
+        {/* Success/Failed Bar Chart */}
+        <motion.div
+          className="card p-5"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5, duration: 0.4 }}
+        >
+          <h4 className="mb-4 font-serif" style={{ color: "var(--color-heading)" }}>Weekly Transactions</h4>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={successHistory}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#221F2B" />
+                <XAxis dataKey="time" tick={{ fill: "#A8A3B0", fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "#A8A3B0", fontSize: 11 }} axisLine={false} tickLine={false} />
+                <Tooltip content={<DarkTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 12, color: "#A8A3B0" }} />
+                <Bar dataKey="success" fill="#6E9C7E" radius={[4, 4, 0, 0]} name="Success" />
+                <Bar dataKey="failed" fill="#C9596A" radius={[4, 4, 0, 0]} name="Failed" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </motion.div>
       </div>
     </div>
   );

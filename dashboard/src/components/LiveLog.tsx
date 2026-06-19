@@ -1,86 +1,156 @@
 "use client";
-import { useDashboard, LogEntry } from "./DashboardContext";
-import { useEffect, useRef, useState } from "react";
-import { Terminal, ChevronDown, ChevronUp, Wifi } from "lucide-react";
+import { useDashboard, type LogEntry } from "./DashboardContext";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { Terminal, ChevronDown, ChevronUp, Radio } from "lucide-react";
 
-const levelStyles: Record<LogEntry["level"], string> = {
-  INFO:    "text-slate-400",
-  WARN:    "text-amber-400",
-  SUCCESS: "text-emerald-400",
-  ERROR:   "text-brand-red",
-  AGENT_A: "text-brand-accent",
-  AGENT_B: "text-brand-purple",
+const levelStyles: Record<LogEntry["level"], { text: string; badge: string }> = {
+  INFO:    { text: "text-[#7F94AD]",   badge: "bg-[#7F94AD]/10 text-[#7F94AD] border-[#7F94AD]/20" },
+  WARN:    { text: "text-[#E5B57A]",   badge: "bg-[#E5B57A]/10 text-[#E5B57A] border-[#E5B57A]/20" },
+  SUCCESS: { text: "text-[#8AB89A]",   badge: "bg-[#8AB89A]/10 text-[#8AB89A] border-[#8AB89A]/20" },
+  ERROR:   { text: "text-[#E08A92]",   badge: "bg-[#E08A92]/10 text-[#E08A92] border-[#E08A92]/20" },
+  AGENT_A: { text: "text-[#A78FB5]",   badge: "bg-[#A78FB5]/10 text-[#A78FB5] border-[#A78FB5]/20" },
+  AGENT_B: { text: "text-[#7FA8A8]",   badge: "bg-[#7FA8A8]/10 text-[#7FA8A8] border-[#7FA8A8]/20" },
 };
 
 const levelLabels: Record<LogEntry["level"], string> = {
-  INFO: "SYS", WARN: "WARN", SUCCESS: "OK", ERROR: "ERR", AGENT_A: "SCT", AGENT_B: "VLT",
+  INFO: "SYS", WARN: "WRN", SUCCESS: "OK", ERROR: "ERR", AGENT_A: "SCT", AGENT_B: "VLT",
 };
 
 export default function LiveLog() {
   const { logs, agentAStatus } = useDashboard();
   const bottomRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (autoScroll && bottomRef.current) {
-      bottomRef.current.scrollIntoView({ behavior: "smooth" });
+    if (autoScroll && containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
   }, [logs, autoScroll]);
 
-  const handleScroll = () => {
+  const handleScroll = useCallback(() => {
     if (!containerRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-    setAutoScroll(scrollHeight - scrollTop - clientHeight < 50);
-  };
+    setAutoScroll(scrollHeight - scrollTop - clientHeight < 60);
+  }, []);
+
+  const statusColor =
+    agentAStatus === "online" ? "#8AB89A" :
+    agentAStatus === "analyzing" ? "#E5B57A" :
+    "#6B6577";
+
+  const reversed = [...logs].reverse();
 
   return (
-    <div className="glass-card flex flex-col h-80">
+    <div
+      className={`card flex flex-col transition-all duration-300 ${isCollapsed ? "h-auto" : "h-80"}`}
+      style={{ borderRadius: "var(--radius-base)" }}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/60 flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <Terminal className="w-4 h-4 text-brand-accent" aria-hidden="true" />
-          <h2 className="font-heading text-sm font-semibold text-white">Agent A Live Log</h2>
-          <span className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${
-            agentAStatus === "online" ? "bg-emerald-500/10 text-emerald-400" :
-            agentAStatus === "analyzing" ? "bg-amber-500/10 text-amber-400" : "bg-slate-700 text-slate-400"
-          }`}>
-            <Wifi className="w-2.5 h-2.5" aria-hidden="true" />
+      <div
+        className="flex items-center justify-between px-4 sm:px-5 py-3 flex-shrink-0"
+        style={{ borderBottom: "1px solid var(--color-border-muted)" }}
+      >
+        <div className="flex items-center gap-2.5">
+          <div
+            className="flex items-center justify-center w-7 h-7 rounded-lg"
+            style={{ background: "var(--color-brand-softer)" }}
+          >
+            <Terminal className="w-3.5 h-3.5" style={{ color: "var(--color-fg-purple)" }} />
+          </div>
+          <h5 className="text-sm font-semibold" style={{ color: "var(--color-heading)", fontFamily: "var(--font-serif)" }}>
+            Agent A Live Log
+          </h5>
+          <span
+            className="flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border font-medium"
+            style={{
+              background: `${statusColor}10`,
+              color: statusColor,
+              borderColor: `${statusColor}25`,
+            }}
+          >
+            <span
+              className="w-1.5 h-1.5 rounded-full animate-pulse-glow"
+              style={{ background: statusColor }}
+            />
             {agentAStatus}
           </span>
         </div>
-        <button
-          onClick={() => setAutoScroll(!autoScroll)}
-          aria-label={autoScroll ? "Pause auto-scroll" : "Resume auto-scroll"}
-          className="text-slate-500 hover:text-slate-300 transition-colors p-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent"
-          title={autoScroll ? "Pause scroll" : "Resume scroll"}
-        >
-          {autoScroll ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-        </button>
+
+        <div className="flex items-center gap-1.5">
+          {!isCollapsed && (
+            <button
+              onClick={() => setAutoScroll(!autoScroll)}
+              aria-label={autoScroll ? "Pause auto-scroll" : "Resume auto-scroll"}
+              className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] transition-colors"
+              style={{
+                color: autoScroll ? "var(--color-fg-success)" : "var(--color-fg-disabled)",
+                background: autoScroll ? "var(--color-success-soft)" : "transparent",
+              }}
+            >
+              <Radio className="w-3 h-3" />
+              {autoScroll ? "Live" : "Paused"}
+            </button>
+          )}
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            aria-label={isCollapsed ? "Expand log" : "Collapse log"}
+            className="flex items-center justify-center w-7 h-7 rounded-lg transition-colors hover:bg-white/[0.05]"
+            style={{ color: "var(--color-fg-disabled)" }}
+            title={isCollapsed ? "Expand" : "Collapse"}
+          >
+            {isCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+          </button>
+        </div>
       </div>
 
       {/* Log Lines */}
-      <div
-        ref={containerRef}
-        onScroll={handleScroll}
-        className="flex-1 overflow-y-auto p-3 font-mono text-xs space-y-1"
-        aria-live="polite"
-        aria-label="Agent A activity log"
-        role="log"
-      >
-        {[...logs].reverse().map((entry) => (
-          <div key={entry.id} className="flex items-start gap-2 leading-relaxed hover:bg-slate-800/30 px-1 rounded transition-colors">
-            <span className="text-slate-600 flex-shrink-0 mt-0.5 tabular-nums">
-              {entry.timestamp.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-            </span>
-            <span className={`flex-shrink-0 w-7 text-center font-bold text-[10px] ${levelStyles[entry.level]}`}>
-              {levelLabels[entry.level]}
-            </span>
-            <span className={`break-all ${levelStyles[entry.level]}`}>{entry.message}</span>
-          </div>
-        ))}
-        <div ref={bottomRef} />
-      </div>
+      {!isCollapsed && (
+        <div
+          ref={containerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto px-3 sm:px-4 py-3 space-y-0.5"
+          style={{ fontFamily: "var(--font-mono)" }}
+          aria-live="polite"
+          aria-label="Agent A activity log"
+          role="log"
+        >
+          <AnimatePresence initial={false}>
+            {reversed.map((entry) => (
+              <motion.div
+                key={entry.id}
+                initial={{ opacity: 0, y: -12, height: 0 }}
+                animate={{ opacity: 1, y: 0, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                className="flex items-start gap-2 sm:gap-3 py-1 px-2 rounded-md hover:bg-white/[0.02] transition-colors group"
+              >
+                <span
+                  className="flex-shrink-0 mt-[1px] tabular-nums text-[10px] sm:text-[11px] pt-px"
+                  style={{ color: "var(--color-fg-disabled)" }}
+                >
+                  {entry.timestamp.toLocaleTimeString("en-US", {
+                    hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit",
+                  })}
+                </span>
+                <span
+                  className={`flex-shrink-0 w-8 text-center font-bold text-[9px] sm:text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border ${levelStyles[entry.level].badge}`}
+                >
+                  {levelLabels[entry.level]}
+                </span>
+                <span
+                  className={`break-all text-[11px] sm:text-xs leading-relaxed ${levelStyles[entry.level].text}`}
+                >
+                  {entry.message}
+                </span>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+          <div ref={bottomRef} />
+        </div>
+      )}
     </div>
   );
 }

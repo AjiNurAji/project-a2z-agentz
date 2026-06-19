@@ -4,134 +4,227 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useDashboard } from "./DashboardContext";
 import {
-  LayoutDashboard, BarChart3, Database, Settings, History,
-  Bot, Zap, ShieldAlert, ChevronLeft, ChevronRight
+  LayoutDashboard, BarChart3, Brain, History, Settings,
+  Activity, ShieldAlert, ChevronLeft, ChevronRight, X, Zap,
 } from "lucide-react";
-import { useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/memory", label: "Vector Memory", icon: Database },
+  { href: "/memory", label: "Vector Memory", icon: Brain },
   { href: "/history", label: "Audit Trail", icon: History },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 function StatusDot({ status }: { status: string }) {
   const colors: Record<string, string> = {
-    online: "bg-emerald-400",
-    offline: "bg-slate-500",
-    analyzing: "bg-amber-400 animate-pulse",
-    executing: "bg-brand-accent animate-pulse",
+    online: "bg-[var(--color-success)]",
+    offline: "bg-[var(--color-gray)]",
+    analyzing: "bg-[var(--color-warning)] animate-pulse",
+    executing: "bg-[var(--color-fg-brand)] animate-pulse",
   };
-  return <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${colors[status] ?? "bg-slate-500"}`} />;
+  return (
+    <span
+      className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${colors[status] ?? "bg-[var(--color-gray)]"}`}
+    />
+  );
 }
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { agentAStatus, agentBStatus, isPaused, approvalQueue } = useDashboard();
-  const [collapsed, setCollapsed] = useState(false);
+  const { agentAStatus, agentBStatus, isPaused, approvalQueue, sidebarOpen, setSidebarOpen } = useDashboard();
 
-  return (
-    <aside
-      className={`flex flex-col h-screen sticky top-0 transition-all duration-300 ease-in-out bg-slate-950 border-r border-slate-800 ${collapsed ? "w-16" : "w-60"}`}
-      aria-label="Main navigation"
-    >
+  const sidebarContent = (
+    <>
       {/* Logo */}
-      <div className={`flex items-center gap-3 px-4 py-5 border-b border-slate-800 ${collapsed ? "justify-center" : ""}`}>
-        <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-gradient-to-br from-brand-purple to-brand-accent flex items-center justify-center shadow-lg shadow-brand-purple/30">
-          <Zap className="w-5 h-5 text-white" aria-hidden="true" />
+      <div className={`flex items-center gap-3 px-4 py-5 border-b border-[var(--color-border-default)] ${!sidebarOpen ? "justify-center" : ""}`}>
+        <div
+          className="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center"
+          style={{ background: "linear-gradient(135deg, var(--color-brand), var(--color-brand-medium))" }}
+        >
+          <Zap className="w-5 h-5 text-[var(--color-heading)]" aria-hidden="true" />
         </div>
-        {!collapsed && (
-          <div>
-            <h1 className="font-heading font-bold text-white text-sm leading-tight">A2Z Agent</h1>
-            <p className="text-slate-500 text-xs">AMD MI300X · Base</p>
-          </div>
-        )}
+        <AnimatePresence>
+          {sidebarOpen && (
+            <motion.div
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -8 }}
+              transition={{ duration: 0.2 }}
+            >
+              <h1 className="text-sm font-semibold text-[var(--color-heading)] leading-tight" style={{ fontFamily: "var(--font-serif)" }}>
+                A2Z Agent
+              </h1>
+              <p className="text-[11px] text-[var(--color-body-subtle)]">AMD MI300X · Base</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        {/* Mobile close button */}
+        <button
+          onClick={() => setSidebarOpen(false)}
+          className="ml-auto lg:hidden p-1 rounded-md text-[var(--color-body-subtle)] hover:text-[var(--color-heading)] hover:bg-[var(--color-neutral-secondary-medium)] focus-ring transition-colors"
+          aria-label="Close sidebar"
+        >
+          <X className="w-5 h-5" />
+        </button>
       </div>
 
       {/* Nav Items */}
       <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto" role="navigation">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+        {NAV_ITEMS.map(({ href, label, icon: Icon }, index) => {
           const isActive = pathname === href;
+          const badge =
+            label === "Audit Trail" && approvalQueue.length > 0 ? approvalQueue.length :
+            label === "Dashboard" && approvalQueue.length > 0 ? approvalQueue.length : 0;
+
           return (
-            <Link
+            <motion.div
               key={href}
-              href={href}
-              aria-current={isActive ? "page" : undefined}
-              title={collapsed ? label : undefined}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 group relative min-h-[44px]
-                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:ring-offset-1 focus-visible:ring-offset-slate-950
-                ${isActive
-                  ? "bg-brand-purple/15 text-white border border-brand-purple/30 shadow-sm shadow-brand-purple/20"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/60"
-                }`}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05, duration: 0.3 }}
             >
-              <Icon
-                className={`w-5 h-5 flex-shrink-0 transition-colors ${isActive ? "text-brand-accent" : "text-slate-500 group-hover:text-slate-300"}`}
-                aria-hidden="true"
-              />
-              {!collapsed && (
-                <>
-                  <span className="flex-1">{label}</span>
-                  {label === "Audit Trail" && approvalQueue.length > 0 && (
-                    <span className="ml-auto bg-brand-red text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse">
-                      {approvalQueue.length}
-                    </span>
+              <Link
+                href={href}
+                onClick={() => {
+                  // Close mobile sidebar on nav
+                  if (window.innerWidth < 1024) setSidebarOpen(false);
+                }}
+                aria-current={isActive ? "page" : undefined}
+                title={!sidebarOpen ? label : undefined}
+                className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-all duration-200 group relative min-h-[44px]
+                  focus-ring
+                  ${isActive
+                    ? "text-[var(--color-heading)]"
+                    : "text-[var(--color-body-subtle)] hover:text-[var(--color-heading)] hover:bg-[var(--color-neutral-secondary-medium)]"
+                  }`}
+                style={isActive ? {
+                  background: "linear-gradient(135deg, var(--color-brand-softer), var(--color-brand-soft))",
+                  border: "1px solid var(--color-border-brand-subtle)",
+                } : undefined}
+              >
+                <Icon
+                  className={`w-5 h-5 flex-shrink-0 transition-colors ${isActive ? "text-[var(--color-fg-brand-strong)]" : "text-[var(--color-body-subtle)] group-hover:text-[var(--color-body)]"}`}
+                  aria-hidden="true"
+                />
+                <AnimatePresence>
+                  {sidebarOpen && (
+                    <motion.span
+                      className="flex-1 flex items-center"
+                      initial={{ opacity: 0, width: 0 }}
+                      animate={{ opacity: 1, width: "auto" }}
+                      exit={{ opacity: 0, width: 0 }}
+                      transition={{ duration: 0.15 }}
+                    >
+                      <span className="flex-1 truncate">{label}</span>
+                      {badge > 0 && (
+                        <span
+                          className="ml-2 text-[var(--color-heading)] text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center"
+                          style={{ background: label === "Audit Trail" ? "var(--color-danger)" : "var(--color-warning)" }}
+                        >
+                          {badge}
+                        </span>
+                      )}
+                    </motion.span>
                   )}
-                  {label === "Dashboard" && approvalQueue.length > 0 && (
-                    <span className="ml-auto bg-amber-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                      {approvalQueue.length}
-                    </span>
-                  )}
-                </>
-              )}
-              {/* Active indicator bar */}
-              {isActive && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-brand-accent rounded-r-full" aria-hidden="true" />
-              )}
-            </Link>
+                </AnimatePresence>
+                {/* Active indicator bar */}
+                {isActive && (
+                  <motion.span
+                    layoutId="sidebar-active"
+                    className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 rounded-r-full"
+                    style={{ background: "var(--color-fg-brand-strong)" }}
+                  />
+                )}
+              </Link>
+            </motion.div>
           );
         })}
       </nav>
 
       {/* Agent Status Panel */}
-      {!collapsed && (
-        <div className="px-3 pb-4 space-y-2">
-          <p className="px-2 text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Agent Status</p>
-          <div className="glass-card px-3 py-2.5 space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Bot className="w-3.5 h-3.5 text-brand-accent" aria-hidden="true" />
-                <span className="text-xs text-slate-400 truncate">Agent A (Scout)</span>
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="px-3 pb-4 space-y-2"
+          >
+            <p className="px-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-body-subtle)] mb-2">
+              Agent Status
+            </p>
+            <div className="card p-3 space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-3.5 h-3.5 text-[var(--color-fg-brand)]" aria-hidden="true" />
+                  <span className="text-xs text-[var(--color-body)] truncate">Agent A (Scout)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <StatusDot status={agentAStatus} />
+                  <span className="text-[11px] text-[var(--color-body-subtle)] capitalize">{agentAStatus}</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5">
-                <StatusDot status={agentAStatus} />
-                <span className="text-xs text-slate-500 capitalize">{agentAStatus}</span>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <ShieldAlert className="w-3.5 h-3.5 text-[var(--color-fg-purple)]" aria-hidden="true" />
+                  <span className="text-xs text-[var(--color-body)] truncate">Agent B (Vault)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <StatusDot status={isPaused ? "offline" : agentBStatus} />
+                  <span className="text-[11px] text-[var(--color-body-subtle)] capitalize">
+                    {isPaused ? "paused" : agentBStatus}
+                  </span>
+                </div>
               </div>
             </div>
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <ShieldAlert className="w-3.5 h-3.5 text-brand-purple" aria-hidden="true" />
-                <span className="text-xs text-slate-400 truncate">Agent B (Vault)</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <StatusDot status={isPaused ? "offline" : agentBStatus} />
-                <span className="text-xs text-slate-500 capitalize">{isPaused ? "paused" : agentBStatus}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Collapse Toggle */}
+      {/* Collapse Toggle — desktop only */}
       <button
-        onClick={() => setCollapsed(!collapsed)}
-        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        className="flex items-center justify-center h-12 border-t border-slate-800 text-slate-500 hover:text-slate-300 hover:bg-slate-800/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+        className="hidden lg:flex items-center justify-center h-12 border-t border-[var(--color-border-default)] text-[var(--color-body-subtle)] hover:text-[var(--color-heading)] hover:bg-[var(--color-neutral-secondary-medium)] transition-colors focus-ring"
       >
-        {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        {sidebarOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
       </button>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Mobile overlay backdrop */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 bg-black/60 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Sidebar panel */}
+      <motion.aside
+        className={`
+          fixed lg:sticky top-0 left-0 z-50 lg:z-auto
+          flex flex-col h-screen
+          bg-[var(--color-surface)] border-r border-[var(--color-border-default)]
+          transition-none lg:transition-all lg:duration-300
+          ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
+        `}
+        animate={{ width: sidebarOpen ? 256 : 72 }}
+        transition={{ duration: 0.3, ease: "easeInOut" }}
+        aria-label="Main navigation"
+      >
+        {sidebarContent}
+      </motion.aside>
+    </>
   );
 }

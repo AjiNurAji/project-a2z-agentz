@@ -275,6 +275,21 @@ def simulate_and_execute_tx(
     return tx_hash_hex
 
 
+def get_contract(address: str, abi: list):
+    """
+    Load and return a Web3 contract instance for ``address`` using ``abi``.
+
+    Args:
+        address: 0x-prefixed contract address (checksum-normalized internally).
+        abi:     Contract ABI (list / dict).
+
+    Returns:
+        A web3.py ``Contract`` instance bound to the cached W3 provider.
+    """
+    w3 = _get_w3()
+    return w3.eth.contract(address=Web3.to_checksum_address(address), abi=abi)
+
+
 # ----------------------------------------------------------------------------
 # Optional smoke test: `python web3_client.py`
 # ----------------------------------------------------------------------------
