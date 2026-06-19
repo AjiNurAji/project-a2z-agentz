@@ -6,13 +6,15 @@ import { useDashboard } from "./DashboardContext";
 import { Tooltip } from "@/components/ui/Tooltip";
 import {
   LayoutDashboard, BarChart3, Brain, History, Settings,
-  Activity, ShieldAlert, ChevronLeft, ChevronRight, X, Zap,
+  Activity, ShieldAlert, ChevronLeft, ChevronRight, X, Bot,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { Sparkline } from "@/components/ui/Sparkline";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/agents", label: "Agents", icon: Bot },
   { href: "/memory", label: "Vector Memory", icon: Brain },
   { href: "/history", label: "Audit Trail", icon: History },
   { href: "/settings", label: "Settings", icon: Settings },
@@ -27,42 +29,13 @@ function StatusDot({ status }: { status: string }) {
   };
   return (
     <span
-      className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${colors[status] ?? "bg-[var(--color-gray)]"}`}
+      className={`w-2 h-2 rounded-full ${colors[status] || "bg-[var(--color-gray)]"}`}
+      aria-hidden="true"
     />
   );
 }
 
-// Sparkline component for agent heartbeat visualization
-function Sparkline({ data }: { data: number[] }) {
-  const width = 60;
-  const height = 20;
-  const padding = 2;
-  
-  if (data.length === 0) return null;
-  
-  const max = Math.max(...data);
-  const min = Math.min(...data);
-  const range = max - min || 1;
-  
-  const points = data.map((value, index) => {
-    const x = padding + (index / (data.length - 1)) * (width - padding * 2);
-    const y = height - padding - ((value - min) / range) * (height - padding * 2);
-    return `${x},${y}`;
-  }).join(" ");
-  
-  return (
-    <svg width={width} height={height} className="opacity-60">
-      <polyline
-        points={points}
-        fill="none"
-        stroke="var(--color-success)"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
+
 
 // Generate mock heartbeat data
 function generateHeartbeatData(): number[] {
@@ -71,17 +44,17 @@ function generateHeartbeatData(): number[] {
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { agentAStatus, agentBStatus, isPaused, approvalQueue, sidebarOpen, setSidebarOpen } = useDashboard();
+  const { sidebarOpen, setSidebarOpen, approvalQueue, agentAStatus, agentBStatus, isPaused } = useDashboard();
 
   const sidebarContent = (
     <>
       {/* Logo */}
       <div className={`flex items-center gap-3 px-4 py-5 border-b border-[var(--color-border-default)] ${!sidebarOpen ? "justify-center" : ""}`}>
         <div
-          className="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center"
-          style={{ background: "linear-gradient(135deg, var(--color-brand), var(--color-brand-medium))" }}
+          className="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center overflow-hidden"
+          style={{ background: "var(--color-neutral-secondary-medium)", border: "1px solid var(--color-border-brand-subtle)" }}
         >
-          <Zap className="w-5 h-5 text-[var(--color-heading)]" aria-hidden="true" />
+          <img src="/images/logo/logo.svg" className="w-7 h-7 object-contain" alt="A2Z Logo" />
         </div>
         <AnimatePresence>
           {sidebarOpen && (
@@ -232,9 +205,13 @@ export default function Sidebar() {
                   <span className="text-[10px] text-[var(--color-fg-disabled)]">Farcaster Scanner</span>
                   <span className="text-[10px] tabular-nums text-[var(--color-fg-disabled)]">~180ms</span>
                 </div>
+                <div className="flex items-center justify-between pl-5">
+                  <span className="text-[10px] text-[var(--color-fg-disabled)]">Uptime (24h)</span>
+                  <span className="text-[10px] tabular-nums text-[var(--color-fg-success)] font-medium">99.8%</span>
+                </div>
                 {/* Sparkline for Agent A */}
                 <div className="pl-5 pt-1">
-                  <Sparkline data={generateHeartbeatData()} />
+                  <Sparkline data={generateHeartbeatData()} color="var(--color-success)" />
                 </div>
               </div>
               <div className="h-px" style={{ background: "var(--color-border-default)" }} />
@@ -255,11 +232,15 @@ export default function Sidebar() {
                 </div>
                 <div className="flex items-center justify-between pl-5">
                   <span className="text-[10px] text-[var(--color-fg-disabled)]">Base Network (8453)</span>
-                  <span className="text-[10px] tabular-nums text-[var(--color-fg-disabled)]">Connected</span>
+                  <span className="text-[10px] tabular-nums text-[var(--color-fg-disabled)] font-medium">Connected</span>
+                </div>
+                <div className="flex items-center justify-between pl-5">
+                  <span className="text-[10px] text-[var(--color-fg-disabled)]">Uptime (24h)</span>
+                  <span className="text-[10px] tabular-nums text-[var(--color-fg-success)] font-medium">99.9%</span>
                 </div>
                 {/* Sparkline for Agent B */}
                 <div className="pl-5 pt-1">
-                  <Sparkline data={generateHeartbeatData()} />
+                  <Sparkline data={generateHeartbeatData()} color="var(--color-success)" />
                 </div>
               </div>
             </div>
@@ -286,9 +267,15 @@ export default function Sidebar() {
       <button
         onClick={() => setSidebarOpen(!sidebarOpen)}
         aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
-        className="hidden lg:flex items-center justify-center h-12 border-t border-[var(--color-border-default)] text-[var(--color-body-subtle)] hover:text-[var(--color-heading)] hover:bg-[var(--color-neutral-secondary-medium)] transition-colors focus-ring"
+        className="hidden lg:flex flex-col items-center justify-center gap-1.5 h-16 border-t border-[var(--color-border-default)] text-[var(--color-body-subtle)] hover:text-[var(--color-heading)] hover:bg-[var(--color-neutral-secondary-medium)] transition-colors focus-ring"
       >
-        {sidebarOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+        {!sidebarOpen && (
+          <div className="flex items-center gap-1 px-2 mb-1">
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: agentAStatus === "online" ? "var(--color-success)" : agentAStatus === "analyzing" ? "var(--color-warning)" : "var(--color-gray)" }} title={`Agent A: ${agentAStatus}`} />
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: isPaused ? "var(--color-danger)" : agentBStatus === "online" ? "var(--color-success)" : agentBStatus === "executing" ? "var(--color-fg-brand)" : "var(--color-gray)" }} title={`Agent B: ${isPaused ? "paused" : agentBStatus}`} />
+          </div>
+        )}
+        {sidebarOpen ? <ChevronLeft className="w-4.5 h-4.5" /> : <ChevronRight className="w-4.5 h-4.5" />}
       </button>
     </>
   );
@@ -315,7 +302,7 @@ export default function Sidebar() {
         className={`
           fixed lg:sticky top-0 left-0 z-50 lg:z-auto
           flex flex-col h-screen
-          bg-[var(--color-surface)] border-r border-[var(--color-border-default)]
+          bg-[var(--color-sidebar)] border-r border-[var(--color-border-default)]
           transition-none lg:transition-all lg:duration-300
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
         `}

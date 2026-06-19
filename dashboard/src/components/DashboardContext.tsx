@@ -98,6 +98,34 @@ export interface AgentMessage {
   };
 }
 
+export type NotificationType = "approval" | "failure" | "agent" | "threshold";
+
+export interface AppNotification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  timestamp: Date;
+  read: boolean;
+  link?: string;
+}
+
+export interface AgentHealth {
+  latencyMs: number;
+  inferenceMs: number;
+  successCount: number;
+  failCount: number;
+  queueDepth: number;
+  uptimePct: number;
+}
+
+export type Density = "compact" | "comfortable" | "spacious";
+
+export interface AppPreferences {
+  density: Density;
+  onboarded: boolean;
+}
+
 interface DashboardContextType {
   agentAStatus: AgentStatus;
   agentBStatus: AgentStatus;
@@ -120,6 +148,15 @@ interface DashboardContextType {
   agentMessages: AgentMessage[];
   sidebarOpen: boolean;
   setSidebarOpen: (v: boolean) => void;
+  lastSync: number;
+  notifications: AppNotification[];
+  unreadCount: number;
+  addNotification: (type: NotificationType, title: string, body: string, link?: string) => void;
+  markNotificationsRead: () => void;
+  clearNotifications: () => void;
+  agentHealth: { a: AgentHealth; b: AgentHealth };
+  preferences: AppPreferences;
+  setPreferences: (p: Partial<AppPreferences>) => void;
 }
 
 const DashboardContext = createContext<DashboardContextType | null>(null);
@@ -278,16 +315,64 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [config, setConfig] = useState<DashboardConfig>(DEFAULT_CONFIG);
   const [agentMessages, setAgentMessages] = useState<AgentMessage[]>(genAgentConversation());
   const [sidebarOpen, setSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
+  const [lastSync, setLastSync] = useState<number>(Date.now());
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [preferences, setPreferencesState] = useState<AppPreferences>({ density: "comfortable", onboarded: false });
+  const [agentHealth, setAgentHealth] = useState<{ a: AgentHealth; b: AgentHealth }>({
+    a: { latencyMs: 180, inferenceMs: 1400, successCount: 0, failCount: 0, queueDepth: 0, uptimePct: 99.8 },
+    b: { latencyMs: 0, inferenceMs: 0, successCount: 0, failCount: 0, queueDepth: 0, uptimePct: 99.9 },
+  });
   const logCountRef = useRef(0);
 
   useEffect(() => {
-    setTransactions(genInitialTransactions());
-    setApprovalQueue(genInitialApprovals());
-    setVectorMemory(genInitialVectorMemory());
-    setGasHistory(genGasHistory());
-    setTvlHistory(genTvlHistory());
-    setSuccessHistory(genSuccessHistory());
-    setMounted(true);
+    try {
+      const stored = localStorage.getItem("a2z-prefs");
+      if (stored) {
+        const parsed = JSON.parse(stored) as Partial<AppPreferences>;
+        setPreferencesState((prev) => ({ ...prev, ...parsed }));
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    setAgentHealth((h) => ({
+      ...h,
+      b: { ...h.b, queueDepth: approvalQueue.length },
+    }));
+  }, [approvalQueue.length]);
+
+  const addNotification = useCallback((type: NotificationType, title: string, body: string, link?: string) => {
+    setNotifications((prev) => [
+      { id: genId(), type, title, body, timestamp: new Date(), read: false, link },
+      ...prev,
+    ].slice(0, 50));
+  }, []);
+
+  const markNotificationsRead = useCallback(() => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  }, []);
+
+  const clearNotifications = useCallback(() => setNotifications([]), []);
+
+  const setPreferences = useCallback((p: Partial<AppPreferences>) => {
+    setPreferencesState((prev) => {
+      const next = { ...prev, ...p };
+      try { localStorage.setItem("a2z-prefs", JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setTransactions(genInitialTransactions());
+      setApprovalQueue(genInitialApprovals());
+      setVectorMemory(genInitialVectorMemory());
+      setGasHistory(genGasHistory());
+      setTvlHistory(genTvlHistory());
+      setSuccessHistory(genSuccessHistory());
+      setMounted(true);
+    }, 0);
+    return () => clearTimeout(t);
   }, []);
   const addLog = useCallback((level: LogEntry["level"], message: string) => {
     setLogs((prev) => [{ id: genId(), timestamp: new Date(), level, message }, ...prev].slice(0, 100));
@@ -298,6 +383,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isPaused) return;
     const interval = setInterval(() => {
+      setLastSync(Date.now());
       const roll = Math.random();
 
       if (roll < 0.35) {
@@ -348,6 +434,17 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           gasUsedGwei: randInt(35, 65),
         };
         setTransactions((prev) => [newTx, ...prev].slice(0, 50));
+        setAgentHealth((h) => ({
+          ...h,
+          b: {
+            ...h.b,
+            successCount: h.b.successCount + (success ? 1 : 0),
+            failCount: h.b.failCount + (success ? 0 : 1),
+          },
+        }));
+        if (!success) {
+          addNotification("failure", "Transaction failed", `${proj} — RPC timeout, retry scheduled`, "/history");
+        }
         addLog(
           success ? "SUCCESS" : "ERROR",
           success
@@ -371,7 +468,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       }
     }, 4000);
     return () => clearInterval(interval);
-  }, [isPaused, addLog]);
+  }, [isPaused, addLog, addNotification]);
 
   const kpiMetrics: KpiMetrics = {
     totalTvlAnalyzed: 42_800_000 + transactions.length * 180000,
@@ -466,6 +563,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         config, setConfig,
         handleApprove, handleReject, handleBlacklist, handleClearCache,
         agentMessages, sidebarOpen, setSidebarOpen,
+        lastSync, notifications, unreadCount: notifications.filter((n) => !n.read).length,
+        addNotification, markNotificationsRead, clearNotifications,
+        agentHealth, preferences, setPreferences,
       }}
     >
       {children}

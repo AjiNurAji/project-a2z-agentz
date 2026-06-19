@@ -1,6 +1,24 @@
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
+@theme {
+  --font-sans: "Inter", var(--font-inter), system-ui, sans-serif;
+  --font-serif: "IBM Plex Serif", var(--font-ibm-plex-serif), Georgia, serif;
+  --font-mono: "Geist Mono", var(--font-geist-mono), "JetBrains Mono", monospace;
+
+  --animate-pulse-glow: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-pulse-ring: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+  @keyframes pulse-ring {
+    0% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(1.05); opacity: 0; }
+  }
+}
+
 :root {
   /* Surface & Card */
   --color-surface: #13111C;
@@ -97,6 +115,7 @@
   --color-dark: #13111A;
   --color-dark-strong: #221B27;
   --color-disabled: #1E1B27;
+  --color-sidebar: #13111C;
 
   /* Font */
   --font-sans: "Inter", system-ui, sans-serif;
@@ -117,128 +136,144 @@
   --radius-default: 8px;
   --radius-sm: 4px;
   --radius-full: 9999px;
+
+  /* Chart Colors (Dark Theme) */
+  --color-chart-brand: #42344B;
+  --color-chart-accent: #6E5A7C;
+  --color-chart-success: #6E9C7E;
+  --color-chart-danger: #C9596A;
+  --color-chart-warning: #D49A5A;
+  --color-chart-grid: #221F2B;
+  --color-chart-muted: #A8A3B0;
+  --color-chart-primary: #42344B;
+  --color-chart-secondary: #6E5A7C;
+  --color-chart-glow: #6E5A7C;
 }
 
 /* ── Light Theme ────────────────────────────── */
 html[data-theme="light"] {
   /* Surface & Card */
-  --color-surface: #FAF9F7;
+  --color-surface: #F8FAFC;
   --color-card: #FFFFFF;
-  --color-card-secondary: #F5F3F0;
+  --color-card-secondary: #F1F5F9;
+  --color-sidebar: #FFFFFF;
 
   /* Neutral Backgrounds */
   --color-neutral-primary-soft: #FFFFFF;
-  --color-neutral-primary: #FAF9F7;
-  --color-neutral-primary-medium: #F0EDE8;
-  --color-neutral-primary-strong: #E8E5EE;
-  --color-neutral-secondary-soft: #F5F3F0;
+  --color-neutral-primary: #F8FAFC;
+  --color-neutral-primary-medium: #F1F5F9;
+  --color-neutral-primary-strong: #E2E8F0;
+  --color-neutral-secondary-soft: #F8FAFC;
   --color-neutral-secondary: #FFFFFF;
-  --color-neutral-secondary-medium: #EDE9E3;
-  --color-neutral-secondary-strong: #E0DCD5;
-  --color-neutral-tertiary-soft: #E8E5EE;
-  --color-neutral-tertiary: #D4D0DC;
-  --color-neutral-tertiary-medium: #C8C3D0;
-  --color-neutral-quaternary: #B8B3C0;
-  --color-quaternary-medium: #A8A2B0;
-  --color-gray: #8A8494;
+  --color-neutral-secondary-medium: #F1F5F9;
+  --color-neutral-secondary-strong: #E2E8F0;
+  --color-neutral-tertiary-soft: #E2E8F0;
+  --color-neutral-tertiary: #CBD5E1;
+  --color-neutral-tertiary-medium: #94A3B8;
+  --color-neutral-quaternary: #64748B;
+  --color-quaternary-medium: #475569;
+  --color-gray: #64748B;
 
   /* Brand */
-  --color-brand-softer: #F0EAF5;
-  --color-brand-soft: #E0D5EB;
-  --color-brand: #6B4F8A;
-  --color-brand-medium: #7E5FA0;
-  --color-brand-strong: #5A3F75;
+  --color-brand-softer: #F5F3FF;
+  --color-brand-soft: #EDE9FE;
+  --color-brand: #6366F1;
+  --color-brand-medium: #4F46E5;
+  --color-brand-strong: #4338CA;
 
   /* Status */
-  --color-success-soft: #E8F5ED;
-  --color-success: #2D7A4A;
-  --color-success-medium: #D0EDE0;
-  --color-success-strong: #1B5C35;
-  --color-danger-soft: #FDE8EA;
-  --color-danger: #B91C3A;
-  --color-danger-medium: #F5D0D5;
-  --color-danger-strong: #9A1530;
-  --color-warning-soft: #FDF3E5;
-  --color-warning: #A16B1A;
-  --color-warning-medium: #F5E5CC;
-  --color-warning-strong: #855810;
+  --color-success-soft: #ECFDF5;
+  --color-success: #10B981;
+  --color-success-medium: #D1FAE5;
+  --color-success-strong: #047857;
+  --color-danger-soft: #FFF1F2;
+  --color-danger: #F43F5E;
+  --color-danger-medium: #FFE4E6;
+  --color-danger-strong: #BE123C;
+  --color-warning-soft: #FFFBEB;
+  --color-warning: #F59E0B;
+  --color-warning-medium: #FEF3C7;
+  --color-warning-strong: #D97706;
 
   /* Text */
-  --color-heading: #1A1625;
-  --color-body: #3D3650;
-  --color-body-subtle: #6B6380;
-  --color-fg-brand-subtle: #6B4F8A;
-  --color-fg-brand: #5A3F75;
-  --color-fg-brand-strong: #4A3060;
-  --color-fg-success: #1B5C35;
-  --color-fg-success-strong: #144A2A;
-  --color-fg-danger: #9A1530;
-  --color-fg-danger-strong: #7E1028;
-  --color-fg-warning-subtle: #A16B1A;
-  --color-fg-warning: #855810;
-  --color-fg-disabled: #A8A2B0;
-  --color-fg-info: #4A6B85;
-  --color-fg-purple: #6B4F8A;
-  --color-fg-cyan: #0E7490;
-  --color-fg-pink: #9E3A60;
+  --color-heading: #0F172A;
+  --color-body: #334155;
+  --color-body-subtle: #64748B;
+  --color-fg-brand-subtle: #818CF8;
+  --color-fg-brand: #4F46E5;
+  --color-fg-brand-strong: #3730A3;
+  --color-fg-success: #059669;
+  --color-fg-success-strong: #064E3B;
+  --color-fg-danger: #E11D48;
+  --color-fg-danger-strong: #881337;
+  --color-fg-warning-subtle: #D97706;
+  --color-fg-warning: #B45309;
+  --color-fg-disabled: #94A3B8;
+  --color-fg-info: #2563EB;
+  --color-fg-purple: #7C3AED;
+  --color-fg-cyan: #0891B2;
+  --color-fg-pink: #DB2777;
 
   /* Accent */
-  --color-accent-purple: #7E5FA0;
-  --color-accent-sky: #4A8AB5;
-  --color-accent-teal: #4A8A68;
-  --color-accent-pink: #9E3A60;
-  --color-accent-cyan: #0891B2;
-  --color-accent-orange: #A16B1A;
+  --color-accent-purple: #8B5CF6;
+  --color-accent-sky: #0EA5E9;
+  --color-accent-teal: #14B8A6;
+  --color-accent-pink: #EC4899;
+  --color-accent-cyan: #06B6D4;
+  --color-accent-orange: #F97316;
 
   /* Borders */
-  --color-border-default: #E8E5EE;
-  --color-border-default-medium: #D4D0DC;
-  --color-border-default-strong: #C8C3D0;
-  --color-border-muted: #F0EDE8;
-  --color-border-light: #E8E5EE;
-  --color-border-light-medium: #D4D0DC;
+  --color-border-default: #E2E8F0;
+  --color-border-default-medium: #CBD5E1;
+  --color-border-default-strong: #94A3B8;
+  --color-border-muted: #F1F5F9;
+  --color-border-light: #E2E8F0;
+  --color-border-light-medium: #CBD5E1;
   --color-border-brand-subtle: #E0D5EB;
-  --color-border-brand: #7E5FA0;
-  --color-border-success-subtle: #D0EDE0;
-  --color-border-danger-subtle: #F5D0D5;
-  --color-border-warning-subtle: #F5E5CC;
-  --color-border-strong: #D4D0DC;
+  --color-border-brand: #8B5CF6;
+  --color-border-success-subtle: #A7F3D0;
+  --color-border-danger-subtle: #FECDD3;
+  --color-border-warning-subtle: #FDE68A;
+  --color-border-strong: #CBD5E1;
 
   /* Icon Colors */
-  --color-icon-secondary: #2D7A4A;
-  --color-icon-tertiary: #A16B1A;
-  --color-icon-quaternary: #3A6B9E;
+  --color-icon-secondary: #10B981;
+  --color-icon-tertiary: #F59E0B;
+  --color-icon-quaternary: #3B82F6;
 
   /* Button Glint */
-  --color-glint-highlight: rgba(255, 255, 255, 0.7);
-  --color-glint-shadow: rgba(0, 0, 0, 0.08);
+  --color-glint-highlight: rgba(255, 255, 255, 0.5);
+  --color-glint-shadow: rgba(0, 0, 0, 0.05);
 
   /* Misc */
-  --color-dark: #FAF9F7;
-  --color-dark-strong: #F0EDE8;
-  --color-disabled: #F0EDE8;
+  --color-dark: #0F172A;
+  --color-dark-strong: #1E293B;
+  --color-disabled: #F1F5F9;
 
   /* Shadow */
-  --color-shadow: 0 1px 3px rgba(26, 22, 37, 0.08), 0 4px 12px rgba(26, 22, 37, 0.04);
+  --color-shadow: 0 1px 3px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.02);
+
+  /* Chart Colors (Light Theme) */
+  --color-chart-brand: #4F46E5;
+  --color-chart-accent: #8B5CF6;
+  --color-chart-success: #10B981;
+  --color-chart-danger: #F43F5E;
+  --color-chart-warning: #F59E0B;
+  --color-chart-grid: #E2E8F0;
+  --color-chart-muted: #64748B;
+  --color-chart-primary: #4F46E5;
+  --color-chart-secondary: #8B5CF6;
+  --color-chart-glow: #8B5CF6;
 }
 
 html[data-theme="light"] .card {
-  background: linear-gradient(
-    180deg,
-    #FFFFFF 0%,
-    #FFFFFF 55%,
-    #F5F3F0 82%,
-    #EDE9E3 100%
-  );
+  background: var(--color-card) !important;
 }
 
 html[data-theme="light"] .card-interactive:hover {
-  background: linear-gradient(
-    180deg,
-    #FFFFFF 0%,
-    #F5F3F0 48%,
-    #EDE9E3 100%
-  );
+  background: var(--color-card) !important;
+  box-shadow: var(--shadow-md) !important;
+  border-color: var(--color-neutral-primary-strong) !important;
 }
 
 html[data-theme="light"] .btn-glint {
@@ -249,19 +284,19 @@ html[data-theme="light"] .btn-glint {
 }
 
 html[data-theme="light"] ::selection {
-  background: #6B4F8A;
+  background: var(--color-brand);
   color: #FFFFFF;
 }
 
 html[data-theme="light"] ::-webkit-scrollbar-thumb {
-  background: #D4D0DC;
+  background: #E2E8F0;
 }
 html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
-  background: #C8C3D0;
+  background: #CBD5E1;
 }
 
 html[data-theme="light"] .focus-ring:focus-visible {
-  box-shadow: 0 0 0 2px #6B4F8A;
+  box-shadow: 0 0 0 2px var(--color-brand);
 }
 
 /* ── Base ───────────────────────────────────── */
@@ -384,5 +419,57 @@ h6 { font-size: 1rem; line-height: 1.4; font-weight: 600; color: var(--color-hea
 }
 .mesh-blob-1 { animation: meshFloat1 25s ease-in-out infinite; }
 .mesh-blob-2 { animation: meshFloat2 30s ease-in-out infinite; }
+
+/* ── Density: Compact Mode ──────────────────── */
+html[data-density="compact"] {
+  --spacing: 0.18rem !important; /* Scale down spacing from 0.25rem to 0.18rem */
+  font-size: 13.5px !important; /* Shrink text slightly */
+}
+
+/* Adjust card padding specifically */
+html[data-density="compact"] .card {
+  padding: 0.75rem !important;
+}
+
+/* Make headings slightly smaller in compact mode */
+html[data-density="compact"] h1 { font-size: 1.8rem !important; }
+html[data-density="compact"] h2 { font-size: 1.45rem !important; }
+html[data-density="compact"] h3 { font-size: 1.2rem !important; }
+html[data-density="compact"] h4 { font-size: 1.05rem !important; }
+html[data-density="compact"] h5 { font-size: 0.95rem !important; }
+html[data-density="compact"] h6 { font-size: 0.85rem !important; }
+
+/* Shrink table padding in compact mode */
+html[data-density="compact"] th,
+html[data-density="compact"] td {
+  padding-top: 0.4rem !important;
+  padding-bottom: 0.4rem !important;
+  padding-left: 0.75rem !important;
+  padding-right: 0.75rem !important;
+}
+
+/* Shrink gaps in grid and flex layouts */
+html[data-density="compact"] .gap-6 { gap: 1rem !important; }
+html[data-density="compact"] .gap-5 { gap: 0.85rem !important; }
+html[data-density="compact"] .gap-4 { gap: 0.75rem !important; }
+html[data-density="compact"] .gap-3 { gap: 0.5rem !important; }
+
+/* Shrink vertical layout margins/paddings */
+html[data-density="compact"] .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 1rem !important;
+}
+html[data-density="compact"] .space-y-5 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 0.85rem !important;
+}
+html[data-density="compact"] .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 0.75rem !important;
+}
+html[data-density="compact"] .space-y-3 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 0.5rem !important;
+}
+html[data-density="compact"] .space-y-2 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 0.35rem !important;
+}
+
 
 

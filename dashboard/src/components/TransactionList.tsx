@@ -4,11 +4,11 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   CheckCircle2, XCircle, Clock, ArrowUpRight,
-  ChevronDown, ChevronRight, Zap,
-  Download,
+  ChevronDown, Zap,
+  Download, Inbox
 } from "lucide-react";
-import { EmptyState } from "./ui/EmptyState";
 import { exportToCSV } from "./ui/exportUtils";
+import { EmptyState } from "./ui/EmptyState";
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }> = {
   success: {
@@ -282,9 +282,7 @@ export default function TransactionList() {
       <div className="md:hidden flex-1 overflow-y-auto p-3 space-y-2">
         <AnimatePresence initial={false}>
           {displayed.length === 0 ? (
-            <div className="py-10 text-center text-sm" style={{ color: "var(--color-fg-disabled)" }}>
-              No transactions yet
-            </div>
+            <EmptyState icon={Inbox} title="No transactions yet" description="Executed transactions will appear here." />
           ) : (
             displayed.map((tx, i) => (
               <motion.div

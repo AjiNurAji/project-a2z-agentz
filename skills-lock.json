@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "logo-creator": {
+      "source": "resciencelab/opc-skills",
+      "sourceType": "github",
+      "skillPath": "skills/logo-creator/SKILL.md",
+      "computedHash": "cfb6815ea42686977fb54fe7f6bbd349056a2fcf61f7675fd1becd721029f82b"
+    },
     "ui-ux-pro-max": {
       "source": "nextlevelbuilder/ui-ux-pro-max-skill",
       "sourceType": "github",

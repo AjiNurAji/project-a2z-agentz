@@ -1,16 +1,42 @@
 "use client";
 
 import { useDashboard, type DashboardConfig } from "./DashboardContext";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Settings, Save, RotateCcw, Sliders, Server, Shield, Zap, Check } from "lucide-react";
+import { Save, RotateCcw, Sliders, Shield, Check } from "lucide-react";
 import { useToast } from "./ui/Toast";
+import { useTheme, type Theme } from "@/hooks/useTheme";
+import { usePreferences, type Density } from "@/hooks/usePreferences";
+import { SegmentedControl } from "./ui/SegmentedControl";
 
 export default function SettingsPanel() {
   const { config, setConfig } = useDashboard();
   const toast = useToast();
   const [local, setLocal] = useState<DashboardConfig>({ ...config });
   const [saved, setSaved] = useState(false);
+
+  const { theme, setTheme } = useTheme();
+  const { density, setDensity } = usePreferences();
+  const [shortcutsEnabled, setShortcutsEnabled] = useState<string>("enabled");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("a2z-shortcuts-enabled");
+      const initialShortcuts = stored === "false" ? "disabled" : "enabled";
+      const timeoutId = setTimeout(() => {
+        setShortcutsEnabled(initialShortcuts);
+      }, 0);
+      return () => clearTimeout(timeoutId);
+    }
+  }, []);
+
+  const handleShortcutsChange = (val: string) => {
+    setShortcutsEnabled(val);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("a2z-shortcuts-enabled", val === "enabled" ? "true" : "false");
+      toast.success("Shortcuts Configuration", `Keyboard shortcuts have been ${val}.`);
+    }
+  };
 
   const updateA = <K extends keyof DashboardConfig["agentA"]>(key: K, value: DashboardConfig["agentA"][K]) => {
     setLocal((prev) => ({ ...prev, agentA: { ...prev.agentA, [key]: value } }));
@@ -224,6 +250,72 @@ export default function SettingsPanel() {
           </div>
         </motion.div>
       </div>
+
+      {/* System & UI Preferences */}
+      <motion.div
+        className="card p-5 space-y-5"
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2, duration: 0.4 }}
+      >
+        <div className="flex items-center gap-3 mb-1">
+          <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "var(--color-brand-softer)", color: "var(--color-fg-brand-strong)" }}>
+            <Sliders size={16} />
+          </div>
+          <div>
+            <h4 className="font-serif" style={labelStyle}>System & UI Preferences</h4>
+            <p className="text-xs" style={subtleStyle}>Customize theme, layout density, and keyboard shortcuts</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+          {/* Theme Toggle */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium" style={labelStyle}>Interface Theme</label>
+            <SegmentedControl
+              name="theme"
+              options={[
+                { label: "Light", value: "light" },
+                { label: "Dark", value: "dark" },
+                { label: "System", value: "system" },
+              ]}
+              value={theme}
+              onChange={(val) => setTheme(val as Theme)}
+            />
+            <p className="text-xs font-light" style={subtleStyle}>Switch between light, dark, or system preference</p>
+          </div>
+
+          {/* Density Toggle */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium" style={labelStyle}>Layout Density</label>
+            <SegmentedControl
+              name="density"
+              options={[
+                { label: "Default", value: "default" },
+                { label: "Compact", value: "compact" },
+              ]}
+              value={density}
+              onChange={(val) => setDensity(val as Density)}
+            />
+            <p className="text-xs font-light" style={subtleStyle}>Adjust sizing and padding of interface elements</p>
+          </div>
+
+          {/* Keyboard Shortcuts */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium" style={labelStyle}>Keyboard Shortcuts</label>
+            <SegmentedControl
+              name="shortcuts"
+              options={[
+                { label: "Enabled", value: "enabled" },
+                { label: "Disabled", value: "disabled" },
+              ]}
+              value={shortcutsEnabled}
+              onChange={handleShortcutsChange}
+            />
+            <p className="text-xs font-light" style={subtleStyle}>Use hotkeys 1-5 for navigation and / for search</p>
+          </div>
+        </div>
+      </motion.div>
 
       {/* Action Buttons */}
       <motion.div

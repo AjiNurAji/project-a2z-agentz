@@ -3,9 +3,12 @@
 import { useDashboard } from "./DashboardContext";
 import { ShieldOff, ShieldCheck, AlertTriangle, Power } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { useState } from "react";
+import { ConfirmModal } from "./ui/ConfirmModal";
 
 export default function CircuitBreaker() {
   const { isPaused, setIsPaused } = useDashboard();
+  const [confirming, setConfirming] = useState(false);
 
   return (
     <div
@@ -46,21 +49,24 @@ export default function CircuitBreaker() {
                   border: `1px solid ${isPaused ? "var(--color-border-danger-subtle)" : "var(--color-border-success-subtle)"}`,
                 }}
               >
-                {isPaused ? "PAUSED" : "ACTIVE"}
+                {isPaused ? "Paused" : "Running"}
               </span>
             </h2>
             <p className="text-sm text-[var(--color-body-subtle)] mt-0.5">
-              Emergency Kill Switch — halts all Agent B on-chain activity instantly.
+              Pause all Agent B on-chain execution. Transactions queue but are not broadcast until resumed.
             </p>
           </div>
         </div>
 
         {/* Toggle switch */}
         <button
-          onClick={() => setIsPaused(!isPaused)}
+          onClick={() => {
+            if (!isPaused) setConfirming(true);
+            else setIsPaused(false);
+          }}
           aria-pressed={isPaused}
           aria-label={isPaused ? "Resume automated payouts" : "Pause automated payouts"}
-          className="relative inline-flex h-12 w-24 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent active:scale-95 focus-ring transition-colors"
+          className="relative inline-flex h-12 w-24 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent active:scale-95 focus-ring transition-colors animate-none"
           style={{
             background: isPaused ? "var(--color-danger)" : "var(--color-neutral-secondary-medium)",
             boxShadow: isPaused
@@ -103,12 +109,28 @@ export default function CircuitBreaker() {
           >
             <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5 animate-pulse" aria-hidden="true" />
             <p>
-              <strong>SYSTEM PAUSED:</strong> All automated payouts are blocked. Agent B will not broadcast
-              any transactions until you resume operations.
+              <strong>Execution paused.</strong> Agent B will not broadcast transactions. Queued items are preserved and can be resumed.
             </p>
           </motion.div>
         )}
       </AnimatePresence>
+
+      <ConfirmModal
+        open={confirming}
+        variant="danger"
+        title="Pause on-chain execution"
+        description="This will pause all Agent B on-chain activity. Queued items are preserved and can be resumed."
+        details={[
+          { label: "Current state", value: "Running" },
+          { label: "Action", value: "Pause execution" }
+        ]}
+        confirmLabel="Pause execution"
+        onConfirm={() => {
+          setIsPaused(true);
+          setConfirming(false);
+        }}
+        onCancel={() => setConfirming(false)}
+      />
     </div>
   );
 }

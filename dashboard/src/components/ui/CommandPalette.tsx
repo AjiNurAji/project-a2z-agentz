@@ -6,8 +6,9 @@ import { motion, AnimatePresence } from "motion/react";
 import { useToast } from "./Toast";
 import {
   Search, LayoutDashboard, BarChart3, Brain, History, Settings,
-  Zap, ArrowRight, Command, Pause, Play, Download, Trash2
+  ArrowRight, Command, Pause, Play, Download, Trash2, Sparkles
 } from "lucide-react";
+import { useDashboard } from "../DashboardContext";
 
 interface CommandItem {
   id: string;
@@ -26,6 +27,7 @@ export function CommandPalette() {
   const triggerRef = useRef<HTMLElement | null>(null);
   const router = useRouter();
   const toast = useToast();
+  const { setPreferences } = useDashboard();
 
   const commands: CommandItem[] = [
     { id: "dash", label: "Dashboard", description: "Mission Control overview", icon: LayoutDashboard, action: () => router.push("/"), category: "Pages" },
@@ -33,6 +35,7 @@ export function CommandPalette() {
     { id: "memory", label: "Vector Memory", description: "ChromaDB explorer", icon: Brain, action: () => router.push("/memory"), category: "Pages" },
     { id: "history", label: "Audit Trail", description: "Transaction history", icon: History, action: () => router.push("/history"), category: "Pages" },
     { id: "settings", label: "Settings", description: "Agent configuration", icon: Settings, action: () => router.push("/settings"), category: "Pages" },
+    { id: "restart-onboarding", label: "Restart Onboarding", description: "Show the intro tour again", icon: Sparkles, action: () => setPreferences({ onboarded: false }), category: "Actions" },
     { id: "pause-agents", label: "Pause All Agents", description: "Temporarily pause agent activity", icon: Pause, action: () => toast.info("All agents paused"), category: "Actions" },
     { id: "resume-agents", label: "Resume All Agents", description: "Resume paused agent activity", icon: Play, action: () => toast.success("All agents resumed"), category: "Actions" },
     { id: "export-csv", label: "Export Transactions CSV", description: "Download transaction data", icon: Download, action: () => toast.info("CSV export started"), category: "Actions" },
@@ -79,8 +82,10 @@ export function CommandPalette() {
       return;
     }
 
-    setQuery("");
-    setTimeout(() => inputRef.current?.focus(), 50);
+    setTimeout(() => {
+      setQuery("");
+      inputRef.current?.focus();
+    }, 50);
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Tab" || !containerRef.current) return;

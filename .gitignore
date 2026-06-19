@@ -64,3 +64,5 @@ test_cache/
 *.tmp
 *.bak
 .cache/
+.agents/
+.skill-archive/
