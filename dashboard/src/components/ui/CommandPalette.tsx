@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { useToast } from "./Toast";
 import {
   Search, LayoutDashboard, BarChart3, Brain, History, Settings,
-  ArrowRight, Command, Pause, Play, Download, Trash2, Sparkles
+  ArrowRight, Command, Pause, Play, Download, Trash2, Sparkles, LucideIcon
 } from "lucide-react";
 import { useDashboard } from "../DashboardContext";
 
@@ -14,7 +14,7 @@ interface CommandItem {
   id: string;
   label: string;
   description: string;
-  icon: React.ElementType;
+  icon: LucideIcon;
   action: () => void;
   category: string;
 }
@@ -30,7 +30,7 @@ export function CommandPalette() {
   const { setPreferences } = useDashboard();
 
   const commands: CommandItem[] = [
-    { id: "dash", label: "Dashboard", description: "Mission Control overview", icon: LayoutDashboard, action: () => router.push("/"), category: "Pages" },
+    { id: "dash", label: "Dashboard", description: "Mission Control overview", icon: LayoutDashboard, action: () => router.push("/dashboard"), category: "Pages" },
     { id: "analytics", label: "Analytics", description: "Charts & TVL trends", icon: BarChart3, action: () => router.push("/analytics"), category: "Pages" },
     { id: "memory", label: "Vector Memory", description: "ChromaDB explorer", icon: Brain, action: () => router.push("/memory"), category: "Pages" },
     { id: "history", label: "Audit Trail", description: "Transaction history", icon: History, action: () => router.push("/history"), category: "Pages" },

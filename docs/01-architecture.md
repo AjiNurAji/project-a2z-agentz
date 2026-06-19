@@ -124,54 +124,70 @@ Dashboard menggunakan sistem desain internal bernama **TypeUI** dengan token-tok
 
 Glassmorphism: `.glass` dan `.glass-card` utility classes untuk efek blur transparan.
 
+### Route & Layout Architecture
+
+Next.js App Router dikelompokkan ke dalam dua grup rute utama untuk memisahkan layout visual landing page dan dashboard:
+1. **`(landing)` Group** (`dashboard/src/app/(landing)/`):
+   - **Rute**: `/` (Landing Page)
+   - **Visual**: Background 2D `<canvas>` Particle Network interaktif (`AgentScene.tsx`) yang beradaptasi dengan perubahan tema, didukung efek mouse parallax, HSL breathing grid, dan scanlines cybernetic.
+   - **Main Component**: Mockup Terminal retro dengan GIF animasi multi-agent `A2Z-animation.gif` otonom (Agent A & Agent B).
+2. **`(dashboard)` Group** (`dashboard/src/app/(dashboard)/`):
+   - **Rute**: `/dashboard` (Dashboard Utama) beserta halaman pendukung (`/agents`, `/analytics`, `/memory`, `/settings`, `/history`).
+   - **Layout**: Sidebar & Navbar permanen, state management tersinkronisasi (`DashboardContext.tsx`), serta global keybindings wrapper.
+
 ### Component Hierarchy
 
 ```
-App Layout (layout.tsx)
-├── SkipToContent          ← WCAG 2.1 skip link
-├── RouteProgress          ← Top loading bar
-├── PWARegister            ← Service worker registration
-├── KeyboardNavWrapper     ← Global keyboard shortcuts
-│   ├── Toast (provider)   ← Toast notification system
-│   ├── ErrorBoundary      ← Crash recovery
-│   ├── Sidebar            ← Navigation
-│   ├── Navbar             ← Top bar
-│   └── Page Content
-│       ├── Breadcrumbs    ← Route trail
-│       ├── PageHeader     ← Consistent header
-│       ├── CommandPalette ← ⌘+K overlay
-│       ├── CommandCenter  ← Action overlay
-│       └── Page Components
-│           ├── KpiCard / AnimatedCounter
-│           ├── Skeleton (loading state)
-│           ├── EmptyState (no data)
-│           └── ScrollToTop
+Root Layout (dashboard/src/app/layout.tsx)
+├── PWARegister                ← Service worker registration
+├── ToastProvider & Toast      ← Global toast notification system
+├── RouteProgress              ← Top transition loading bar
+└── Rute Grup
+    ├── (landing) Layout
+    │   └── Landing Page (page.tsx)
+    │       ├── AgentScene     ← Interactive HTML5 2D Canvas Background
+    │       └── Terminal UI    ← Cyberpunk Mockup Terminal with A2Z-animation.gif
+    └── (dashboard) Layout (layout.tsx)
+        ├── SkipToContent      ← WCAG 2.1 skip link
+        ├── KeyboardNavWrapper ← Global keyboard shortcuts (1-5 routes, Esc, etc.)
+        │   ├── KeyboardHelpOverlay
+        │   ├── OnboardingTour
+        │   ├── Sidebar        ← Main Navigation
+        │   └── Main Area
+        │       ├── Navbar     ← Top bar w/ AMD status indicators
+        │       ├── Breadcrumbs← Route trail navigation
+        │       ├── Page Content
+        │       │   ├── PageHeader
+        │       │   ├── CommandPalette  ← ⌘+K overlay
+        │       │   ├── CommandCenter   ← Actions overlay
+        │       │   └── Page Components (KpiCard, AnalyticsCharts, etc.)
+        │       └── ScrollToTop
 ```
 
 ### Loading & Streaming Patterns
 
-Setiap route memiliki `loading.tsx` yang menampilkan **Skeleton** komponen saat data sedang dimuat:
+Setiap rute di bawah grup `(dashboard)` memiliki `loading.tsx` yang menampilkan **Skeleton** komponen saat data sedang dimuat secara asinkron (Streaming SSR):
 
-- `app/loading.tsx` — Root dashboard skeleton (6 KPI cards + 3-column grid)
-- `app/analytics/loading.tsx` — Chart skeletons (area, line, bar)
-- `app/memory/loading.tsx` — Vector memory explorer skeleton
-- `app/settings/loading.tsx` — Settings form skeleton
-- `app/history/loading.tsx` — Audit trail table skeleton
+- `dashboard/src/app/(dashboard)/loading.tsx` — Root dashboard skeleton (6 KPI cards + 3-column grid)
+- `dashboard/src/app/(dashboard)/analytics/loading.tsx` — Chart skeletons (area, line, bar)
+- `dashboard/src/app/(dashboard)/memory/loading.tsx` — Vector memory explorer skeleton
+- `dashboard/src/app/(dashboard)/settings/loading.tsx` — Settings form skeleton
+- `dashboard/src/app/(dashboard)/history/loading.tsx` — Audit trail table skeleton
 
-Pattern: **Streaming SSR** via Next.js App Router — komponen server mengalir data ke komponen client, dengan `loading.tsx` sebagai Suspense boundary.
+Pattern: **Streaming SSR** via Next.js App Router — data simulasi real-time dialirkan secara asinkron dari server ke komponen client, menggunakan `loading.tsx` sebagai Suspense boundary.
 
 ### Error Handling
 
-- `ErrorBoundary.tsx` — Setiap section utama dibungkus error boundary dengan fallback UI
-- `not-found.tsx` — Custom 404 page (animated, branded)
-- `Toast.tsx` — Notifikasi error/info/success global (ARIA live regions)
+- `ErrorBoundary.tsx` — Setiap section utama dibungkus error boundary dengan fallback UI untuk pemulihan crash seketika.
+- `not-found.tsx` — Custom 404 page (animated, branded).
+- `Toast.tsx` — Notifikasi error/info/success global (ARIA live regions).
 
 ### Accessibility Stack
 
-- `SkipToContent.tsx` — WCAG 2.1 skip navigation link
-- `useReducedMotion.ts` — Detect `prefers-reduced-motion` media query
-- `KeyboardNavWrapper.tsx` — Full keyboard navigation (1-5 routes, ⌘+K, Esc)
-- `aria-live="polite"` pada semua area yang update real-time (LiveLog, Toast)
-- `role="log"`, `role="alert"`, `aria-label` pada semua interactive elements
-- Focus-visible rings pada semua interactive targets
-- Touch targets minimum 44×44px
+- `SkipToContent.tsx` — WCAG 2.1 skip navigation link.
+- `useReducedMotion.ts` — Mendeteksi media query `prefers-reduced-motion`.
+- `KeyboardNavWrapper.tsx` — Navigasi keyboard penuh (1-5 rute, ⌘+K, Esc).
+- `aria-live="polite"` pada semua area yang update real-time (LiveLog, Toast).
+- `role="log"`, `role="alert"`, `aria-label` pada semua interactive elements.
+- Focus-visible rings pada semua target interaktif.
+- Area sentuh (touch targets) minimum 44×44px.
