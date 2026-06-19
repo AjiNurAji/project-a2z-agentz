@@ -224,6 +224,32 @@ def insert_execution_log(
     return safe_hash
 
 
+def get_target_status(address: str) -> Optional[str]:
+    """
+    Return the raw ``status`` column for ``address`` from
+    ``target_addresses``, or ``None`` if the address is not present.
+
+    Unlike :func:`is_blacklisted`, this helper does **not** fail-closed:
+    on real DB errors it lets ``psycopg2.Error`` propagate so callers can
+    distinguish "not in table" from "DB unreachable" and log accordingly.
+
+    The returned value preserves the row's original casing (e.g.
+    ``'BLACKLISTED'``, ``'blacklisted'``, ``'active'``, ``'pending'``).
+    """
+    addr = (address or "").strip()
+    if not addr:
+        return None
+
+    query = "SELECT status FROM target_addresses WHERE address = %s LIMIT 1;"
+    with _get_cursor() as cur:
+        cur.execute(query, (addr,))
+        row = cur.fetchone()
+    if not row:
+        return None
+    # psycopg2 default cursor returns tuples; row[0] is the status string.
+    return row[0] if isinstance(row, (tuple, list)) else row.get("status")
+
+
 def is_blacklisted(address: str) -> bool:
     """
     True iff the given target address exists in target_addresses AND
