@@ -118,7 +118,7 @@ npm install
 npm run dev
 ```
 
-Buka `http://localhost:3000` untuk memantau **Live Log** AI secara real-time — semua event dari Agent A (AIM inference), Hybrid Scoring, dan Agent B (tx execution) muncul di sini.
+Buka `http://localhost:3000` untuk melihat Landing Page interaktif (dengan visualisasi Particle Network), lalu klik tombol dashboard atau navigasikan langsung ke `http://localhost:3000/dashboard` untuk memantau **Live Log** AI secara real-time — semua event dari Agent A (AIM inference), Hybrid Scoring, dan Agent B (tx execution) muncul di sini.
 
 ---
 
