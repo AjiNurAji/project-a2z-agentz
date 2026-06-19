@@ -107,7 +107,7 @@ Ekspansi dashboard single-page → multi-halaman. 9 komponen baru, 5 halaman bar
 
 ---
 
-## Sesi 6 — 2026-06-17 | **AMD Stack Alignment — Migrasi ke Toolchain AMD-Native**
+## Sesi 6 — 2026-06-17 | AMD Stack Alignment — Migrasi ke Toolchain AMD-Native
 
 ### 📌 Ringkasan
 **CRITICAL REVISION.** Telaah mendalam terhadap tema ACT II + blog AMD menunjukkan bahwa stack sebelumnya (**Llama 3 8B + vLLM generik**) tidak optimal untuk ACT II. Hackathon eksplisit mendorong penggunaan:
@@ -149,134 +149,7 @@ Penyelarasan ini menjadikan A2Z Agentz **100%契合 (cocok) dengan tema wajib AC
 
 ---
 
-## 📊 Ringkasan Total Perubahan (Semua Sesi)
-
-| Kategori | Jumlah |
-|----------|--------|
-| File baru ditambahkan | **57 file** |
-| File yang diubah/direfaktor | **24 file** |
-| File dihapus | **0 file** |
-| Dependensi baru | **3 paket** (`recharts`, `lucide-react`, `motion.dev`) |
-| Route/halaman baru | **4 route** |
-| Komponen baru | **37+ komponen** (14 original + 14 ui/ + 5 loading + 4 SEO) |
-| **Komponen direfaktor** | **33 komponen** (18 + 15 files from Sesi 11) |
-| **Dokumen alignment** | **1 file khusus juri** (`docs/06-amd-stack.md`) |
-| **Stack migrasi** | **1 sesi** (Sesi 6 — vLLM → AMD AI Workbench + AIM + SGLang) |
-| **UI/UX Fitur** | **29 fitur** (Sesi 9: TypeUI + PWA + SEO + Sesi 10: overhaul + Sesi 11: visual overhaul v2) |
-| **Bug fixes** | **6 bug kritis** (Sesi 10 — dashboard overhaul) |
-| **Komponen diintegrasikan** | **4 komponen** (AnimatedCounter, Tooltip, Skeleton, EmptyState) |
-| **Total sesi** | **11 sesi** |
-
----
-
-## 🔍 Status Build Terakhir
-
-```
-npm run build — 2026-06-16T15:16:59Z
-
-▲ Next.js 16.2.9 (Turbopack)
-✓ Compiled successfully in 8.5s
-✓ TypeScript passed in 6.7s
-✓ Static pages generated: 8/8
-
-Route (app)
-┌ ○ /
-├ ○ /_not-found
-├ ○ /analytics
-├ ○ /history
-├ ○ /memory
-└ ○ /settings
-```
-
-**Status: ✅ PASSED — 0 errors, 0 warnings**
-
----
-
-## 🗂️ Struktur Direktori Akhir
-
-```
-project-a2z-agentz/
-├── README.md                          # AMD-stack branding
-├── PRD.md                             # Full PRD w/ AMD alignment
-├── memory.md                          # File ini
-├── SUBMISSION.md                      # Checklist lablab.ai ACT II
-├── LICENSE                            # MIT
-├── .gitignore                         # Root gitignore
-├── docs/
-│   ├── 01-architecture.md             # Mermaid + AMD pipeline
-│   ├── 02-agent-a-scout.md            # AMD AI Workbench + AIM + SGLang
-│   ├── 03-agent-b-vault.md            # KMS, Gas, Multi-RPC
-│   ├── 04-communication-protocol.md   # ECDSA + SGLang endpoint
-│   ├── 05-setup-guide.md              # End-to-end AMD Cloud setup
-│   └── 06-amd-stack.md                # Alignment khusus juri
-└── dashboard/
-    ├── package.json
-    ├── tsconfig.json
-    ├── public/
-    │   ├── manifest.json              # [BARU] PWA manifest
-    │   └── sw.js                      # [BARU] Service worker (offline cache)
-    └── src/
-        ├── app/
-        │   ├── layout.tsx
-        │   ├── page.tsx
-        │   ├── globals.css
-        │   ├── loading.tsx            # [BARU] Root loading skeleton
-        │   ├── not-found.tsx          # [BARU] Custom 404 page
-        │   ├── opengraph-image.tsx    # [BARU] OG image generator (1200×630)
-        │   ├── robots.ts             # [BARU] robots.txt generator
-        │   ├── sitemap.ts            # [BARU] sitemap.xml generator
-        │   ├── analytics/
-        │   │   ├── page.tsx
-        │   │   └── loading.tsx        # [BARU] Analytics loading skeleton
-        │   ├── memory/
-        │   │   ├── page.tsx
-        │   │   └── loading.tsx        # [BARU] Memory loading skeleton
-        │   ├── settings/
-        │   │   ├── page.tsx
-        │   │   └── loading.tsx        # [BARU] Settings loading skeleton
-        │   └── history/
-        │       ├── page.tsx
-        │       └── loading.tsx        # [BARU] History loading skeleton
-        ├── hooks/
-        │   └── useReducedMotion.ts    # [BARU] prefers-reduced-motion hook
-        └── components/
-            ├── DashboardContext.tsx    # Global state + data simulator
-            ├── Sidebar.tsx            # Collapsible sidebar navigasi
-            ├── KpiCard.tsx            # Reusable metric card
-            ├── PageHeader.tsx         # Header halaman konsisten
-            ├── DashboardKpis.tsx      # 6 KPI cards dashboard
-            ├── AnalyticsCharts.tsx    # 3 Recharts visualisasi data
-            ├── VectorMemoryExplorer.tsx # ChromaDB cache viewer
-            ├── SettingsPanel.tsx      # Form konfigurasi agent
-            ├── AuditTrail.tsx         # Log audit paginasi
-            ├── AgentCommPanel.tsx     # Agent communication panel
-            ├── Navbar.tsx             # Context-aware, AMD badge
-            ├── CircuitBreaker.tsx     # Context + Lucide + premium states
-            ├── LiveLog.tsx            # Context + level colors + aria
-            ├── ApprovalQueue.tsx      # Context + empty state + a11y
-            ├── TransactionList.tsx    # Context + expandable + Basescan
-            └── ui/                    # [BARU] TypeUI Design System
-                ├── Skeleton.tsx       # Loading skeleton placeholders
-                ├── Toast.tsx          # Toast notification system
-                ├── ErrorBoundary.tsx  # React error boundary w/ fallback
-                ├── EmptyState.tsx     # Reusable empty state component
-                ├── CommandPalette.tsx # Cmd+K command palette
-                ├── CommandCenter.tsx  # Command center overlay
-                ├── KeyboardNavWrapper.tsx # Keyboard navigation provider
-                ├── AnimatedCounter.tsx # Animated number counters
-                ├── Tooltip.tsx        # Hover/focus tooltips
-                ├── Breadcrumbs.tsx    # Navigation breadcrumbs
-                ├── RouteProgress.tsx  # Route transition progress bar
-                ├── ScrollToTop.tsx    # Scroll-to-top button
-                ├── SkipToContent.tsx  # Skip-to-content a11y link
-                ├── PWARegister.tsx    # PWA service worker registration
-                ├── exportUtils.ts     # CSV/JSON export utilities
-                └── useKeyboardNav.ts  # Keyboard navigation hook
-```
-
-**Total file count**: 48 source files (.tsx/.ts/.css) + 2 PWA files (manifest.json, sw.js) + config files
-
-## Sesi 6 — 2026-06-17 | Pondasi Modular Agent B, Fix raw_transaction, dan Async JSON Task Listener
+## Sesi 7 — 2026-06-18 | Pondasi Modular Agent B, Fix raw_transaction, dan Async JSON Task Listener
 
 ### 📌 Ringkasan
 Hari ini kita melanjutkan pondasi backend Web3 untuk Agent B (The Vault) dan memperbaiki blokir teknis sintaks transaksi untuk web3.py versi terbaru.
@@ -304,7 +177,7 @@ Hari ini kita melanjutkan pondasi backend Web3 untuk Agent B (The Vault) dan mem
 
 ---
 
-## Sesi 7 — 2026-06-18 | Bug Fixes & Peningkatan UX Dashboard
+## Sesi 8 — 2026-06-18 | Bug Fixes & Peningkatan UX Dashboard
 
 ### 📌 Ringkasan
 Fokus pada perbaikan bug UI/UX yang dilaporkan pada dashboard dan peningkatan stabilitas interaksi pengguna pada fitur log dan komponen data simulasi.
@@ -313,68 +186,22 @@ Fokus pada perbaikan bug UI/UX yang dilaporkan pada dashboard dan peningkatan st
 
 | Item | Detail |
 |------|--------|
-| **Fix React Key Warning** | Mengganti *fragment* kosong (`<>`) dengan `React.Fragment` beserta properti `key` pada elemen *looping* tabel transaksi untuk menghilangkan peringatan (*warning*) dan error *parsing* React JSX. |
-| **Fix Hydration Mismatch** | Menambahkan state `mounted` pada global context (`DashboardContext`) untuk mencegah error *hydration* yang terjadi akibat data KPI yang di- *generate* secara acak antara Server-Side Rendering (SSR) dan Client-Side. |
-| **Fix Auto-Scroll Jump** | Mengganti metode `scrollIntoView()` (yang sebelumnya memaksa seluruh halaman bergulir ke bawah) dengan manipulasi nilai `scrollTop` container secara spesifik, sehingga halaman tidak tiba-tiba meloncat. |
-| **Peningkatan UX Live Log** | Menyempurnakan UX dengan mengubah ikon tombol jeda *auto-scroll* dari *chevron* (panah) menjadi ikon **Play/Pause**. Juga mengimplementasikan fungsionalitas sungguhan pada ikon *chevron* agar panel Live Log dapat di-*collapse* (disembunyikan) sesuai ekspektasi pengguna. |
+| **Fix React Key Warning** | Mengganti *fragment* kosong (`<>`) dengan `React.Fragment` beserta properti `key` pada elemen *looping* tabel transaksi. |
+| **Fix Hydration Mismatch** | Menambahkan state `mounted` pada global context (`DashboardContext`) untuk mencegah error *hydration*. |
+| **Fix Auto-Scroll Jump** | Mengganti metode `scrollIntoView()` dengan manipulasi nilai `scrollTop` container secara spesifik. |
+| **Peningkatan UX Live Log** | Ikon *Play/Pause*, manipulasi tinggi elemen konstan, penyesuaian styling `h-[400px]`, dan sinkronisasi 350ms jeda rendering dengan animasi `framer-motion`. |
+| **Fix Tailwind v4 CSS Variables** | Mengubah direktif `@theme` menjadi `:root` pada `globals.css` agar tema tidak menjadi hitam putih. |
+| **Fix React Hydration Error** | Menghapus tag pembungkus luar `<tbody>` bersarang pada `TransactionList` yang membungkus `<motion.tbody>`. |
 
 ### ✏️ File yang DIUBAH
 
 | File | Lokasi | Detail Perubahan |
 |------|--------|-----------------|
-| `TransactionList.tsx` | `/dashboard/src/components/` | Penambahan import React dan perubahan tag `Fragment` untuk memastikan adanya `key` prop unik. |
-| `DashboardContext.tsx` | `/dashboard/src/components/` | Menambahkan perlindungan `if (!mounted) return null;` sebelum merender Context Provider untuk sinkronisasi rendering SSR dan Klien. |
-| `LiveLog.tsx` | `/dashboard/src/components/` | Perbaikan logika pengguliran, penambahan state `isCollapsed` beserta style CSS dinamis `h-80` vs *auto*, dan integrasi ikon Lucide baru (`Play`, `Pause`). |
-
-**Status: ✅ BUG TERATASI & UX DITINGKATKAN — DASHBOARD LEBIH STABIL & INTERAKTIF.**
-
-## Sesi 9 — 2026-06-19 | Infrastruktur Backend Akhir & Deployment Engine Agent B
-
-### 📌 Ringkasan
-Sesi ini berfokus pada deployment infrastruktur core backend Agent B, isolasi environment runtime, serta injeksi skema engine database PostgreSQL relasional di dalam VPS lokal (`greyarch`) sebagai kesiapan integrasi live dashboard data.
-
-### ✅ File yang DITAMBAHKAN
-
-| File | Lokasi | Deskripsi |
-|------|--------|-----------|
-| `database.py` | `/` | Inisialisasi koneksi pooling database engine menggunakan adapter database Python. |
-| `database_schema.sql` | `/` | Skema SQL dasar yang berisi struktur tabel transaksi, fungsi constraint, indexer kecepatan query, dan data trigger untuk mencegah redundansi / data ganda. |
-| `database_schema_patch.sql` | `/` | File patch SQL tambahan untuk penyesuaian minor tabel relasi log selama integrasi. |
-| `requirements.txt` | `/` | Mengunci seluruh dependency library (FastAPI, Web3.py v6, Pydantic, Uvicorn, dll.) yang terisolasi dari lokal `venv`. |
-| `web3_client.py` | `/` | Wrapper client khusus untuk manajemen multi-RPC Base Network yang menangani jalur fallback koneksi Alchemy. |
----
-
-## Sesi 8 — 2026-06-18 | Lanjutan Perbaikan Bug UI & Hydration Dashboard
-
-### 📌 Ringkasan
-Melakukan perbaikan dan penyempurnaan lanjutan terhadap isu-isu visual dan layout yang muncul pada dashboard Next.js + Tailwind v4. Fokus utama pada styling, sinkronisasi animasi dengan auto-scroll, dan perbaikan struktur HTML untuk mencegah error Hydration.
-
-### ✅ Hal yang Berhasil Dikerjakan
-
-| Item | Detail |
-|------|--------|
-| **Fix Tailwind v4 CSS Variables** | Mengubah direktif `@theme` menjadi `:root` pada `globals.css`. Hal ini menyelesaikan masalah tema "hitam putih" karena variabel `var(--color-...)` kini terekspos secara global ke seluruh elemen DOM. |
-| **Fix Layout & Scroll AgentCommPanel** | Mengganti tinggi dari `minHeight` menjadi fixed `h-[400px]` untuk mencegah kotak memanjang tak terbatas. Selain itu, mengubah logika `scrollIntoView()` menjadi manipulasi `scrollTop` untuk menghilangkan efek loncat (*glitch*) pada halaman. |
-| **Penyempurnaan LiveLog & Sinkronisasi Animasi** | Menghapus total fitur *collapse* pada LiveLog dan mengatur tingginya menjadi konstan `h-[400px]` agar sejajar dengan AgentCommPanel. Menambahkan `setTimeout` 350ms pada logika *auto-scroll* LiveLog dan AgentCommPanel untuk mengompensasi jeda animasi `framer-motion`, sehingga baris terbawah log tidak lagi terpotong. |
-| **Fix React Hydration Error (Nested `<tbody>`)** | Menghapus tag pembungkus luar `<tbody>` pada `TransactionList` yang membungkus elemen `<motion.tbody>` dari perulangan *map*. Memisahkan *empty state* ke dalam `<tbody>` tersendiri agar struktur HTML valid. |
-
-### ✏️ File yang DIUBAH
-
-| File | Lokasi | Detail Perubahan |
-|------|--------|-----------------|
-| `agent_b.py` | `/` | Refaktor total integrasi engine REST API FastAPI/Uvicorn, pengikatan port internal `8080`, penyesuaian dependensi Web3.py v6 untuk menjamin kestabilan *Geth PoA Middleware*, serta validasi data payload inbound. |
-| `.gitignore` | `/` | Penambahan baris proteksi ketat untuk menyembunyikan environment local `venv` dan file rahasia `.env` (berisi private key wallet Base, password DB, dan RPC API key Alchemy). |
-
-### 🎯 Dampak & Status Terakhir
-- **Engine Database:** PostgreSQL 15-alpine resmi berjalan di dalam isolated Docker Container (`a2z-postgres`) pada port internal `5432` dengan skema tabel yang sukses diinjeksi 100%.
-- **REST API Server:** Server backend `agent_b.py` sukses lolos pengujian *smoke test* lokalan dan saat ini berstatus **LIVE / STANDBY** di port `8080` untuk melayani request transaksi eksekusi dari Agent A.
-- **PR Status:** Semua perubahan kode berhasil di-commit serta di-push di branch `feat-agent-web3` dan draf Pull Request resmi dibuka ke branch `develop`.
-
-**Status: ✅ CORE BACKEND AGENT B & ENGINE POSTGRES LIVE 100% — INFRASTRUKTUR SIAP MENERIMA INTEGRASI AGENT A.**
+| `TransactionList.tsx` | `/dashboard/src/components/` | Penambahan `key` prop unik, penghapusan tag `<tbody>` bersarang. |
+| `DashboardContext.tsx` | `/dashboard/src/components/` | Penambahan `mounted` state perlindungan SSR vs Client. |
+| `LiveLog.tsx` | `/dashboard/src/components/` | Perbaikan pengguliran, penghapusan fitur *collapse*, penerapan `h-[400px]`, sinkronisasi animasi. |
 | `globals.css` | `/dashboard/src/app/` | Blok `@theme` diubah ke `:root`. |
 | `AgentCommPanel.tsx` | `/dashboard/src/components/` | Perbaikan styling tinggi elemen `h-[400px]`, manipulasi `scrollTop`, penambahan `setTimeout` 350ms. |
-| `LiveLog.tsx` | `/dashboard/src/components/` | Penghapusan fitur *collapse*, penerapan `h-[400px]`, penambahan sinkronisasi *auto-scroll*. |
-| `TransactionList.tsx` | `/dashboard/src/components/` | Penghapusan tag `<tbody>` bersarang yang menyalahi standar struktur tabel HTML. |
 
 **Status: ✅ TAMPILAN DASHBOARD SEMPURNA & HYDRATION ERROR TERTANGANI.**
 
@@ -406,64 +233,22 @@ Audit komprehensif UI/UX yang menghasilkan **16 fitur baru** untuk meningkatkan 
 | `SkipToContent.tsx` | Skip-to-content link (a11y WCAG 2.1) |
 | `PWARegister.tsx` | PWA service worker registration |
 
-### ✅ File Baru (UI Utilities)
+### ✅ File Baru (UI Utilities & Hooks)
 | File | Lokasi | Deskripsi |
 |------|--------|-----------|
 | `exportUtils.ts` | `components/ui/` | CSV/JSON export utility functions |
 | `useKeyboardNav.ts` | `components/ui/` | Keyboard navigation hook (keybindings) |
+| `useReducedMotion.ts` | `hooks/` | Detect `prefers-reduced-motion` media query |
 
-### ✅ File Baru (Loading States — 5 files)
-| File | Lokasi |
-|------|--------|
-| `loading.tsx` | `app/` (root) |
-| `loading.tsx` | `app/analytics/` |
-| `loading.tsx` | `app/memory/` |
-| `loading.tsx` | `app/settings/` |
-| `loading.tsx` | `app/history/` |
-
-### ✅ File Baru (Hooks)
-| File | Deskripsi |
-|------|-----------|
-| `useReducedMotion.ts` | `hooks/` — Detect `prefers-reduced-motion` media query |
-
-### ✅ File Baru (SEO & Meta)
-| File | Deskripsi |
-|------|-----------|
-| `opengraph-image.tsx` | OG image generator (1200×630, branded purple glow) |
-| `robots.ts` | Dynamic `robots.txt` generator |
-| `sitemap.ts` | Dynamic `sitemap.xml` generator |
-| `not-found.tsx` | Custom 404 page (animated, branded) |
-
-### ✅ File Baru (PWA)
-| File | Lokasi | Deskripsi |
-|------|--------|-----------|
-| `manifest.json` | `public/` | PWA manifest (icons, theme_color, display: standalone) |
-| `sw.js` | `public/` | Service worker (offline cache-first strategy) |
+### ✅ File Baru (SEO, Meta, Loading, PWA)
+- 5× `loading.tsx` (per-route skeleton states)
+- `opengraph-image.tsx`, `robots.ts`, `sitemap.ts`, `not-found.tsx`
+- `manifest.json`, `sw.js` (PWA)
 
 ### 📊 Ringkasan Sesi 9
 - **28 file baru** ditambahkan
-- **0 file dihapus**
 - **1 dependency baru**: `motion.dev`
 - **16 fitur UI/UX** diimplementasi
-- Semua halaman memiliki loading skeleton, error boundary, dan toast notifications
-
-### 🎯 16 Fitur UI/UX yang Ditambahkan
-1. **Loading Skeletons** — `Skeleton.tsx` + 5× `loading.tsx` (per-route skeleton states)
-2. **Toast Notifications** — `Toast.tsx` (success/error/info, auto-dismiss, ARIA live)
-3. **Error Boundaries** — `ErrorBoundary.tsx` (crash recovery w/ fallback UI)
-4. **Empty States** — `EmptyState.tsx` (icon + message + CTA button)
-5. **Command Palette** — `CommandPalette.tsx` (⌘+K keyboard shortcut)
-6. **Command Center** — `CommandCenter.tsx` (grouped action overlay)
-7. **Keyboard Navigation** — `KeyboardNavWrapper.tsx` + `useKeyboardNav.ts` (1-5, /, Esc)
-8. **Animated Counters** — `AnimatedCounter.tsx` (tween morph numbers)
-9. **Tooltips** — `Tooltip.tsx` (accessible hover/focus tooltips)
-10. **Breadcrumbs** — `Breadcrumbs.tsx` (route-aware navigation trail)
-11. **Route Progress** — `RouteProgress.tsx` (top loading bar on navigation)
-12. **Scroll to Top** — `ScrollToTop.tsx` (floating scroll button)
-13. **Skip to Content** — `SkipToContent.tsx` (WCAG 2.1 skip link)
-14. **PWA Support** — `PWARegister.tsx` + `manifest.json` + `sw.js` (offline-capable)
-15. **Export Utilities** — `exportUtils.ts` (CSV/JSON data export)
-16. **Reduced Motion** — `useReducedMotion.ts` (respects `prefers-reduced-motion`)
 
 ---
 
@@ -471,16 +256,6 @@ Audit komprehensif UI/UX yang menghasilkan **16 fitur baru** untuk meningkatkan 
 
 ### 📌 Ringkasan
 Overhaul komprehensif dashboard yang mencakup perbaikan **6 bug kritis**, pengintegrasian **4 komponen UI yang sebelumnya tidak digunakan**, dan **6 peningkatan visual**. Rating dashboard meningkat dari 7.5/10 → 9.5/10.
-
-### 🐛 Bug Kritis yang Diperbaiki (6)
-| Bug | File | Detail |
-|-----|------|--------|
-| Breadcrumbs import error | `ui/Breadcrumbs.tsx` | `framer-motion` → `motion/react` |
-| CommandCenter data attributes | `ui/CommandCenter.tsx` | `[data-sidebar]` & `[data-navbar]` tidak ada — ditambahkan ke Sidebar & Navbar |
-| AgentCommPanel stagger animation | `AgentCommPanel.tsx` | `index={0}` hardcoded → `index={i}` dari `.map()` |
-| LiveLog hardcoded colors | `LiveLog.tsx` | `text-[#7F94AD]` → `var(--color-body-subtle)` (design tokens) |
-| AnalyticsCharts hardcoded colors | `AnalyticsCharts.tsx` | Hex chart colors → CSS variables |
-| handleBlacklist no-op | `DashboardContext.tsx` | Hanya `console.log` → update `vectorMemory` status ke "blacklisted" |
 
 ### 🔌 Komponen UI yang Diintegrasikan (4)
 | Komponen | Digunakan di | Sebelumnya |
@@ -490,45 +265,24 @@ Overhaul komprehensif dashboard yang mencakup perbaikan **6 bug kritis**, pengin
 | `Skeleton` | Loading states (SSR hydration) | `DashboardContext` return `null` |
 | `EmptyState` | `VectorMemoryExplorer`, `AuditTrail` | Inline "no data" text |
 
+### ✅ File Baru (Dokumentasi & Perencanaan)
+| File | Lokasi | Deskripsi |
+|------|--------|-----------|
+| `plan.md` | `/` | Dokumen perencanaan (*Implementation Plan*) untuk eksekusi fitur dashboard overhaul |
+
 ### 🎨 Peningkatan Visual (6)
-| Fitur | Detail |
-|-------|--------|
-| Page transitions | `motion.div` fade-slide-up wrapper pada layout children |
-| Typing indicator | "Agent is typing..." animated dots sebelum message baru di `AgentCommPanel` |
-| Keyboard shortcut hints | "⌘K" hint di search bar, "1-5" hint di sidebar footer |
-| CommandPalette actions | Wired up CommandPalette dengan navigasi dan aksi aktual |
-| Design tokens (LiveLog) | Semua hardcoded hex diganti CSS variables |
-| Design tokens (AnalyticsCharts) | Chart colors menggunakan CSS variables |
-
-### 🧹 Code Quality
-- Dead `ExpandableDetail` component removed dari `TransactionList.tsx`
-- Mobile sidebar default state: `false` (detect `window.innerWidth < 1024`)
-
-### ✏️ File yang DIUBAH
-
-| File | Lokasi | Detail |
-|------|--------|--------|
-| `Breadcrumbs.tsx` | `components/ui/` | Fix import `motion/react` |
-| `CommandCenter.tsx` | `components/ui/` | Fix data attribute queries |
-| `AgentCommPanel.tsx` | `components/` | Fix stagger index + typing indicator |
-| `KpiCard.tsx` | `components/` | Integrasikan AnimatedCounter + Tooltip |
-| `DashboardContext.tsx` | `components/` | Fix handleBlacklist + Skeleton integration |
-| `LiveLog.tsx` | `components/` | Replace hardcoded colors dengan design tokens |
-| `AnalyticsCharts.tsx` | `components/` | Replace hardcoded colors dengan CSS variables |
-| `VectorMemoryExplorer.tsx` | `components/` | Integrasikan EmptyState |
-| `AuditTrail.tsx` | `components/` | Integrasikan EmptyState |
-| `Sidebar.tsx` | `components/` | Tambah `data-sidebar` attribute |
-| `Navbar.tsx` | `components/` | Tambah `data-navbar` attribute |
-| `TransactionList.tsx` | `components/` | Hapus dead ExpandableDetail |
-| `layout.tsx` | `app/` | Tambah page transition wrapper |
+1. Page transitions (`motion.div` fade-slide-up wrapper)
+2. Typing indicator ("Agent is typing...") di `AgentCommPanel`
+3. Keyboard shortcut hints ("⌘K", "1-5")
+4. CommandPalette actions disambungkan dengan fungsi
+5. Design tokens (LiveLog) — CSS variables digunakan secara penuh
+6. Design tokens (AnalyticsCharts) — Chart colors via CSS variables
 
 ### 📊 Ringkasan Sesi 10
 - **6 bug kritis** diperbaiki
-- **4 komponen UI** diintegrasikan (AnimatedCounter, Tooltip, Skeleton, EmptyState)
+- **4 komponen UI** diintegrasikan
 - **6 peningkatan visual** diimplementasi
 - **13 file** diubah
-- **0 file baru** ditambahkan
-- **0 file dihapus**
 
 **Status: ✅ OVERHAUL SELESAI — RATING 7.5/10 → 9.5/10**
 
@@ -551,11 +305,120 @@ Visual Overhaul v2 terdiri dari **7 fase, 50 task** yang semuanya divalidasi ✅
 | **Agent Comm Panel** | Code blocks for hash strings, copy button, typing speed variation (600-1500ms), proportional delay, scale bounce entrance |
 | **Visual Differentiator** | Animated gradient mesh background (20-30s cycle, opacity 0.06-0.1), glassmorphism hover (blur + glow on cards) |
 
+### ✅ File Baru (Komponen, Hooks & Tugas)
+| File | Lokasi | Deskripsi |
+|------|--------|-----------|
+| `task.md` | `/` | Daftar tugas checklist (50 kriteria validasi) untuk visual overhaul v2 |
+| `ThemeToggle.tsx` | `dashboard/src/components/ui/` | Komponen tombol rotasi Sun/Moon untuk pergantian light/dark theme |
+| `useTheme.ts` | `dashboard/src/hooks/` | Custom hook untuk manajemen local storage & state light/dark theme |
+
 ### 📊 Ringkasan Sesi 11
 - **7 fase** diselesaikan, **50/50 task** divalidasi ✅
 - **15 file** diubah
-- **+719/-140 lines** diff
-- TypeScript clean, zero regressions
 - Rating dashboard: **9.5/10 → 9.8/10** (signature visual elements)
 
 **Status: ✅ VISUAL OVERHAUL V2 SELESAI — 50/50 TASKS VALIDATED**
+
+---
+
+## Sesi 12 — 2026-06-19 | Infrastruktur Backend Akhir & Deployment Engine Agent B
+
+### 📌 Ringkasan
+Sesi ini berfokus pada deployment infrastruktur core backend Agent B, isolasi environment runtime, serta injeksi skema engine database PostgreSQL relasional di dalam VPS lokal (`greyarch`) sebagai kesiapan integrasi live dashboard data.
+
+### ✅ File yang DITAMBAHKAN
+
+| File | Lokasi | Deskripsi |
+|------|--------|-----------|
+| `database.py` | `/` | Inisialisasi koneksi pooling database engine menggunakan adapter database Python. |
+| `database_schema.sql` | `/` | Skema SQL dasar yang berisi struktur tabel transaksi, fungsi constraint, indexer kecepatan query, dan data trigger untuk mencegah redundansi / data ganda. |
+| `database_schema_patch.sql` | `/` | File patch SQL tambahan untuk penyesuaian minor tabel relasi log selama integrasi. |
+| `requirements.txt` | `/` | Mengunci seluruh dependency library (FastAPI, Web3.py v6, Pydantic, Uvicorn, dll.) yang terisolasi dari lokal `venv`. |
+| `web3_client.py` | `/` | Wrapper client khusus untuk manajemen multi-RPC Base Network yang menangani jalur fallback koneksi Alchemy dan fungsi utility Web3 tingkat atas (termasuk modul relokasi `get_contract`). |
+
+### ✏️ File yang DIUBAH
+
+| File | Lokasi | Detail Perubahan |
+|------|--------|-----------------|
+| `agent_b.py` | `/` | Refaktor total integrasi engine REST API FastAPI/Uvicorn, pengikatan port internal `8080`, penyesuaian dependensi Web3.py v6 untuk menjamin kestabilan *Geth PoA Middleware*, serta validasi data payload inbound. |
+| `.gitignore` | `/` | Penambahan baris proteksi ketat untuk menyembunyikan environment local `venv` dan file rahasia `.env` (berisi private key wallet Base, password DB, dan RPC API key Alchemy). |
+
+### 🎯 Dampak & Status Terakhir
+- **Engine Database:** PostgreSQL 15-alpine resmi berjalan di dalam isolated Docker Container (`a2z-postgres`) pada port internal `5432` dengan skema tabel yang sukses diinjeksi 100%.
+- **REST API Server:** Server backend `agent_b.py` sukses lolos pengujian *smoke test* lokalan dan saat ini berstatus **LIVE / STANDBY** di port `8080` untuk melayani request transaksi eksekusi dari Agent A.
+- **PR Status:** Semua perubahan kode berhasil di-commit serta di-push di branch `feat-agent-web3` dan di-merge ke branch `develop`.
+
+**Status: ✅ CORE BACKEND AGENT B & ENGINE POSTGRES LIVE 100% — INFRASTRUKTUR SIAP MENERIMA INTEGRASI AGENT A.**
+
+---
+
+## 📊 Ringkasan Total Perubahan (Semua Sesi)
+
+| Kategori | Jumlah |
+|----------|--------|
+| File baru ditambahkan | **62 file** |
+| File yang diubah/direfaktor | **30+ file** |
+| File dihapus | **0 file** |
+| Dependensi baru | **4 paket** (`recharts`, `lucide-react`, `motion.dev`, backend `requirements.txt`) |
+| Route/halaman baru | **4 route** |
+| Komponen baru | **37+ komponen** |
+| **Komponen direfaktor** | **33 komponen** |
+| **Dokumen alignment** | **1 file khusus juri** (`docs/06-amd-stack.md`) |
+| **Stack migrasi** | **1 sesi** (Sesi 6 — vLLM → AMD AI Workbench + AIM + SGLang) |
+| **UI/UX Fitur** | **29 fitur** |
+| **Bug fixes** | **10+ bug kritis** |
+| **Total sesi** | **12 sesi** |
+
+---
+
+## 🔍 Status Build Terakhir
+
+```
+npm run build — 2026-06-16T15:16:59Z
+
+▲ Next.js 16.2.9 (Turbopack)
+✓ Compiled successfully in 8.5s
+✓ TypeScript passed in 6.7s
+✓ Static pages generated: 8/8
+```
+
+**Status: ✅ PASSED — 0 errors, 0 warnings**
+
+---
+
+## 🗂️ Struktur Direktori Akhir
+
+```
+project-a2z-agentz/
+├── README.md                          # AMD-stack branding
+├── PRD.md                             # Full PRD w/ AMD alignment
+├── memory.md                          # File ini
+├── SUBMISSION.md                      # Checklist lablab.ai ACT II
+├── LICENSE                            # MIT
+├── .gitignore                         # Root gitignore
+├── agent_b.py                         # REST API FastAPI + Web3 executor
+├── database.py                        # DB Connection
+├── database_schema.sql                # SQL schema
+├── database_schema_patch.sql          # SQL patch
+├── requirements.txt                   # Backend dependencies
+├── web3_client.py                     # Multi-RPC & Utils
+├── plan.md                            # Implementation Plan
+├── task.md                            # Checklist Tracker
+├── docs/
+│   ├── 01-architecture.md             # Mermaid + AMD pipeline
+│   ├── 02-agent-a-scout.md            # AMD AI Workbench + AIM + SGLang
+│   ├── 03-agent-b-vault.md            # KMS, Gas, Multi-RPC
+│   ├── 04-communication-protocol.md   # ECDSA + SGLang endpoint
+│   ├── 05-setup-guide.md              # End-to-end AMD Cloud setup
+│   └── 06-amd-stack.md                # Alignment khusus juri
+└── dashboard/
+    ├── package.json
+    ├── tsconfig.json
+    ├── public/
+    │   ├── manifest.json              # PWA manifest
+    │   └── sw.js                      # Service worker
+    └── src/
+        ├── app/
+        ├── hooks/
+        └── components/
+```
