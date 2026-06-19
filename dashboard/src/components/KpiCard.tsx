@@ -5,6 +5,7 @@ import { motion } from "motion/react";
 import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { useRef, useState, useEffect } from "react";
+import { Sparkline } from "@/components/ui/Sparkline";
 
 interface KpiCardProps {
   label: string;
@@ -21,11 +22,12 @@ interface KpiCardProps {
   counterDecimals?: number;
   iconTooltip?: string;
   showPulse?: boolean;
+  sparkData?: number[];
 }
 
 const colorMap = {
   accent: {
-    icon: "var(--color-fg-brand-strong)",
+    icon: "var(--color-brand-strong)",
     bg: "var(--color-brand-softer)",
     border: "var(--color-border-brand-subtle)",
   },
@@ -54,6 +56,7 @@ const colorMap = {
 export default function KpiCard({
   label, value, subValue, icon: Icon, color = "accent", trend, trendValue, index = 0,
   numericValue, counterPrefix, counterSuffix, counterDecimals, iconTooltip, showPulse = false,
+  sparkData,
 }: KpiCardProps) {
   const c = colorMap[color];
   const prevValueRef = useRef<number | undefined>(numericValue);
@@ -103,6 +106,7 @@ export default function KpiCard({
         <p
           className="text-2xl font-bold text-[var(--color-heading)] tabular-nums"
           style={{ fontFamily: "var(--font-serif)" }}
+          aria-live="polite"
         >
           {numericValue !== undefined ? (
             <AnimatedCounter
@@ -117,6 +121,11 @@ export default function KpiCard({
         </p>
         {subValue && <p className="text-xs text-[var(--color-body-subtle)] mt-0.5">{subValue}</p>}
       </div>
+      {sparkData && sparkData.length > 1 && (
+        <div className="pt-1">
+          <Sparkline data={sparkData} width={200} height={28} color={color === "green" ? "var(--color-success)" : color === "red" ? "var(--color-danger)" : "var(--color-fg-brand-strong)"} />
+        </div>
+      )}
       {trend && trendValue && (
         <div
           className="flex items-center gap-1 text-xs font-medium"

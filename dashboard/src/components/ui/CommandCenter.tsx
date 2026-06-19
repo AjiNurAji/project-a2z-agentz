@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { Maximize2, Minimize2, Clock, RefreshCw } from "lucide-react";
 
@@ -37,6 +38,13 @@ export function CommandCenterToggle() {
     const mainContent = document.getElementById("main-content");
     if (mainContent) mainContent.style.padding = "0";
 
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setActive(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+
     // Auto-refresh visual indicator
     const refreshId = setInterval(() => {
       setRefreshing(true);
@@ -48,6 +56,7 @@ export function CommandCenterToggle() {
       if (sidebar) (sidebar as HTMLElement).style.display = "";
       if (navbar) (navbar as HTMLElement).style.display = "";
       if (mainContent) mainContent.style.padding = "";
+      window.removeEventListener("keydown", handleKeyDown);
       clearInterval(refreshId);
     };
   }, [active]);
@@ -94,16 +103,38 @@ export function CommandCenterToggle() {
       {/* Toggle */}
       <button
         onClick={() => setActive(!active)}
-        className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors hover:bg-[var(--color-neutral-secondary-medium)]"
+        className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors hover:bg-[var(--color-neutral-secondary-medium)] focus-ring"
         style={{
           color: active ? "var(--color-fg-brand)" : "var(--color-body-subtle)",
           border: active ? "1px solid var(--color-border-brand-subtle)" : "1px solid transparent",
         }}
         aria-label={active ? "Exit command center" : "Enter command center mode"}
-        title={active ? "Exit Command Center (F11)" : "Command Center Mode"}
+        title={active ? "Exit Command Center (Esc)" : "Command Center Mode"}
       >
         {active ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
       </button>
+
+      {/* Floating Exit Button */}
+      {active && typeof document !== "undefined" && createPortal(
+        <motion.button
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          onClick={() => setActive(false)}
+          className="fixed top-4 right-4 z-[9999] flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold shadow-lg hover:bg-[var(--color-neutral-secondary-strong)] transition-all focus-ring cursor-pointer"
+          style={{
+            background: "var(--color-neutral-secondary-medium)",
+            color: "var(--color-fg-danger)",
+            border: "1px solid var(--color-border-danger-subtle)",
+          }}
+          aria-label="Floating close command center"
+          title="Close Command Center View (Esc)"
+        >
+          <Minimize2 className="w-3.5 h-3.5" />
+          Close View
+        </motion.button>,
+        document.body
+      )}
     </div>
   );
 }

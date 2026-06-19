@@ -52,6 +52,9 @@ export const metadata: Metadata = {
   },
 };
 
+import { KeyboardHelpOverlay } from "@/components/ui/KeyboardHelpOverlay";
+import { OnboardingTour } from "@/components/ui/OnboardingTour";
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -59,14 +62,16 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${inter.variable} ${ibmPlexSerif.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
       <head>
         <link rel="manifest" href="/manifest.json" />
-        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('a2z-theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}})()` }} />
+        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('a2z-theme');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t)}else{var isDark=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-theme',isDark?'dark':'light')}}catch(e){}})()` }} />
       </head>
       <body
         className="flex h-screen overflow-hidden font-sans"
         style={{ backgroundColor: "var(--color-surface)", color: "var(--color-body)", transition: "background-color 0.3s ease, color 0.3s ease" }}
+        suppressHydrationWarning
       >
         <PWARegister />
         <SkipToContent />
@@ -75,6 +80,8 @@ export default function RootLayout({
             <KeyboardNavWrapper>
               <RouteProgress />
               <CommandPalette />
+              <KeyboardHelpOverlay />
+              <OnboardingTour />
               <Sidebar />
               <div className="flex flex-col flex-1 overflow-hidden min-w-0">
                 <Navbar />

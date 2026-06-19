@@ -1,9 +1,9 @@
 "use client";
 
 import { useDashboard } from "./DashboardContext";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { History, Search, ChevronDown, ChevronRight, Hash, Clock, ExternalLink, Copy, FileText, CheckCircle2, XCircle, AlertTriangle, Download } from "lucide-react";
+import { History, Search, ChevronRight, Clock, CheckCircle2, XCircle, AlertTriangle, Download } from "lucide-react";
 import { exportToCSV } from "./ui/exportUtils";
 import { EmptyState } from "@/components/ui/EmptyState";
 
@@ -24,6 +24,8 @@ const STATUS_STYLES: Record<string, { bg: string; border: string; text: string; 
   rejected: { bg: "var(--color-danger-soft)", border: "var(--color-border-danger-subtle)", text: "var(--color-fg-danger-strong)", icon: XCircle },
 };
 
+const getNow = () => Date.now();
+
 export default function AuditTrail() {
   const { transactions, approvalQueue } = useDashboard();
   const [search, setSearch] = useState("");
@@ -31,6 +33,12 @@ export default function AuditTrail() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const perPage = 10;
+  const [now, setNow] = useState<number | null>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setNow(getNow()), 0);
+    return () => clearTimeout(t);
+  }, []);
 
   // Merge transactions + approvals into unified audit entries
   const allEntries: AuditEntry[] = [
@@ -81,7 +89,8 @@ export default function AuditTrail() {
   };
 
   const timeAgo = (d: Date) => {
-    const sec = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (!now) return "just now";
+    const sec = Math.floor((now - d.getTime()) / 1000);
     if (sec < 60) return `${sec}s ago`;
     if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
     return `${Math.floor(sec / 3600)}h ago`;
@@ -94,7 +103,7 @@ export default function AuditTrail() {
       status: e.status,
       timestamp: e.timestamp.toISOString(),
     }));
-    exportToCSV(data, `a2z-audit-trail-${Date.now()}`);
+    exportToCSV(data, `a2z-audit-trail-${getNow()}`);
   };
 
   return (

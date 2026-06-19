@@ -1,10 +1,9 @@
-"use client";
-
 import { useDashboard, type VectorMemoryItem } from "./DashboardContext";
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Brain, Search, Filter, Database, Ban, Trash2, ExternalLink, Copy } from "lucide-react";
+import { Brain, Search, Filter, Database, Ban, Trash2 } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ConfirmModal } from "./ui/ConfirmModal";
 
 const STATUS_COLORS: Record<string, { bg: string; border: string; text: string }> = {
   indexed: { bg: "var(--color-success-soft)", border: "var(--color-border-success-subtle)", text: "var(--color-fg-success-strong)" },
@@ -22,6 +21,7 @@ export default function VectorMemoryExplorer() {
   const { vectorMemory, handleBlacklist, handleClearCache } = useDashboard();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [pendingBlacklist, setPendingBlacklist] = useState<VectorMemoryItem | null>(null);
 
   const filtered = vectorMemory.filter((item) => {
     const matchesSearch = item.projectName.toLowerCase().includes(search.toLowerCase()) ||
@@ -169,8 +169,8 @@ export default function VectorMemoryExplorer() {
                       <td className="text-right px-5 py-3">
                         <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={() => handleBlacklist(item.id)}
-                            className="p-1.5 rounded-md transition-colors hover:opacity-80"
+                            onClick={() => setPendingBlacklist(item)}
+                            className="p-1.5 rounded-md transition-colors hover:opacity-80 focus-ring"
                             style={{ color: "var(--color-fg-danger)" }}
                             title="Blacklist"
                           >
@@ -178,7 +178,7 @@ export default function VectorMemoryExplorer() {
                           </button>
                           <button
                             onClick={() => handleClearCache(item.id)}
-                            className="p-1.5 rounded-md transition-colors hover:opacity-80"
+                            className="p-1.5 rounded-md transition-colors hover:opacity-80 focus-ring"
                             style={{ color: "var(--color-body-subtle)" }}
                             title="Clear cache"
                           >
@@ -231,10 +231,10 @@ export default function VectorMemoryExplorer() {
                   <span className="text-xs tabular-nums" style={{ color: "var(--color-body)" }}>{item.similarityScore}</span>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => handleBlacklist(item.id)} className="flex-1 text-xs py-1.5 rounded-md font-medium" style={{ background: "var(--color-danger-soft)", color: "var(--color-fg-danger)", border: "1px solid var(--color-border-danger-subtle)" }}>
+                  <button onClick={() => setPendingBlacklist(item)} className="flex-1 text-xs py-1.5 rounded-md font-medium focus-ring" style={{ background: "var(--color-danger-soft)", color: "var(--color-fg-danger)", border: "1px solid var(--color-border-danger-subtle)" }}>
                     <Ban size={12} className="inline mr-1" /> Blacklist
                   </button>
-                  <button onClick={() => handleClearCache(item.id)} className="flex-1 text-xs py-1.5 rounded-md font-medium" style={{ background: "var(--color-neutral-secondary-medium)", color: "var(--color-body-subtle)", border: "1px solid var(--color-border-default)" }}>
+                  <button onClick={() => handleClearCache(item.id)} className="flex-1 text-xs py-1.5 rounded-md font-medium focus-ring" style={{ background: "var(--color-neutral-secondary-medium)", color: "var(--color-body-subtle)", border: "1px solid var(--color-border-default)" }}>
                     <Trash2 size={12} className="inline mr-1" /> Clear
                   </button>
                 </div>
@@ -251,6 +251,23 @@ export default function VectorMemoryExplorer() {
           description="No vector memory entries match your current search or filter criteria."
         />
       )}
+
+      <ConfirmModal
+        open={pendingBlacklist !== null}
+        variant="danger"
+        title="Blacklist project"
+        description="This project will be marked as blacklisted in the vector store. Existing data is preserved but excluded from scans."
+        details={pendingBlacklist ? [
+          { label: "Project", value: pendingBlacklist.projectName },
+          { label: "TVL", value: `$${(pendingBlacklist.tvl / 1_000_000).toFixed(2)}M` },
+        ] : []}
+        confirmLabel="Blacklist"
+        onConfirm={() => {
+          if (pendingBlacklist) handleBlacklist(pendingBlacklist.id);
+          setPendingBlacklist(null);
+        }}
+        onCancel={() => setPendingBlacklist(null)}
+      />
     </div>
   );
 }

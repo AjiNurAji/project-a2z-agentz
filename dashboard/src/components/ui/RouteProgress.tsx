@@ -10,10 +10,13 @@ export function RouteProgress() {
   const timeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
-    setActive(true);
+    const activeTimeout = setTimeout(() => setActive(true), 0);
     if (timeout.current) clearTimeout(timeout.current);
     timeout.current = setTimeout(() => setActive(false), 1200);
-    return () => { if (timeout.current) clearTimeout(timeout.current); };
+    return () => {
+      clearTimeout(activeTimeout);
+      if (timeout.current) clearTimeout(timeout.current);
+    };
   }, [pathname]);
 
   return (

@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Zap, ArrowLeft, Home } from "lucide-react";
+import { ArrowLeft, Home } from "lucide-react";
 import Link from "next/link";
 
 export default function NotFound() {
@@ -14,13 +14,14 @@ export default function NotFound() {
         className="text-center"
       >
         <div
-          className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6"
+          className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6 overflow-hidden"
           style={{
-            background: "linear-gradient(135deg, var(--color-brand), var(--color-brand-medium))",
-            boxShadow: "0 8px 32px var(--color-brand-soft)",
+            background: "var(--color-neutral-secondary-medium)",
+            border: "1px solid var(--color-border-brand-subtle)",
+            boxShadow: "0 8px 32px var(--color-glow-brand)",
           }}
         >
-          <Zap className="w-10 h-10" style={{ color: "var(--color-heading)" }} />
+          <img src="/images/logo/logo.svg" className="w-14 h-14 object-contain" alt="A2Z Logo" />
         </div>
         <h1
           className="text-7xl font-bold mb-2 tabular-nums"
