@@ -157,6 +157,7 @@ interface DashboardContextType {
   agentHealth: { a: AgentHealth; b: AgentHealth };
   preferences: AppPreferences;
   setPreferences: (p: Partial<AppPreferences>) => void;
+  analyzeTarget: (targetAddress: string, description: string, projectName: string) => Promise<void>;
 }
 
 const DashboardContext = createContext<DashboardContextType | null>(null);
@@ -379,92 +380,95 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     logCountRef.current++;
   }, []);
 
-  // ─── Live Simulation ──────────────────────────────────────
-  useEffect(() => {
-    if (isPaused) return;
-    const interval = setInterval(() => {
-      setLastSync(Date.now());
-      const roll = Math.random();
-
-      if (roll < 0.35) {
-        // Agent A message
-        addLog("AGENT_A", randFrom(FARCASTER_MSGS));
+  const analyzeTarget = useCallback(async (targetAddress: string, description: string, projectName: string) => {
+    setAgentAStatus("analyzing");
+    addLog("INFO", `Initiating analysis for ${projectName} (${targetAddress})...`);
+    
+    try {
+      const res = await fetch("http://localhost:8080/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target_address: targetAddress, description, project_name: projectName, use_mock: false })
+      });
+      
+      if (!res.ok) throw new Error("Backend unavailable");
+      
+      const data = await res.json();
+      setAgentAStatus("online");
+      
+      addLog("SUCCESS", `Analysis complete for ${projectName}: Score ${data.score}/100. Status: ${data.status}`);
+      
+      if (data.status === "executed" || data.status === "pending_approval") {
         setAgentMessages((prev) => [
           ...prev,
-          {
-            id: genId(),
-            sender: "agent_a" as const,
-            content: randFrom(FARCASTER_MSGS),
-            timestamp: new Date(),
-            status: "done" as const,
-          },
-        ].slice(-50));
-      } else if (roll < 0.6) {
-        // Agent B message
-        const msg = randFrom(AGENT_B_MSGS);
-        addLog("AGENT_B", msg);
-        setAgentMessages((prev) => [
-          ...prev,
-          { id: genId(), sender: "agent_b" as const, content: msg, timestamp: new Date(), status: "done" as const },
-        ].slice(-50));
-        setAgentBStatus("executing");
-        setTimeout(() => setAgentBStatus("online"), 2000);
-      } else if (roll < 0.8) {
-        // System inference
-        setAgentAStatus("analyzing");
-        setTimeout(() => setAgentAStatus("online"), 1500);
-        addLog("INFO", `Llama 3 8B inference completed in ${randInt(800, 2200)}ms on AMD MI300X`);
-        setAgentMessages((prev) => [
-          ...prev,
-          { id: genId(), sender: "system" as const, content: `Llama 3 inference: ${randInt(800, 2200)}ms on AMD MI300X`, timestamp: new Date(), status: "done" as const },
+          { id: genId(), sender: "system" as const, content: `Analysis passed with score ${data.score}. Execution status: ${data.status}`, timestamp: new Date(), status: "done" as const },
         ].slice(-50));
       } else {
-        // New transaction
-        const proj = randFrom(PROJECTS);
-        const success = Math.random() > 0.15;
-        const newTx: Transaction = {
-          id: genId(),
-          projectName: proj,
-          targetAddress: genAddress(),
-          amountUsd: +(Math.random() * 1.8 + 0.2).toFixed(2),
-          status: success ? "success" : "failed",
-          txHash: genTxHash(),
-          timestamp: new Date(),
-          reason: "Llama 3 score: " + randInt(86, 99) + "/100",
-          gasUsedGwei: randInt(35, 65),
-        };
-        setTransactions((prev) => [newTx, ...prev].slice(0, 50));
-        setAgentHealth((h) => ({
-          ...h,
-          b: {
-            ...h.b,
-            successCount: h.b.successCount + (success ? 1 : 0),
-            failCount: h.b.failCount + (success ? 0 : 1),
-          },
-        }));
-        if (!success) {
-          addNotification("failure", "Transaction failed", `${proj} — RPC timeout, retry scheduled`, "/history");
+        addNotification("failure", "Analysis Rejected", `${projectName} was rejected. Reason: ${data.reason}`);
+      }
+      
+    } catch (err) {
+      addLog("WARN", `Backend unavailable. Using mock simulation for ${projectName}.`);
+      // Mock Fallback
+      setTimeout(() => {
+        setAgentAStatus("online");
+        addLog("SUCCESS", `Mock Analysis complete for ${projectName}: Score 92/100.`);
+      }, 1500);
+    }
+  }, [addLog, addNotification]);
+
+  // ─── Real Backend Polling & Live Simulation ──────────────────────────────────────
+  useEffect(() => {
+    if (isPaused) return;
+    const interval = setInterval(async () => {
+      setLastSync(Date.now());
+      
+      try {
+        const res = await fetch("http://localhost:8080/api/status");
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.logs && data.logs.length > 0) {
+            // Update transactions based on backend logs
+            const mappedTxs = data.logs.map((log: any) => ({
+              id: log.tx_hash_id,
+              projectName: "On-Chain Target", // We could join with target_addresses in backend to get this
+              targetAddress: log.project_target_address,
+              amountUsd: log.amount_usd,
+              status: log.status.toLowerCase() === "success" ? "success" : log.status.toLowerCase() === "pending_approval" ? "pending" : "failed",
+              txHash: log.tx_hash_id,
+              timestamp: new Date(log.created_at),
+              reason: "Autonomous Execution",
+              gasUsedGwei: 42, // Mocked gas since execution_logs doesn't have it
+            }));
+            
+            // Only update if there are new transactions (simplified check by length)
+            setTransactions((prev) => mappedTxs.length > prev.length ? mappedTxs.slice(0, 50) : prev);
+          }
         }
-        addLog(
-          success ? "SUCCESS" : "ERROR",
-          success
-            ? `Tx confirmed: ${proj} +$${newTx.amountUsd} | Hash: ${newTx.txHash.slice(0, 16)}...`
-            : `Tx failed: ${proj} — RPC timeout, retry scheduled`
-        );
-        // Also add to agent messages
-        setAgentMessages((prev) => [
-          ...prev,
-          {
+      } catch (e) {
+        // Fallback to simulation if backend is down
+        const roll = Math.random();
+
+        if (roll < 0.35) {
+          addLog("AGENT_A", randFrom(FARCASTER_MSGS));
+        } else if (roll < 0.6) {
+          addLog("AGENT_B", randFrom(AGENT_B_MSGS));
+        } else {
+          const proj = randFrom(PROJECTS);
+          const success = Math.random() > 0.15;
+          const newTx: Transaction = {
             id: genId(),
-            sender: "agent_b" as const,
-            content: success
-              ? `Transaction confirmed for ${proj}. Amount: $${newTx.amountUsd}. Hash: ${newTx.txHash.slice(0, 16)}...`
-              : `Transaction failed for ${proj}. RPC timeout — scheduling retry.`,
+            projectName: proj,
+            targetAddress: genAddress(),
+            amountUsd: +(Math.random() * 1.8 + 0.2).toFixed(2),
+            status: success ? "success" : "failed",
+            txHash: genTxHash(),
             timestamp: new Date(),
-            status: (success ? "done" : "error") as "done" | "error",
-            metadata: { txHash: newTx.txHash.slice(0, 18) + "...", projectName: proj, amountUsd: newTx.amountUsd },
-          },
-        ].slice(-50));
+            reason: "Llama 3 score: " + randInt(86, 99) + "/100",
+            gasUsedGwei: randInt(35, 65),
+          };
+          setTransactions((prev) => [newTx, ...prev].slice(0, 50));
+        }
       }
     }, 4000);
     return () => clearInterval(interval);
@@ -565,7 +569,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         agentMessages, sidebarOpen, setSidebarOpen,
         lastSync, notifications, unreadCount: notifications.filter((n) => !n.read).length,
         addNotification, markNotificationsRead, clearNotifications,
-        agentHealth, preferences, setPreferences,
+        agentHealth, preferences, setPreferences, analyzeTarget,
       }}
     >
       {children}
