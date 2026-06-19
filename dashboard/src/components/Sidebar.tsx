@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useDashboard } from "./DashboardContext";
+import { Tooltip } from "@/components/ui/Tooltip";
 import {
   LayoutDashboard, BarChart3, Brain, History, Settings,
   Activity, ShieldAlert, ChevronLeft, ChevronRight, X, Zap,
@@ -29,6 +30,43 @@ function StatusDot({ status }: { status: string }) {
       className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${colors[status] ?? "bg-[var(--color-gray)]"}`}
     />
   );
+}
+
+// Sparkline component for agent heartbeat visualization
+function Sparkline({ data }: { data: number[] }) {
+  const width = 60;
+  const height = 20;
+  const padding = 2;
+  
+  if (data.length === 0) return null;
+  
+  const max = Math.max(...data);
+  const min = Math.min(...data);
+  const range = max - min || 1;
+  
+  const points = data.map((value, index) => {
+    const x = padding + (index / (data.length - 1)) * (width - padding * 2);
+    const y = height - padding - ((value - min) / range) * (height - padding * 2);
+    return `${x},${y}`;
+  }).join(" ");
+  
+  return (
+    <svg width={width} height={height} className="opacity-60">
+      <polyline
+        points={points}
+        fill="none"
+        stroke="var(--color-success)"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+// Generate mock heartbeat data
+function generateHeartbeatData(): number[] {
+  return Array.from({ length: 10 }, () => Math.random() * 0.7 + 0.3);
 }
 
 export default function Sidebar() {
@@ -85,59 +123,80 @@ export default function Sidebar() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05, duration: 0.3 }}
             >
-              <Link
-                href={href}
-                onClick={() => {
-                  // Close mobile sidebar on nav
-                  if (window.innerWidth < 1024) setSidebarOpen(false);
-                }}
-                aria-current={isActive ? "page" : undefined}
-                title={!sidebarOpen ? label : undefined}
-                className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-all duration-200 group relative min-h-[44px]
+              <motion.div
+                whileHover={{ x: 4 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              >
+                <Link
+                  href={href}
+                  onClick={() => {
+                    // Close mobile sidebar on nav
+                    if (window.innerWidth < 1024) setSidebarOpen(false);
+                  }}
+                  aria-current={isActive ? "page" : undefined}
+                  title={!sidebarOpen ? label : undefined}
+                  className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-all duration-200 group relative min-h-[44px]
                   focus-ring
                   ${isActive
                     ? "text-[var(--color-heading)]"
                     : "text-[var(--color-body-subtle)] hover:text-[var(--color-heading)] hover:bg-[var(--color-neutral-secondary-medium)]"
                   }`}
-                style={isActive ? {
-                  background: "linear-gradient(135deg, var(--color-brand-softer), var(--color-brand-soft))",
-                  border: "1px solid var(--color-border-brand-subtle)",
-                } : undefined}
-              >
-                <Icon
-                  className={`w-5 h-5 flex-shrink-0 transition-colors ${isActive ? "text-[var(--color-fg-brand-strong)]" : "text-[var(--color-body-subtle)] group-hover:text-[var(--color-body)]"}`}
-                  aria-hidden="true"
-                />
-                <AnimatePresence>
-                  {sidebarOpen && (
-                    <motion.span
-                      className="flex-1 flex items-center"
-                      initial={{ opacity: 0, width: 0 }}
-                      animate={{ opacity: 1, width: "auto" }}
-                      exit={{ opacity: 0, width: 0 }}
-                      transition={{ duration: 0.15 }}
-                    >
-                      <span className="flex-1 truncate">{label}</span>
-                      {badge > 0 && (
-                        <span
-                          className="ml-2 text-[var(--color-heading)] text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center"
-                          style={{ background: label === "Audit Trail" ? "var(--color-danger)" : "var(--color-warning)" }}
-                        >
-                          {badge}
-                        </span>
-                      )}
-                    </motion.span>
+                  style={isActive ? {
+                    background: "linear-gradient(135deg, var(--color-brand-softer), var(--color-brand-soft))",
+                    border: "1px solid var(--color-border-brand-subtle)",
+                  } : undefined}
+                >
+                  {/* Pulsing dot for active page */}
+                  {isActive && (
+                    <motion.div
+                      className="w-2 h-2 rounded-full"
+                      style={{ background: "var(--color-fg-brand-strong)" }}
+                      animate={{
+                        scale: [1, 1.5, 1],
+                        opacity: [1, 0, 1],
+                      }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                      }}
+                    />
                   )}
-                </AnimatePresence>
-                {/* Active indicator bar */}
-                {isActive && (
-                  <motion.span
-                    layoutId="sidebar-active"
-                    className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 rounded-r-full"
-                    style={{ background: "var(--color-fg-brand-strong)" }}
+                  <Icon
+                    className={`w-5 h-5 flex-shrink-0 transition-colors ${isActive ? "text-[var(--color-fg-brand-strong)]" : "text-[var(--color-body-subtle)] group-hover:text-[var(--color-body)]"}`}
+                    aria-hidden="true"
                   />
-                )}
-              </Link>
+                  <AnimatePresence>
+                    {sidebarOpen && (
+                      <motion.span
+                        className="flex-1 flex items-center"
+                        initial={{ opacity: 0, width: 0 }}
+                        animate={{ opacity: 1, width: "auto" }}
+                        exit={{ opacity: 0, width: 0 }}
+                        transition={{ duration: 0.15 }}
+                      >
+                        <span className="flex-1 truncate">{label}</span>
+                        {badge > 0 && (
+                          <span
+                            className="ml-2 text-[var(--color-heading)] text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center"
+                            style={{ background: label === "Audit Trail" ? "var(--color-danger)" : "var(--color-warning)" }}
+                          >
+                            {badge}
+                          </span>
+                        )}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                  {/* Active indicator bar */}
+                  {isActive && (
+                    <motion.span
+                      layoutId="sidebar-active"
+                      className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 rounded-r-full"
+                      style={{ background: "var(--color-fg-brand-strong)" }}
+                    />
+                  )}
+                </Link>
+              </motion.div>
             </motion.div>
           );
         })}
@@ -156,30 +215,70 @@ export default function Sidebar() {
               Agent Status
             </p>
             <div className="card p-3 space-y-2.5">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Activity className="w-3.5 h-3.5 text-[var(--color-fg-brand)]" aria-hidden="true" />
-                  <span className="text-xs text-[var(--color-body)] truncate">Agent A (Scout)</span>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Activity className="w-3.5 h-3.5 text-[var(--color-fg-brand)]" aria-hidden="true" />
+                    <span className="text-xs font-medium text-[var(--color-body)] truncate">Agent A (Scout)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Tooltip content={agentAStatus === "online" ? "Online — actively scanning" : agentAStatus === "analyzing" ? "Analyzing signals..." : agentAStatus === "executing" ? "Executing transaction" : "Offline"} side="right">
+                      <StatusDot status={agentAStatus} />
+                    </Tooltip>
+                    <span className="text-[11px] text-[var(--color-body-subtle)] capitalize">{agentAStatus}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <StatusDot status={agentAStatus} />
-                  <span className="text-[11px] text-[var(--color-body-subtle)] capitalize">{agentAStatus}</span>
+                <div className="flex items-center justify-between pl-5">
+                  <span className="text-[10px] text-[var(--color-fg-disabled)]">Farcaster Scanner</span>
+                  <span className="text-[10px] tabular-nums text-[var(--color-fg-disabled)]">~180ms</span>
+                </div>
+                {/* Sparkline for Agent A */}
+                <div className="pl-5 pt-1">
+                  <Sparkline data={generateHeartbeatData()} />
                 </div>
               </div>
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <ShieldAlert className="w-3.5 h-3.5 text-[var(--color-fg-purple)]" aria-hidden="true" />
-                  <span className="text-xs text-[var(--color-body)] truncate">Agent B (Vault)</span>
+              <div className="h-px" style={{ background: "var(--color-border-default)" }} />
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert className="w-3.5 h-3.5 text-[var(--color-fg-purple)]" aria-hidden="true" />
+                    <span className="text-xs font-medium text-[var(--color-body)] truncate">Agent B (Vault)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Tooltip content={isPaused ? "Paused — human override" : agentBStatus === "online" ? "Online — awaiting payloads" : agentBStatus === "executing" ? "Executing on Base mainnet" : agentBStatus === "analyzing" ? "Verifying payload" : "Offline"} side="right">
+                      <StatusDot status={isPaused ? "offline" : agentBStatus} />
+                    </Tooltip>
+                    <span className="text-[11px] text-[var(--color-body-subtle)] capitalize">
+                      {isPaused ? "paused" : agentBStatus}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <StatusDot status={isPaused ? "offline" : agentBStatus} />
-                  <span className="text-[11px] text-[var(--color-body-subtle)] capitalize">
-                    {isPaused ? "paused" : agentBStatus}
-                  </span>
+                <div className="flex items-center justify-between pl-5">
+                  <span className="text-[10px] text-[var(--color-fg-disabled)]">Base Network (8453)</span>
+                  <span className="text-[10px] tabular-nums text-[var(--color-fg-disabled)]">Connected</span>
+                </div>
+                {/* Sparkline for Agent B */}
+                <div className="pl-5 pt-1">
+                  <Sparkline data={generateHeartbeatData()} />
                 </div>
               </div>
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Keyboard navigation hint */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="px-5 pb-2 text-[10px]"
+            style={{ color: "var(--color-fg-disabled)" }}
+          >
+            Press <kbd className="font-mono px-1 rounded" style={{ background: "var(--color-neutral-secondary-medium)" }}>1</kbd>-<kbd className="font-mono px-1 rounded" style={{ background: "var(--color-neutral-secondary-medium)" }}>5</kbd> to navigate
+          </motion.p>
         )}
       </AnimatePresence>
 
@@ -212,6 +311,7 @@ export default function Sidebar() {
 
       {/* Sidebar panel */}
       <motion.aside
+        data-sidebar="true"
         className={`
           fixed lg:sticky top-0 left-0 z-50 lg:z-auto
           flex flex-col h-screen

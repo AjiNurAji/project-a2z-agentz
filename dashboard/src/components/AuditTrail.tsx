@@ -3,7 +3,9 @@
 import { useDashboard } from "./DashboardContext";
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { History, Search, ChevronDown, ChevronRight, Hash, Clock, ExternalLink, Copy, FileText, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
+import { History, Search, ChevronDown, ChevronRight, Hash, Clock, ExternalLink, Copy, FileText, CheckCircle2, XCircle, AlertTriangle, Download } from "lucide-react";
+import { exportToCSV } from "./ui/exportUtils";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 interface AuditEntry {
   id: string;
@@ -85,6 +87,16 @@ export default function AuditTrail() {
     return `${Math.floor(sec / 3600)}h ago`;
   };
 
+  const handleExport = () => {
+    const data = filtered.map((e) => ({
+      type: e.type,
+      project: e.projectName,
+      status: e.status,
+      timestamp: e.timestamp.toISOString(),
+    }));
+    exportToCSV(data, `a2z-audit-trail-${Date.now()}`);
+  };
+
   return (
     <div className="space-y-6">
       {/* Stats */}
@@ -143,6 +155,16 @@ export default function AuditTrail() {
           <option value="failed">Failed</option>
           <option value="pending">Pending</option>
         </select>
+        {filtered.length > 0 && (
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-[var(--color-neutral-secondary-medium)]"
+            style={{ color: "var(--color-body-subtle)", border: "1px solid var(--color-border-default-medium)" }}
+          >
+            <Download size={14} />
+            Export CSV
+          </button>
+        )}
       </div>
 
       {/* Accordion Entries */}
@@ -218,10 +240,11 @@ export default function AuditTrail() {
         </div>
 
         {pageEntries.length === 0 && (
-          <div className="p-12 text-center">
-            <FileText size={36} className="mx-auto mb-3" style={{ color: "var(--color-body-subtle)" }} />
-            <p className="text-sm" style={{ color: "var(--color-body-subtle)" }}>No audit entries found.</p>
-          </div>
+          <EmptyState
+            icon={History}
+            title="No audit entries"
+            description="No audit entries match your current search or filter criteria."
+          />
         )}
       </div>
 

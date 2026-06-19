@@ -4,9 +4,11 @@ import { useDashboard, type DashboardConfig } from "./DashboardContext";
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Settings, Save, RotateCcw, Sliders, Server, Shield, Zap, Check } from "lucide-react";
+import { useToast } from "./ui/Toast";
 
 export default function SettingsPanel() {
   const { config, setConfig } = useDashboard();
+  const toast = useToast();
   const [local, setLocal] = useState<DashboardConfig>({ ...config });
   const [saved, setSaved] = useState(false);
 
@@ -28,6 +30,7 @@ export default function SettingsPanel() {
   const handleSave = () => {
     setConfig(local);
     setSaved(true);
+    toast.success("Settings Saved", "Agent configuration updated successfully");
     setTimeout(() => setSaved(false), 2000);
   };
 

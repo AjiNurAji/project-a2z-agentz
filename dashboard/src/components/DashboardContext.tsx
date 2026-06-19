@@ -1,6 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import { KpiGridSkeleton, ChartSkeleton, TableSkeleton } from "@/components/ui/Skeleton";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 // ─── Types ──────────────────────────────────────────────────
 export type AgentStatus = "online" | "offline" | "analyzing" | "executing";
@@ -275,7 +277,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [successHistory, setSuccessHistory] = useState<SuccessDataPoint[]>([]);
   const [config, setConfig] = useState<DashboardConfig>(DEFAULT_CONFIG);
   const [agentMessages, setAgentMessages] = useState<AgentMessage[]>(genAgentConversation());
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
   const logCountRef = useRef(0);
 
   useEffect(() => {
@@ -417,8 +419,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
   const handleBlacklist = useCallback(
     (id: string) => {
+      setVectorMemory(prev => prev.map(v => v.id === id ? {...v, embeddingStatus: 'blacklisted' as const} : v));
       addLog("WARN", "Project blacklisted in ChromaDB vector store");
-      console.log("blacklist", id);
     },
     [addLog]
   );
@@ -430,7 +432,30 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     [addLog]
   );
 
-  if (!mounted) return null;
+  if (!mounted) {
+    return (
+      <div className="flex h-screen">
+        {/* Sidebar skeleton */}
+        <div className="hidden lg:flex flex-col w-[72px] border-r border-[var(--color-border-default)] bg-[var(--color-surface)] p-3 gap-3">
+          <Skeleton variant="circular" className="w-9 h-9" />
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} variant="rectangular" className="w-full h-10 rounded-xl" />
+          ))}
+        </div>
+        {/* Main content skeleton */}
+        <div className="flex-1 p-6 space-y-6 overflow-hidden">
+          <KpiGridSkeleton />
+          {/* Circuit breaker bar skeleton */}
+          <Skeleton variant="rectangular" className="h-14 rounded-xl" />
+          {/* 2-column grid with card skeletons */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <ChartSkeleton />
+            <TableSkeleton rows={4} />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <DashboardContext.Provider
