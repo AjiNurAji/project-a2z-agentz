@@ -4,6 +4,7 @@ import { useDashboard, type VectorMemoryItem } from "./DashboardContext";
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Brain, Search, Filter, Database, Ban, Trash2, ExternalLink, Copy } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 const STATUS_COLORS: Record<string, { bg: string; border: string; text: string }> = {
   indexed: { bg: "var(--color-success-soft)", border: "var(--color-border-success-subtle)", text: "var(--color-fg-success-strong)" },
@@ -244,10 +245,11 @@ export default function VectorMemoryExplorer() {
       </div>
 
       {filtered.length === 0 && (
-        <div className="card p-12 text-center">
-          <Brain size={40} className="mx-auto mb-3" style={{ color: "var(--color-body-subtle)" }} />
-          <p className="text-sm" style={{ color: "var(--color-body-subtle)" }}>No vector memory entries found.</p>
-        </div>
+        <EmptyState
+          icon={Brain}
+          title="No results found"
+          description="No vector memory entries match your current search or filter criteria."
+        />
       )}
     </div>
   );

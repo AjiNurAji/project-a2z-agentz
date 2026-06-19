@@ -1,7 +1,9 @@
 "use client";
 
 import { useDashboard } from "./DashboardContext";
-import { Bell, Cpu, Menu, Activity } from "lucide-react";
+import { Bell, Cpu, Menu } from "lucide-react";
+import { CommandCenterToggle } from "./ui/CommandCenter";
+import { ThemeToggle } from "./ui/ThemeToggle";
 import { motion } from "motion/react";
 
 export default function Navbar() {
@@ -9,6 +11,7 @@ export default function Navbar() {
 
   return (
     <motion.header
+      data-navbar="true"
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
@@ -42,7 +45,12 @@ export default function Navbar() {
         </div>
 
         {/* Right: alerts + agent pings */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1">
+          <ThemeToggle />
+          <CommandCenterToggle />
+            <kbd className="text-[10px] px-1.5 py-0.5 rounded font-mono hidden sm:inline-flex items-center" style={{ background: "var(--color-neutral-secondary-medium)", color: "var(--color-body-subtle)", border: "1px solid var(--color-border-default)" }}>⌘K</kbd>
+          </div>
           {kpiMetrics.activeAlerts > 0 && (
             <button
               className="relative p-1.5 rounded-xl hover:bg-[var(--color-neutral-secondary-medium)] focus-ring transition-colors"

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="32" fill="#13111C"/>
+  <rect x="24" y="24" width="144" height="144" rx="24" fill="#181621"/>
+  <text x="96" y="88" text-anchor="middle" font-family="Arial,sans-serif" font-weight="bold" font-size="48" fill="white">A2Z</text>
+  <text x="96" y="125" text-anchor="middle" font-family="Arial,sans-serif" font-size="24" fill="#42344B">Agent</text>
+  <circle cx="96" cy="150" r="6" fill="#6E9C7E"/>
+</svg>
