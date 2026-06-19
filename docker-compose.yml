@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: a2z_postgres
+    environment:
+      POSTGRES_USER: a2z_user
+      POSTGRES_PASSWORD: a2z_password
+      POSTGRES_DB: a2z_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./database_schema.sql:/docker-entrypoint-initdb.d/01_database_schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U a2z_user -d a2z_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
