@@ -101,6 +101,33 @@ async def get_openapi(request):
                     "responses": {"200": {"description": "Successful Response"}}
                 }
             },
+            "/api/analyze": {
+                "post": {
+                    "summary": "Analyze Target Wallet",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "target_address": {"type": "string", "example": "0x123..."},
+                                        "description": {"type": "string", "example": "A highly innovative protocol"},
+                                        "project_name": {"type": "string", "example": "Project X"},
+                                        "use_mock": {"type": "boolean", "example": False}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {"200": {"description": "Successful Response"}}
+                }
+            },
+            "/api/status": {
+                "get": {
+                    "summary": "Get Execution Status",
+                    "responses": {"200": {"description": "Successful Response"}}
+                }
+            },
             "/api/auth/register": {
                 "post": {
                     "summary": "Register new user",
