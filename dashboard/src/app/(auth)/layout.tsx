@@ -1,3 +1,5 @@
+"use client";
+
 import AgentScene from "@/components/landing/AgentScene";
 
 export default function AuthLayout({
