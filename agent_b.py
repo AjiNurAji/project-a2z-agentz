@@ -32,7 +32,11 @@ from database import (
     insert_execution_log,
     is_blacklisted,
 )
-from web3_client import simulate_and_execute_tx
+from web3_client import (
+    canonical_message_for_signing,
+    recover_signer,
+    simulate_and_execute_tx,
+)
 
 
 # ----------------------------------------------------------------------------
@@ -88,14 +92,10 @@ class VaultExecuteResponse(BaseModel):
 # ----------------------------------------------------------------------------
 # Helpers
 # ----------------------------------------------------------------------------
-def _canonical_message(req: VaultExecuteRequest) -> str:
-    """Deterministic human-readable payload signed by Agent A."""
-    return (
-        f"project_target_address={req.project_target_address}\n"
-        f"timestamp={req.timestamp}\n"
-        f"amount_usd={req.amount_usd}\n"
-        f"reason={req.reason}"
-    )
+# The canonical-message format lives in web3_client.canonical_message_for_signing
+# so Agent A (signer) and Agent B (verifier) cannot drift. Alias for
+# readability in the legacy call-sites below.
+_canonical_message = canonical_message_for_signing
 
 
 def _verify_signature(req: VaultExecuteRequest) -> bool:
@@ -106,8 +106,13 @@ def _verify_signature(req: VaultExecuteRequest) -> bool:
         logger.error("AGENT_A_PUBLIC_KEY must be 0x-prefixed")
         return False
     try:
-        msg = encode_defunct(text=_canonical_message(req))
-        signer = Account.recover_message(msg, signature=req.signature)
+        signer = recover_signer(
+            req.project_target_address,
+            req.timestamp,
+            req.amount_usd,
+            req.reason,
+            req.signature,
+        )
         ok = signer.lower() == AGENT_A_PUBLIC_KEY.lower()
         if not ok:
             logger.warning(
