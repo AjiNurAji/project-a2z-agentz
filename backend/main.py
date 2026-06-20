@@ -100,6 +100,57 @@ async def get_openapi(request):
                     },
                     "responses": {"200": {"description": "Successful Response"}}
                 }
+            },
+            "/api/auth/register": {
+                "post": {
+                    "summary": "Register new user",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "email": {"type": "string", "example": "user@agent.io"},
+                                        "password": {"type": "string", "example": "securepass123"},
+                                        "wallet_address": {"type": "string", "example": "0x000..."}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {"201": {"description": "User created"}, "409": {"description": "Email already registered"}, "422": {"description": "Invalid input"}}
+                }
+            },
+            "/api/auth/login": {
+                "post": {
+                    "summary": "Login user",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "email": {"type": "string", "example": "user@agent.io"},
+                                        "password": {"type": "string", "example": "securepass123"}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {"200": {"description": "Login successful"}, "401": {"description": "Invalid credentials"}}
+                }
+            },
+            "/api/auth/me": {
+                "get": {
+                    "summary": "Get current user profile",
+                    "responses": {"200": {"description": "User profile"}, "401": {"description": "Not authenticated"}}
+                }
+            },
+            "/api/auth/logout": {
+                "post": {
+                    "summary": "Logout user",
+                    "responses": {"200": {"description": "Logout successful"}}
+                }
             }
         }
     })
