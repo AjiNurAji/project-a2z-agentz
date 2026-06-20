@@ -45,13 +45,23 @@ import hashlib
 import json
 import logging
 import sys
+import os
+import threading
 from pathlib import Path
 from typing import Optional, Tuple
 
-import chromadb
-from chromadb.api.models.Collection import Collection
-from chromadb.config import Settings
-from chromadb.utils import embedding_functions
+try:
+    import chromadb
+    from chromadb.api.models.Collection import Collection
+    from chromadb.config import Settings
+    from chromadb.utils import embedding_functions
+    HAS_CHROMA = True
+except ImportError:
+    HAS_CHROMA = False
+    class Collection: pass
+    class Settings: pass
+    class embedding_functions:
+        DefaultEmbeddingFunction = lambda: None
 
 
 # ----------------------------------------------------------------------------
@@ -89,40 +99,36 @@ def _ensure_storage_dir() -> None:
         Path(CHROMA_PATH).mkdir(parents=True, exist_ok=True)
     except OSError as exc:
         logger.error("Cannot create ChromaDB directory %s: %s", CHROMA_PATH, exc)
-        raise
+_client_singleton = None
+_client_lock = threading.Lock()
 
 
-def get_collection() -> Collection:
+def get_chroma_client():
+    global _client_singleton
+    if _client_singleton is None:
+        with _client_lock:
+            if _client_singleton is None:
+                os.makedirs(CHROMA_PATH, exist_ok=True)
+                _client_singleton = chromadb.PersistentClient(
+                    path=CHROMA_PATH,
+                    settings=Settings(anonymized_telemetry=False)
+                )
+    return _client_singleton
+
+
+def get_collection() -> Optional[Collection]:
     """Return the singleton ``project_embeddings`` collection (cosine space)."""
-    global _client, _collection
-    if _collection is not None:
-        return _collection
+    if not HAS_CHROMA:
+        logger.warning("chromadb not installed, returning mock persistent client")
+        return None
 
-    _ensure_storage_dir()
-
-    try:
-        _client = chromadb.PersistentClient(
-            path=CHROMA_PATH,
-            settings=Settings(anonymized_telemetry=False),
-        )
-    except Exception as exc:
-        logger.error("ChromaDB PersistentClient init failed: %s", exc)
-        raise
-
-    # DefaultEmbeddingFunction downloads ``onnx`` model on first call
-    # (~80 MB MiniLM-L6-v2 cached under ~/.cache/chroma/onnx_models/...).
+    client = get_chroma_client()
     ef = embedding_functions.DefaultEmbeddingFunction()
-
-    _collection = _client.get_or_create_collection(
+    return client.get_or_create_collection(
         name=COLLECTION_NAME,
         embedding_function=ef,
         metadata={"hnsw:space": "cosine", "description": "A2Z Agentz — Base project embeddings"},
     )
-    logger.info(
-        "ChromaDB collection '%s' ready (path=%s, count=%d, space=cosine)",
-        COLLECTION_NAME, CHROMA_PATH, _collection.count(),
-    )
-    return _collection
 
 
 # ----------------------------------------------------------------------------
@@ -146,21 +152,18 @@ def check_semantic_similarity(
     Fail-OPEN on ChromaDB errors: returns (False, 0.0, None) so a transient
     vector-DB outage does not block ingestion of new opportunities.
     """
+    if not HAS_CHROMA:
+        return False, 0.0, None
+
     if not description or not description.strip():
         return False, 0.0, None
 
     try:
-        coll = get_collection()
-    except Exception as exc:
-        logger.error("ChromaDB unavailable — fail-OPEN: %s", exc)
-        return False, 0.0, None
+        col = get_collection()
+        if col.count() == 0:
+            return False, 0.0, None
 
-    # Empty collection = nothing to dedup against. New project → pass.
-    if coll.count() == 0:
-        return False, 0.0, None
-
-    try:
-        results = coll.query(
+        results = col.query(
             query_texts=[description.strip()],
             n_results=1,
             include=["distances", "metadatas"],
@@ -189,40 +192,28 @@ def insert_project_embedding(
 ) -> str:
     """
     Persist a project embedding so future runs can dedup against it.
-
-    Args:
-        project_id: Stable unique key (use the target_address where possible).
-        description: Human-readable description; this is what gets embedded.
-        metadata:    Arbitrary scalar-only dict (ChromaDB requirement).
-
-    Returns:
-        The project_id that was stored.
-
-    Raises:
-        ValueError on missing project_id / description.
-        chromadb.errors.* on real DB failure.
     """
+    if not HAS_CHROMA:
+        return project_id
+
     if not project_id or not str(project_id).strip():
         raise ValueError("project_id must be a non-empty string")
     if not description or not description.strip():
-        raise ValueError("description must be a non-empty string")
+        logger.warning("Empty description for project %s; skipping vector insert.", project_id)
+        return project_id
 
-    coll = get_collection()
-
-    # ChromaDB metadata must be JSON-scalar (str/int/float/bool/None).
-    # Defensively drop nested structures so we don't get a cryptic 500.
     payload_meta: dict = {}
     for k, v in (metadata or {}).items():
         if isinstance(v, (str, int, float, bool)) or v is None:
             payload_meta[str(k)] = v
         else:
             payload_meta[str(k)] = str(v)
-    # Keep a short preview of the description for human audit via the dashboard.
     payload_meta.setdefault("description_preview", description.strip()[:200])
     payload_meta.setdefault("inserted_at", _now_iso())
 
     try:
-        coll.add(
+        col = get_collection()
+        col.add(
             ids=[str(project_id)],
             documents=[description.strip()],
             metadatas=[payload_meta],
@@ -232,7 +223,7 @@ def insert_project_embedding(
         raise
 
     logger.info("Inserted embedding project_id=%s (collection size now=%d)",
-                project_id, coll.count())
+                project_id, col.count())
     return str(project_id)
 
 

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, IBM_Plex_Serif, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
+import { AuthProvider } from "@/components/AuthProvider";
 import PWARegister from "@/components/ui/PWARegister";
 import { RouteProgress } from "@/components/ui/RouteProgress";
 
@@ -64,8 +65,10 @@ export default function RootLayout({
       >
         <PWARegister />
         <ToastProvider>
-          <RouteProgress />
-          {children}
+          <AuthProvider>
+            <RouteProgress />
+            {children}
+          </AuthProvider>
         </ToastProvider>
       </body>
     </html>

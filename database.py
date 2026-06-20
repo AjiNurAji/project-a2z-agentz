@@ -293,3 +293,121 @@ if __name__ == "__main__":  # pragma: no cover
         "duplicate_for_fresh_ts": check_idempotency(sample_addr, ts),
     }, indent=2))
     close_pool()
+# ==============================================================================
+# User Auth Operations
+# ==============================================================================
+
+def create_user(email: str, password_hash: str, wallet_address: str = None) -> dict:
+    query = """
+        INSERT INTO users (email, password_hash, wallet_address)
+        VALUES (%s, %s, %s)
+        RETURNING id, email, wallet_address, created_at, last_login_at;
+    """
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (email, password_hash, wallet_address))
+            row = cur.fetchone()
+            if row:
+                return {
+                    'id': row[0],
+                    'email': row[1],
+                    'wallet_address': row[2],
+                    'created_at': row[3].strftime('%Y-%m-%d %H:%M:%S') if row[3] else None,
+                    'last_login_at': row[4].strftime('%Y-%m-%d %H:%M:%S') if row[4] else None
+                }
+    except psycopg2.IntegrityError:
+        return None
+    except psycopg2.Error as exc:
+        logger.error("create_user failed: %s", exc)
+        return None
+    return None
+
+def get_user_by_email(email: str) -> dict:
+    query = "SELECT id, email, password_hash, wallet_address, created_at, last_login_at FROM users WHERE email = %s LIMIT 1;"
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (email,))
+            row = cur.fetchone()
+            if row:
+                return {
+                    'id': row[0],
+                    'email': row[1],
+                    'password_hash': row[2],
+                    'wallet_address': row[3],
+                    'created_at': row[4].strftime('%Y-%m-%d %H:%M:%S') if row[4] else None,
+                    'last_login_at': row[5].strftime('%Y-%m-%d %H:%M:%S') if row[5] else None
+                }
+    except psycopg2.Error as exc:
+        logger.error("get_user_by_email failed: %s", exc)
+        return None
+    return None
+
+def get_user_by_id(user_id: int) -> dict:
+    query = "SELECT id, email, wallet_address, created_at, last_login_at FROM users WHERE id = %s LIMIT 1;"
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (user_id,))
+            row = cur.fetchone()
+            if row:
+                return {
+                    'id': row[0],
+                    'email': row[1],
+                    'wallet_address': row[2],
+                    'created_at': row[3].strftime('%Y-%m-%d %H:%M:%S') if row[3] else None,
+                    'last_login_at': row[4].strftime('%Y-%m-%d %H:%M:%S') if row[4] else None
+                }
+    except psycopg2.Error as exc:
+        logger.error("get_user_by_id failed: %s", exc)
+        return None
+    return None
+
+def update_last_login(user_id: int) -> None:
+    query = "UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = %s;"
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (user_id,))
+    except psycopg2.Error as exc:
+        logger.error("update_last_login failed: %s", exc)
+
+# ==============================================================================
+# System Config Operations
+# ==============================================================================
+
+def get_system_config(key: str, default_value: str = None) -> str:
+    query = """
+        CREATE TABLE IF NOT EXISTS system_config (
+            key VARCHAR(50) PRIMARY KEY,
+            value VARCHAR(255) NOT NULL,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        SELECT value FROM system_config WHERE key = %s LIMIT 1;
+    """
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (key,))
+            row = cur.fetchone()
+            if row:
+                return row[0]
+            elif default_value is not None:
+                # Insert default if not exists
+                cur.execute('INSERT INTO system_config (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING;', (key, default_value))
+                return default_value
+    except psycopg2.Error as exc:
+        logger.error('get_system_config failed: %s', exc)
+    return default_value
+
+def set_system_config(key: str, value: str) -> None:
+    query = """
+        CREATE TABLE IF NOT EXISTS system_config (
+            key VARCHAR(50) PRIMARY KEY,
+            value VARCHAR(255) NOT NULL,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO system_config (key, value) VALUES (%s, %s)
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP;
+    """
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (key, value))
+    except psycopg2.Error as exc:
+        logger.error('set_system_config failed: %s', exc)

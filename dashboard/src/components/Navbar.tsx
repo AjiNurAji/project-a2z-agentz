@@ -1,7 +1,8 @@
 "use client";
 
 import { useDashboard } from "./DashboardContext";
-import { Cpu, Menu } from "lucide-react";
+import { useAuth } from "./AuthProvider";
+import { Cpu, Menu, LogOut, User } from "lucide-react";
 import { CommandCenterToggle } from "./ui/CommandCenter";
 import { ThemeToggle } from "./ui/ThemeToggle";
 import { NotificationsPanel } from "./ui/NotificationsPanel";
@@ -9,6 +10,7 @@ import { motion } from "motion/react";
 
 export default function Navbar() {
   const { kpiMetrics, agentAStatus, agentBStatus, setSidebarOpen } = useDashboard();
+  const { user, loading, logout } = useAuth();
 
   return (
     <motion.header
@@ -53,6 +55,28 @@ export default function Navbar() {
             <kbd className="text-[10px] px-1.5 py-0.5 rounded font-mono hidden sm:inline-flex items-center" style={{ background: "var(--color-neutral-secondary-medium)", color: "var(--color-body-subtle)", border: "1px solid var(--color-border-default)" }}>⌘K</kbd>
           </div>
           <NotificationsPanel />
+          {/* User badge + logout */}
+          {loading ? (
+            <div className="w-20 h-7 rounded-full animate-pulse" style={{ background: "var(--color-neutral-secondary-medium)" }} />
+          ) : user ? (
+            <div className="flex items-center gap-2">
+              <div
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs"
+                style={{ background: "var(--color-neutral-secondary-medium)", border: "1px solid var(--color-border-default)" }}
+              >
+                <User className="w-3 h-3" style={{ color: "var(--color-fg-brand)" }} aria-hidden="true" />
+                <span className="text-[var(--color-body-subtle)] max-w-[120px] truncate">{user.email}</span>
+              </div>
+              <button
+                onClick={logout}
+                className="p-2 rounded-xl text-[var(--color-body-subtle)] hover:text-[var(--color-fg-danger)] hover:bg-[var(--color-neutral-secondary-medium)] transition-colors focus-ring"
+                aria-label="Log out"
+                title="Log out"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          ) : null}
           <div className="flex items-center gap-3 text-xs">
             <div className="flex items-center gap-1.5">
               <span

@@ -4,3 +4,5 @@ websockets
 psycopg2-binary
 APScheduler
 python-dotenv
+bcrypt
+PyJWT

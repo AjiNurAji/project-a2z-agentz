@@ -8,6 +8,23 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 import database
 
+# Also add backend directory so we can import auth module
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from auth import verify_access_token
+
+API_KEY = os.getenv("API_KEY", "your_secret_api_key_for_agents")
+
+def check_ws_auth(websocket) -> bool:
+    api_key = websocket.headers.get("X-API-Key")
+    if api_key and api_key == API_KEY:
+        return True
+    
+    token = websocket.cookies.get("a2z-token")
+    if token and verify_access_token(token):
+        return True
+        
+    return False
+
 class ConnectionManager:
     def __init__(self):
         self.active_connections = []
@@ -56,6 +73,9 @@ class WSEndpoint(WebSocketEndpoint):
     encoding = "text"
 
     async def on_connect(self, websocket):
+        if not check_ws_auth(websocket):
+            await websocket.close(code=1008)
+            return
         await manager.connect(websocket)
 
     async def on_receive(self, websocket, data):

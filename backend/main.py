@@ -10,18 +10,22 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from routes.api import routes as api_routes
+from routes.auth import routes as auth_routes
 from routes.websockets import routes as ws_routes
 from routes.websockets import poll_and_broadcast
 from scheduler.agent_runner import start_scheduler, stop_scheduler
 
-async def startup():
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: Starlette):
     print("Starting A2Z Agentz Backend (Starlette)...")
     start_scheduler()
-    asyncio.create_task(poll_and_broadcast())
-
-async def shutdown():
+    task = asyncio.create_task(poll_and_broadcast())
+    yield
     print("Shutting down A2Z Agentz Backend...")
     stop_scheduler()
+    task.cancel()
 
 async def read_root(request):
     return JSONResponse({"message": "A2Z Agentz API is running."})
@@ -96,12 +100,92 @@ async def get_openapi(request):
                     },
                     "responses": {"200": {"description": "Successful Response"}}
                 }
+            },
+            "/api/analyze": {
+                "post": {
+                    "summary": "Analyze Target Wallet",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "target_address": {"type": "string", "example": "0x123..."},
+                                        "description": {"type": "string", "example": "A highly innovative protocol"},
+                                        "project_name": {"type": "string", "example": "Project X"},
+                                        "use_mock": {"type": "boolean", "example": False}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {"200": {"description": "Successful Response"}}
+                }
+            },
+            "/api/status": {
+                "get": {
+                    "summary": "Get Execution Status",
+                    "responses": {"200": {"description": "Successful Response"}}
+                }
+            },
+            "/api/auth/register": {
+                "post": {
+                    "summary": "Register new user",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "email": {"type": "string", "example": "user@agent.io"},
+                                        "password": {"type": "string", "example": "securepass123"},
+                                        "wallet_address": {"type": "string", "example": "0x000..."}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {"201": {"description": "User created"}, "409": {"description": "Email already registered"}, "422": {"description": "Invalid input"}}
+                }
+            },
+            "/api/auth/login": {
+                "post": {
+                    "summary": "Login user",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "email": {"type": "string", "example": "user@agent.io"},
+                                        "password": {"type": "string", "example": "securepass123"}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {"200": {"description": "Login successful"}, "401": {"description": "Invalid credentials"}}
+                }
+            },
+            "/api/auth/me": {
+                "get": {
+                    "summary": "Get current user profile",
+                    "responses": {"200": {"description": "User profile"}, "401": {"description": "Not authenticated"}}
+                }
+            },
+            "/api/auth/logout": {
+                "post": {
+                    "summary": "Logout user",
+                    "responses": {"200": {"description": "Logout successful"}}
+                }
             }
         }
     })
 
+frontend_origin = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
+
 middleware = [
-    Middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], allow_credentials=True)
+    Middleware(CORSMiddleware, allow_origins=[frontend_origin], allow_methods=["*"], allow_headers=["*"], allow_credentials=True)
 ]
 
 app = Starlette(
@@ -110,10 +194,10 @@ app = Starlette(
         Route("/", read_root, methods=["GET"]),
         Route("/docs", get_docs, methods=["GET"]),
         Route("/openapi.json", get_openapi, methods=["GET"]),
+        Mount("/api/auth", routes=auth_routes),
         Mount("/api", routes=api_routes),
         Mount("/", routes=ws_routes) # /ws is defined in ws_routes
     ],
     middleware=middleware,
-    on_startup=[startup],
-    on_shutdown=[shutdown]
+    lifespan=lifespan
 )
