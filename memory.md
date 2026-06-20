@@ -4,6 +4,8 @@ Dokumen ini mencatat seluruh riwayat perubahan proyek secara kronologis, mencaku
 
 ---
 
+---
+
 ## Sesi 1 — 2026-06-16 | Inisialisasi Dokumentasi & Arsitektur
 
 ### 📌 Ringkasan
@@ -19,6 +21,8 @@ Sesi pertama berfokus pada pembangunan fondasi dokumentasi proyek berdasarkan ko
 | `docs/03-agent-b-vault.md` | `/docs/` | Spesifikasi Agent B (Vault) — KMS, Gas Oracle, Multi-RPC, Circuit Breaker |
 | `docs/04-communication-protocol.md` | `/docs/` | Protokol komunikasi: payload JSON, ECDSA, LangGraph |
 | `docs/05-setup-guide.md` | `/docs/` | Panduan instalasi vLLM ROCm + Docker Compose + .env |
+
+---
 
 ---
 
@@ -43,6 +47,8 @@ Membangun antarmuka web dashboard **Next.js 16** + **Tailwind CSS v4** untuk vis
 
 ---
 
+---
+
 ## Sesi 3 — 2026-06-16 | Peningkatan UI/UX Pro Max (Phase 1.5)
 
 ### 📌 Ringkasan
@@ -60,6 +66,8 @@ Refaktor semua komponen berdasarkan standar **UI/UX Pro Max Skill**: aksesibilit
 
 ---
 
+---
+
 ## Sesi 4 — 2026-06-16 | Pembuatan PRD.md
 
 ### 📌 Ringkasan
@@ -67,6 +75,8 @@ Menganalisis semua file `docs/` + `dashboard/` untuk menyusun **PRD** komprehens
 
 ### ✅ File yang DITAMBAHKAN
 - `PRD.md` — PRD lengkap
+
+---
 
 ---
 
@@ -104,6 +114,8 @@ Ekspansi dashboard single-page → multi-halaman. 9 komponen baru, 5 halaman bar
 - `TransactionList.tsx` — Expandable rows + Basescan link
 - `layout.tsx` — DashboardProvider + Sidebar
 - `page.tsx` — KPI + Circuit Breaker + grid 3-kolom
+
+---
 
 ---
 
@@ -149,134 +161,9 @@ Penyelarasan ini menjadikan A2Z Agentz **100%契合 (cocok) dengan tema wajib AC
 
 ---
 
-## 📊 Ringkasan Total Perubahan (Semua Sesi)
-
-| Kategori | Jumlah |
-|----------|--------|
-| File baru ditambahkan | **57 file** |
-| File yang diubah/direfaktor | **24 file** |
-| File dihapus | **0 file** |
-| Dependensi baru | **3 paket** (`recharts`, `lucide-react`, `motion.dev`) |
-| Route/halaman baru | **4 route** |
-| Komponen baru | **37+ komponen** (14 original + 14 ui/ + 5 loading + 4 SEO) |
-| **Komponen direfaktor** | **33 komponen** (18 + 15 files from Sesi 11) |
-| **Dokumen alignment** | **1 file khusus juri** (`docs/06-amd-stack.md`) |
-| **Stack migrasi** | **1 sesi** (Sesi 6 — vLLM → AMD AI Workbench + AIM + SGLang) |
-| **UI/UX Fitur** | **29 fitur** (Sesi 9: TypeUI + PWA + SEO + Sesi 10: overhaul + Sesi 11: visual overhaul v2) |
-| **Bug fixes** | **6 bug kritis** (Sesi 10 — dashboard overhaul) |
-| **Komponen diintegrasikan** | **4 komponen** (AnimatedCounter, Tooltip, Skeleton, EmptyState) |
-| **Total sesi** | **11 sesi** |
-
 ---
 
-## 🔍 Status Build Terakhir
-
-```
-npm run build — 2026-06-16T15:16:59Z
-
-▲ Next.js 16.2.9 (Turbopack)
-✓ Compiled successfully in 8.5s
-✓ TypeScript passed in 6.7s
-✓ Static pages generated: 8/8
-
-Route (app)
-┌ ○ /
-├ ○ /_not-found
-├ ○ /analytics
-├ ○ /history
-├ ○ /memory
-└ ○ /settings
-```
-
-**Status: ✅ PASSED — 0 errors, 0 warnings**
-
----
-
-## 🗂️ Struktur Direktori Akhir
-
-```
-project-a2z-agentz/
-├── README.md                          # AMD-stack branding
-├── PRD.md                             # Full PRD w/ AMD alignment
-├── memory.md                          # File ini
-├── SUBMISSION.md                      # Checklist lablab.ai ACT II
-├── LICENSE                            # MIT
-├── .gitignore                         # Root gitignore
-├── docs/
-│   ├── 01-architecture.md             # Mermaid + AMD pipeline
-│   ├── 02-agent-a-scout.md            # AMD AI Workbench + AIM + SGLang
-│   ├── 03-agent-b-vault.md            # KMS, Gas, Multi-RPC
-│   ├── 04-communication-protocol.md   # ECDSA + SGLang endpoint
-│   ├── 05-setup-guide.md              # End-to-end AMD Cloud setup
-│   └── 06-amd-stack.md                # Alignment khusus juri
-└── dashboard/
-    ├── package.json
-    ├── tsconfig.json
-    ├── public/
-    │   ├── manifest.json              # [BARU] PWA manifest
-    │   └── sw.js                      # [BARU] Service worker (offline cache)
-    └── src/
-        ├── app/
-        │   ├── layout.tsx
-        │   ├── page.tsx
-        │   ├── globals.css
-        │   ├── loading.tsx            # [BARU] Root loading skeleton
-        │   ├── not-found.tsx          # [BARU] Custom 404 page
-        │   ├── opengraph-image.tsx    # [BARU] OG image generator (1200×630)
-        │   ├── robots.ts             # [BARU] robots.txt generator
-        │   ├── sitemap.ts            # [BARU] sitemap.xml generator
-        │   ├── analytics/
-        │   │   ├── page.tsx
-        │   │   └── loading.tsx        # [BARU] Analytics loading skeleton
-        │   ├── memory/
-        │   │   ├── page.tsx
-        │   │   └── loading.tsx        # [BARU] Memory loading skeleton
-        │   ├── settings/
-        │   │   ├── page.tsx
-        │   │   └── loading.tsx        # [BARU] Settings loading skeleton
-        │   └── history/
-        │       ├── page.tsx
-        │       └── loading.tsx        # [BARU] History loading skeleton
-        ├── hooks/
-        │   └── useReducedMotion.ts    # [BARU] prefers-reduced-motion hook
-        └── components/
-            ├── DashboardContext.tsx    # Global state + data simulator
-            ├── Sidebar.tsx            # Collapsible sidebar navigasi
-            ├── KpiCard.tsx            # Reusable metric card
-            ├── PageHeader.tsx         # Header halaman konsisten
-            ├── DashboardKpis.tsx      # 6 KPI cards dashboard
-            ├── AnalyticsCharts.tsx    # 3 Recharts visualisasi data
-            ├── VectorMemoryExplorer.tsx # ChromaDB cache viewer
-            ├── SettingsPanel.tsx      # Form konfigurasi agent
-            ├── AuditTrail.tsx         # Log audit paginasi
-            ├── AgentCommPanel.tsx     # Agent communication panel
-            ├── Navbar.tsx             # Context-aware, AMD badge
-            ├── CircuitBreaker.tsx     # Context + Lucide + premium states
-            ├── LiveLog.tsx            # Context + level colors + aria
-            ├── ApprovalQueue.tsx      # Context + empty state + a11y
-            ├── TransactionList.tsx    # Context + expandable + Basescan
-            └── ui/                    # [BARU] TypeUI Design System
-                ├── Skeleton.tsx       # Loading skeleton placeholders
-                ├── Toast.tsx          # Toast notification system
-                ├── ErrorBoundary.tsx  # React error boundary w/ fallback
-                ├── EmptyState.tsx     # Reusable empty state component
-                ├── CommandPalette.tsx # Cmd+K command palette
-                ├── CommandCenter.tsx  # Command center overlay
-                ├── KeyboardNavWrapper.tsx # Keyboard navigation provider
-                ├── AnimatedCounter.tsx # Animated number counters
-                ├── Tooltip.tsx        # Hover/focus tooltips
-                ├── Breadcrumbs.tsx    # Navigation breadcrumbs
-                ├── RouteProgress.tsx  # Route transition progress bar
-                ├── ScrollToTop.tsx    # Scroll-to-top button
-                ├── SkipToContent.tsx  # Skip-to-content a11y link
-                ├── PWARegister.tsx    # PWA service worker registration
-                ├── exportUtils.ts     # CSV/JSON export utilities
-                └── useKeyboardNav.ts  # Keyboard navigation hook
-```
-
-**Total file count**: 48 source files (.tsx/.ts/.css) + 2 PWA files (manifest.json, sw.js) + config files
-
-## Sesi 6 — 2026-06-17 | Pondasi Modular Agent B, Fix raw_transaction, dan Async JSON Task Listener
+## Sesi 7 — 2026-06-17 | Pondasi Modular Agent B, Fix raw_transaction, dan Async JSON Task Listener
 
 ### 📌 Ringkasan
 Hari ini kita melanjutkan pondasi backend Web3 untuk Agent B (The Vault) dan memperbaiki blokir teknis sintaks transaksi untuk web3.py versi terbaru.
@@ -304,7 +191,9 @@ Hari ini kita melanjutkan pondasi backend Web3 untuk Agent B (The Vault) dan mem
 
 ---
 
-## Sesi 7 — 2026-06-18 | Bug Fixes & Peningkatan UX Dashboard
+---
+
+## Sesi 8 — 2026-06-18 | Bug Fixes & Peningkatan UX Dashboard
 
 ### 📌 Ringkasan
 Fokus pada perbaikan bug UI/UX yang dilaporkan pada dashboard dan peningkatan stabilitas interaksi pengguna pada fitur log dan komponen data simulasi.
@@ -328,23 +217,9 @@ Fokus pada perbaikan bug UI/UX yang dilaporkan pada dashboard dan peningkatan st
 
 **Status: ✅ BUG TERATASI & UX DITINGKATKAN — DASHBOARD LEBIH STABIL & INTERAKTIF.**
 
-## Sesi 9 — 2026-06-19 | Infrastruktur Backend Akhir & Deployment Engine Agent B
-
-### 📌 Ringkasan
-Sesi ini berfokus pada deployment infrastruktur core backend Agent B, isolasi environment runtime, serta injeksi skema engine database PostgreSQL relasional di dalam VPS lokal (`greyarch`) sebagai kesiapan integrasi live dashboard data.
-
-### ✅ File yang DITAMBAHKAN
-
-| File | Lokasi | Deskripsi |
-|------|--------|-----------|
-| `database.py` | `/` | Inisialisasi koneksi pooling database engine menggunakan adapter database Python. |
-| `database_schema.sql` | `/` | Skema SQL dasar yang berisi struktur tabel transaksi, fungsi constraint, indexer kecepatan query, dan data trigger untuk mencegah redundansi / data ganda. |
-| `database_schema_patch.sql` | `/` | File patch SQL tambahan untuk penyesuaian minor tabel relasi log selama integrasi. |
-| `requirements.txt` | `/` | Mengunci seluruh dependency library (FastAPI, Web3.py v6, Pydantic, Uvicorn, dll.) yang terisolasi dari lokal `venv`. |
-| `web3_client.py` | `/` | Wrapper client khusus untuk manajemen multi-RPC Base Network yang menangani jalur fallback koneksi Alchemy. |
 ---
 
-## Sesi 8 — 2026-06-18 | Lanjutan Perbaikan Bug UI & Hydration Dashboard
+## Sesi 9 — 2026-06-18 | Lanjutan Perbaikan Bug UI & Hydration Dashboard
 
 ### 📌 Ringkasan
 Melakukan perbaikan dan penyempurnaan lanjutan terhadap isu-isu visual dan layout yang muncul pada dashboard Next.js + Tailwind v4. Fokus utama pada styling, sinkronisasi animasi dengan auto-scroll, dan perbaikan struktur HTML untuk mencegah error Hydration.
@@ -380,7 +255,9 @@ Melakukan perbaikan dan penyempurnaan lanjutan terhadap isu-isu visual dan layou
 
 ---
 
-## Sesi 9 — 2026-06-18 | UI/UX Audit — 16 Fitur Baru + TypeUI Design System
+---
+
+## Sesi 10 — 2026-06-18 | UI/UX Audit — 16 Fitur Baru + TypeUI Design System
 
 ### 📌 Ringkasan
 Audit komprehensif UI/UX yang menghasilkan **16 fitur baru** untuk meningkatkan kualitas frontend ke level production-grade. Mencakup TypeUI design system (`components/ui/`), per-route loading states, error handling, aksesibilitas lanjutan, SEO metadata, dan PWA offline support.
@@ -467,7 +344,9 @@ Audit komprehensif UI/UX yang menghasilkan **16 fitur baru** untuk meningkatkan 
 
 ---
 
-## Sesi 10 — 2026-06-18 | Dashboard Overhaul — Bug Fixes, Component Integration & Visual Polish
+---
+
+## Sesi 11 — 2026-06-18 | Dashboard Overhaul — Bug Fixes, Component Integration & Visual Polish
 
 ### 📌 Ringkasan
 Overhaul komprehensif dashboard yang mencakup perbaikan **6 bug kritis**, pengintegrasian **4 komponen UI yang sebelumnya tidak digunakan**, dan **6 peningkatan visual**. Rating dashboard meningkat dari 7.5/10 → 9.5/10.
@@ -534,7 +413,9 @@ Overhaul komprehensif dashboard yang mencakup perbaikan **6 bug kritis**, pengin
 
 ---
 
-## Sesi 11 — 2026-06-19 | Visual Overhaul v2 — Signature Animations & Theme System
+---
+
+## Sesi 12 — 2026-06-19 | Visual Overhaul v2 — Signature Animations & Theme System
 
 ### 📌 Ringkasan
 Visual Overhaul v2 terdiri dari **7 fase, 50 task** yang semuanya divalidasi ✅. Fokus: Light/Dark theme system, animasi "feels alive", charts level-up, staggered entrance, sidebar enhancements, agent comm panel polish, dan signature visual elements (gradient mesh, glassmorphism).
@@ -560,13 +441,9 @@ Visual Overhaul v2 terdiri dari **7 fase, 50 task** yang semuanya divalidasi ✅
 
 **Status: ✅ VISUAL OVERHAUL V2 SELESAI — 50/50 TASKS VALIDATED**
 
-## Sesi 12 — 2026-06-19 | Full Pipeline Agent A & Cryptographic Handshake
-
-### 📌 Ringkasan
-Sesi ini berfokus pada penyelesaian pipeline *end-to-end* Agent A, mulai dari integrasi database vektor untuk *semantic dedup*, eksekusi *AI Inference*, hingga penyelesaian *bug Cryptographic Handshake* agar Agent B dapat memverifikasi *signature* kriptografi dengan benar. Arsitektur sekarang telah mencapai level *production-grade*.
 ---
 
-## Sesi 12 — 2026-06-19 | Infrastruktur Backend Akhir & Deployment Engine Agent B
+## Sesi 13 — 2026-06-19 | Infrastruktur Backend Akhir & Full Pipeline Agent A
 
 ### 📌 Ringkasan
 Sesi ini berfokus pada deployment infrastruktur core backend Agent B, isolasi environment runtime, serta injeksi skema engine database PostgreSQL relasional di dalam VPS lokal (`greyarch`) sebagai kesiapan integrasi live dashboard data.
@@ -593,14 +470,13 @@ Sesi ini berfokus pada deployment infrastruktur core backend Agent B, isolasi en
 | `database.py` | `/` | Penambahan fungsi pembantu `get_target_status()` untuk validasi lanjutan. |
 | `requirements.txt` | `/` | Penambahan dependensi `chromadb`, `onnxruntime`, dan `tokenizers`. |
 | `.gitignore` | `/` | Penambahan pengecualian untuk folder lokal `chroma_db/` agar vector store tidak ikut ter-commit. |
-
-### 🎯 Dampak & Status Terakhir
-- **Pipeline Agent A Selesai:** Tahapan eksekusi secara berurutan `Scraper -> ChromaDB -> AI Inference -> ECDSA Signing` sukses lolos *end-to-end testing*.
-- **Keamanan Kriptografi:** *Full Cryptographic Handshake* antara Agent A dan Agent B berhasil diverifikasi dengan tingkat akurasi 100%.
 | `agent_b.py` | `/` | Refaktor total integrasi engine REST API FastAPI/Uvicorn, pengikatan port internal `8080`, penyesuaian dependensi Web3.py v6 untuk menjamin kestabilan *Geth PoA Middleware*, serta validasi data payload inbound. |
 | `.gitignore` | `/` | Penambahan baris proteksi ketat untuk menyembunyikan environment local `venv` dan file rahasia `.env` (berisi private key wallet Base, password DB, dan RPC API key Alchemy). |
 
 ### 🎯 Dampak & Status Terakhir
+- **Pipeline Agent A Selesai:** Tahapan eksekusi secara berurutan `Scraper -> ChromaDB -> AI Inference -> ECDSA Signing` sukses lolos *end-to-end testing*.
+- **Keamanan Kriptografi:** *Full Cryptographic Handshake* antara Agent A dan Agent B berhasil diverifikasi dengan tingkat akurasi 100%.
+
 - **Engine Database:** PostgreSQL 15-alpine resmi berjalan di dalam isolated Docker Container (`a2z-postgres`) pada port internal `5432` dengan skema tabel yang sukses diinjeksi 100%.
 - **REST API Server:** Server backend `agent_b.py` sukses lolos pengujian *smoke test* lokalan dan saat ini berstatus **LIVE / STANDBY** di port `8080` untuk melayani request transaksi eksekusi dari Agent A.
 - **PR Status:** Semua perubahan kode berhasil di-commit serta di-push di branch `feat-agent-web3` dan di-merge ke branch `develop`.
@@ -609,7 +485,42 @@ Sesi ini berfokus pada deployment infrastruktur core backend Agent B, isolasi en
 
 ---
 
-## Sesi 13 — 2026-06-20 | Backend Local Testing & Environment Fixes
+---
+
+## Sesi 14 — 2026-06-19 | Implementasi Core Backend & Database (Starlette)
+
+### 📌 Ringkasan
+Sesi ini berfokus pada implementasi jembatan backend antara sistem agen Python (Agent A/B) dengan dashboard Next.js. Backend ini awalnya dirancang menggunakan FastAPI, namun di-*refactor* ke **Starlette murni** demi menghindari isu kompilasi dependensi `pydantic-core` berbasis Rust di environment **Python 3.14** yang belum disupport penuh oleh ekosistem.
+
+### ✅ Hal yang Berhasil Dikerjakan
+
+| Item | Detail |
+|------|--------|
+| **Setup Docker Compose** | Menyusun `docker-compose.yml` untuk menjalankan PostgreSQL 15-alpine lokal beserta _auto-migration_ skema `database_schema.sql`. |
+| **Starlette API Core** | Mengganti *engine* FastAPI ke Starlette untuk kompatibilitas penuh dengan Python 3.14. Membuat REST API endpoints (`/api/stats`, `/api/targets`, `/api/transactions`, `/api/circuit-breaker`). |
+| **Real-time WebSockets** | Membangun `ConnectionManager` dan sistem *polling* database (5 detik) untuk mendorong (*push*) update log transaksi `execution_logs` secara instan ke dashboard. |
+| **Agent Scheduler** | Mengintegrasikan `APScheduler` (BackgroundScheduler) ke dalam *lifecycle* Starlette untuk menjalankan loop Agent A (setiap 5 menit) dan Agent B (setiap 1 menit). |
+| **Environment Fix** | Mengatasi konflik port mapping internal Docker dan merapikan sistem module import Python. |
+
+### ✏️ File yang DITAMBAHKAN / DIUBAH
+
+| File | Lokasi | Detail Perubahan |
+|------|--------|-----------------|
+| `docker-compose.yml` | `/` | File orkestrasi container untuk database PostgreSQL `a2z_db`. |
+| `main.py` | `/backend/` | *Entry point* Starlette server, CORS middleware, mounting API & WebSocket router, dan inisialisasi *scheduler*. |
+| `api.py` | `/backend/routes/` | Kumpulan *route* REST yang melakukan _query_ ke `database.py`. |
+| `websockets.py` | `/backend/routes/` | Handler `ws://` dan *background task* polling DB untuk disiarkan ke client. |
+| `agent_runner.py` | `/backend/scheduler/` | Pengaturan cron/interval `APScheduler` untuk simulasi _agent background loop_. |
+| `requirements.txt` | `/backend/` | Daftar dependensi `starlette`, `uvicorn`, `psycopg2-binary`, dll (tanpa strict versioning untuk Pydantic/FastAPI). |
+| `.env.example` | `/backend/` | _Template_ variabel lingkungan. |
+
+**Status: ✅ BACKEND API & WEBSOCKETS LIVE — KOMPATIBEL DENGAN PYTHON 3.14.**
+
+---
+
+---
+
+## Sesi 15 — 2026-06-20 | Backend Local Testing & Environment Fixes
 
 ### 📌 Ringkasan
 Sesi ini berfokus pada penyelesaian kendala environment di Windows (ModuleNotFoundError karena kurangnya C++ Build Tools untuk web3/chromadb), sinkronisasi Docker Compose, perbaikan skema database, serta migrasi sintaks library terbaru agar `backend` (Agent B) dapat ditest baik secara lokal murni maupun via Docker.
@@ -647,36 +558,9 @@ Sesi ini berfokus pada penyelesaian kendala environment di Windows (ModuleNotFou
 
 ---
 
-## 📊 Ringkasan Total Perubahan (Semua Sesi)
-
-| Kategori | Jumlah |
-|----------|--------|
-| File baru ditambahkan | **75+ file** (termasuk dashboard & backend) |
-| File yang diubah/direfaktor | **40+ file** |
-| File dihapus | **0 file** |
-| Dependensi baru | **5 paket** (`recharts`, `lucide-react`, `motion.dev`, backend `requirements.txt`, PWA) |
-| Route/halaman baru | **5 route** (termasuk /agents) |
-| Komponen baru | **45+ komponen** |
-| **Total sesi** | **13 sesi** |
-
 ---
 
-## 🔍 Status Build Terakhir
-
-```
-npm run build — 2026-06-19T15:00:34Z
-
-▲ Next.js 16.2.9 (Turbopack)
-✓ Compiled successfully in 10.8s
-✓ TypeScript passed in 12.0s
-✓ Static pages generated: 12/12
-```
-
-**Status: ✅ PASSED — 0 errors, 0 warnings**
-
----
-
-## Sesi 14 — 2026-06-19 | Landing Page Redesign & Overhaul, Interactive Particle Canvas & Responsive Layout
+## Sesi 16 — 2026-06-19 | Landing Page Redesign & Overhaul, Interactive Particle Canvas & Responsive Layout
 
 ### 📌 Ringkasan
 Sesi ini berfokus pada perombakan total Landing Page `/` menggunakan Next.js Route Groups (`(landing)` dan `(dashboard)`), penggantian visual background Three.js yang berat dengan interactive 2D `<canvas>` Particle Network, integrasi mockup terminal berisi GIF otonom loop multi-agent, penataan posisi tooltip label Agent A & B, serta perbaikan responsiveness layout di mobile dan desktop.
@@ -712,141 +596,9 @@ Sesi ini berfokus pada perombakan total Landing Page `/` menggunakan Next.js Rou
 
 ---
 
-## 🗂️ Struktur Direktori Akhir
-
-```
-project-a2z-agentz/
-├── README.md                          # AMD-stack branding
-├── PRD.md                             # Full PRD w/ AMD alignment
-├── memory.md                          # File ini
-├── SUBMISSION.md                      # Checklist lablab.ai ACT II
-├── LICENSE                            # MIT
-├── .gitignore                         # Root gitignore
-├── agent_b.py                         # REST API FastAPI + Web3 executor
-├── database.py                        # DB Connection pooling
-├── database_schema.sql                # PostgreSQL SQL schema
-├── database_schema_patch.sql          # SQL patch
-├── requirements.txt                   # Backend dependencies
-├── web3_client.py                     # Multi-RPC client fallback wrapper
-├── plan.md                            # Implementation Plan
-├── task.md                            # Checklist Tracker
-├── docs/
-│   ├── 01-architecture.md             # Mermaid + AMD pipeline + Route Groups
-│   ├── 02-agent-a-scout.md            # AMD AI Workbench + AIM + SGLang
-│   ├── 03-agent-b-vault.md            # KMS, Gas, Multi-RPC
-│   ├── 04-communication-protocol.md   # ECDSA + SGLang endpoint
-│   ├── 05-setup-guide.md              # End-to-end AMD Cloud setup
-│   └── 06-amd-stack.md                # Alignment khusus juri
-└── dashboard/
-    ├── package.json
-    ├── tsconfig.json
-    ├── public/
-    │   ├── manifest.json              # PWA manifest
-    │   ├── sw.js                      # Service worker
-    │   ├── images/logo/               # A2Z logo assets
-    │   └── gif/                       # GIF rendering loop otonom
-    └── src/
-        ├── app/                       # Next.js Pages & Layouts (Route Groups)
-        │   ├── layout.tsx             # Root layout global
-        │   ├── (landing)/             # Rute Landing Page (/)
-        │   └── (dashboard)/           # Rute Dashboard (/dashboard/*)
-        ├── hooks/                     # Custom react hooks
-        └── components/                # React components & UI (termasuk landing/)
-```
-
 ---
 
-## Sesi 14 — 2026-06-19 | Implementasi Core Backend & Database (Starlette)
-
-### 📌 Ringkasan
-Sesi ini berfokus pada implementasi jembatan backend antara sistem agen Python (Agent A/B) dengan dashboard Next.js. Backend ini awalnya dirancang menggunakan FastAPI, namun di-*refactor* ke **Starlette murni** demi menghindari isu kompilasi dependensi `pydantic-core` berbasis Rust di environment **Python 3.14** yang belum disupport penuh oleh ekosistem.
-
-### ✅ Hal yang Berhasil Dikerjakan
-
-| Item | Detail |
-|------|--------|
-| **Setup Docker Compose** | Menyusun `docker-compose.yml` untuk menjalankan PostgreSQL 15-alpine lokal beserta _auto-migration_ skema `database_schema.sql`. |
-| **Starlette API Core** | Mengganti *engine* FastAPI ke Starlette untuk kompatibilitas penuh dengan Python 3.14. Membuat REST API endpoints (`/api/stats`, `/api/targets`, `/api/transactions`, `/api/circuit-breaker`). |
-| **Real-time WebSockets** | Membangun `ConnectionManager` dan sistem *polling* database (5 detik) untuk mendorong (*push*) update log transaksi `execution_logs` secara instan ke dashboard. |
-| **Agent Scheduler** | Mengintegrasikan `APScheduler` (BackgroundScheduler) ke dalam *lifecycle* Starlette untuk menjalankan loop Agent A (setiap 5 menit) dan Agent B (setiap 1 menit). |
-| **Environment Fix** | Mengatasi konflik port mapping internal Docker dan merapikan sistem module import Python. |
-
-### ✏️ File yang DITAMBAHKAN / DIUBAH
-
-| File | Lokasi | Detail Perubahan |
-|------|--------|-----------------|
-| `docker-compose.yml` | `/` | File orkestrasi container untuk database PostgreSQL `a2z_db`. |
-| `main.py` | `/backend/` | *Entry point* Starlette server, CORS middleware, mounting API & WebSocket router, dan inisialisasi *scheduler*. |
-| `api.py` | `/backend/routes/` | Kumpulan *route* REST yang melakukan _query_ ke `database.py`. |
-| `websockets.py` | `/backend/routes/` | Handler `ws://` dan *background task* polling DB untuk disiarkan ke client. |
-| `agent_runner.py` | `/backend/scheduler/` | Pengaturan cron/interval `APScheduler` untuk simulasi _agent background loop_. |
-| `requirements.txt` | `/backend/` | Daftar dependensi `starlette`, `uvicorn`, `psycopg2-binary`, dll (tanpa strict versioning untuk Pydantic/FastAPI). |
-| `.env.example` | `/backend/` | _Template_ variabel lingkungan. |
-
-**Status: ✅ BACKEND API & WEBSOCKETS LIVE — KOMPATIBEL DENGAN PYTHON 3.14.**
-
----
-
-## 🗂️ Struktur Direktori Akhir (Update Sesi 14)
-
-```
-project-a2z-agentz/
-├── README.md                          # AMD-stack branding
-├── docker-compose.yml                 # Database orchestration
-├── agent_b.py                         # Web3 executor
-├── database.py                        # DB Connection pooling
-├── database_schema.sql                # PostgreSQL SQL schema
-├── backend/                           # Backend API
-│   ├── main.py                        # Starlette entrypoint
-│   ├── requirements.txt               # Backend dependencies
-│   ├── .env.example                   # Env vars template
-│   ├── routes/
-│   │   ├── api.py                     # REST endpoints
-│   │   └── websockets.py              # WebSocket handlers
-│   └── scheduler/
-│       └── agent_runner.py            # APScheduler cron jobs
-├── docs/                              # Project Documentation
-└── dashboard/                         # Next.js Frontend
-```
-
-
-## Sesi 14 ΓÇö 2026-06-19 | Landing Page Redesign & Overhaul, Interactive Particle Canvas & Responsive Layout
-
-### ≡ƒôî Ringkasan
-Sesi ini berfokus pada perombakan total Landing Page `/` menggunakan Next.js Route Groups (`(landing)` dan `(dashboard)`), penggantian visual background Three.js yang berat dengan interactive 2D `<canvas>` Particle Network, integrasi mockup terminal berisi GIF otonom loop multi-agent, penataan posisi tooltip label Agent A & B, serta perbaikan responsiveness layout di mobile dan desktop.
-
-### Γ£à Hal yang Berhasil Dikerjakan
-
-| Item | Detail |
-|------|--------|
-| **Next.js Route Group Restructuring** | Mengelompokkan struktur folder `dashboard/src/app` ke dalam `(landing)` (rute `/`) dan `(dashboard)` (rute `/dashboard/*` dkk.) untuk isolasi layout visual yang bersih. |
-| **Interactive 2D Canvas Background** | Membuat canvas rendering loop di `AgentScene.tsx` dengan floating particle network dalam nuansa warna Cyan/Purple/Pink, mouse parallax tracker, grid breathing adaptif, dan efek scanline retro. |
-| **A2Z Terminal GIF Integration** | Mengintegrasikan `/gif/A2Z-animation.gif` (animasi multi-agent loop 10 detik) ke dalam mockup terminal retro dengan header bar di Landing Page. |
-| **Label Positioning Correction** | Menggeser posisi tooltip Agent A dan Agent B ke bawah (`top-[68%]`) agar berada tepat di bawah visual kepala/mata robot, mencegah label menutupi wajah robot. |
-| **Mobile & Desktop Responsiveness** | Menerapkan utility classes Tailwind di layout utama, teks grid, header, dan footer. Memperbaiki bug scroll cutoff di mobile dengan mengganti pembungkus background canvas menjadi `fixed inset-0`. |
-| **Next.js Turbopack Cache Resolution** | Mengatasi error compiler Turbopack `[browser] Uncaught Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'` dengan menghapus folder `.next` (`rm -rf .next` atau `Remove-Item -Recurse -Force .next`) secara berkala saat restrukturisasi file. |
-
-### Γ£Å∩╕Å File yang DIUBAH
-
-| File | Lokasi | Detail Perubahan |
-|------|--------|-----------------|
-| `layout.tsx` | `dashboard/src/app/` | Menjadikan `layout.tsx` sebagai Root Layout global Next.js, memindahkan layout dashboard ke `(dashboard)/layout.tsx`. |
-| `page.tsx` (Root) | `dashboard/src/app/` | Dihapus / dipindahkan ke `(landing)/page.tsx` (Landing Page) dan `(dashboard)/dashboard/page.tsx` (Dashboard Utama). |
-| `Sidebar.tsx`, `AnalyticsCharts.tsx`, `AuditTrail.tsx`, `Toast.tsx`, `EmptyState.tsx`, `CommandPalette.tsx` | `dashboard/src/components/` | Perbaikan minor path imports dan types menyusul restrukturisasi folder. |
-| `01-architecture.md` | `docs/` | Memperbarui peta arsitektur Next.js route groups `(landing)` & `(dashboard)` serta deskripsi interactive particle canvas background. |
-
-### Γ£à File Baru (Komponen, Halaman, & GIF)
-
-| File / Aset | Lokasi | Deskripsi |
-|-------------|--------|-----------|
-| `A2Z-animation.gif` | `dashboard/public/gif/` | Animasi GIF rendering 3D looping otonom Agent A & Agent B. |
-| `layout.tsx` & `page.tsx` | `dashboard/src/app/(landing)/` | Layout dan Landing Page baru dengan terminal mockup dan interactive canvas. |
-| `layout.tsx` & `dashboard/page.tsx` | `dashboard/src/app/(dashboard)/` | Layout dashboard lama dan halaman dashboard yang direlokasi ke sub-rute `/dashboard`. |
-| `AgentScene.tsx` | `dashboard/src/components/landing/` | Komponen background HTML5 2D `<canvas>` Particle Network interaktif berkinerja tinggi. |
-
----
-
-## Sesi 15 — 2026-06-19 | Penyatuan Backend & Integrasi Frontend (API Mapping)
+## Sesi 17 — 2026-06-19 | Penyatuan Backend & Integrasi Frontend (API Mapping)
 
 ### 📌 Ringkasan
 Sesi ini difokuskan pada penyatuan dua sisi backend (eksperimen awal vs struktur Agent Web3) dan pengikatan (mapping) API tersebut ke dashboard frontend. Pipeline logika end-to-end (Scraper -> ChromaDB -> AI Inference -> Agent B) berhasil digabungkan dalam satu server Starlette.
@@ -874,7 +626,9 @@ Sesi ini difokuskan pada penyatuan dua sisi backend (eksperimen awal vs struktur
 
 ---
 
-## Sesi 16 — 2026-06-20 | Autentikasi (Login/Register) & Sinkronisasi Landing ↔ Dashboard
+---
+
+## Sesi 18 — 2026-06-20 | Autentikasi (Login/Register) & Sinkronisasi Landing ↔ Dashboard
 
 ### 📌 Ringkasan
 Menambahkan sistem autentikasi lengkap (email/password + optional Web3 wallet) dan menyinkronkan alur landing page → login → dashboard. Sebelumnya, tombol CTA di landing page langsung `router.push("/dashboard")` tanpa autentikasi. Sekarang dilindungi oleh middleware JWT cookie.
@@ -934,7 +688,9 @@ Menambahkan sistem autentikasi lengkap (email/password + optional Web3 wallet) d
 
 ---
 
-## Sesi 14 — 2026-06-20 | Implementasi Backend Authentication System (JWT + bcrypt)
+---
+
+## Sesi 19 — 2026-06-20 | Implementasi Backend Authentication System (JWT + bcrypt)
 
 ### 📌 Ringkasan
 Sesi ini berfokus pada melengkapi kepingan terakhir dari sistem autentikasi di *backend* agar dapat mensinkronkan sesi kredensial *Frontend* (dashboard). Pengembangan ini mengacu penuh pada spesifikasi internal `docs/AUTH_BACKEND_SPEC.md` yang disiapkan oleh *teammate*. Backend Auth System ini sudah bersifat *Production-ready* untuk mengelola pengguna.
@@ -966,3 +722,82 @@ Sesi ini berfokus pada melengkapi kepingan terakhir dari sistem autentikasi di *
 | `backend/routes/auth.py` | `/backend/routes/` | Mengandung arsitektur *endpoints* register, login, profil diri, dan pembersihan token (logout). |
 
 **Status: ✅ SISTEM AUTENTIKASI BACKEND SELESAI DAN TERINTEGRASI. PENGUJIAN FRONTEND-TO-BACKEND SIAP DILAKSANAKAN.**
+
+---
+
+## 📊 Ringkasan Total Perubahan (Semua Sesi)
+
+| Kategori | Jumlah |
+|----------|--------|
+| File baru ditambahkan | **75+ file** (termasuk dashboard & backend) |
+| File yang diubah/direfaktor | **40+ file** |
+| File dihapus | **0 file** |
+| Dependensi baru | **5 paket** (`recharts`, `lucide-react`, `motion.dev`, backend `requirements.txt`, PWA) |
+| Route/halaman baru | **5 route** (termasuk /agents) |
+| Komponen baru | **45+ komponen** |
+| **Total sesi** | **13 sesi** |
+
+---
+
+---
+
+## 🔍 Status Build Terakhir
+
+```
+npm run build — 2026-06-19T15:00:34Z
+
+▲ Next.js 16.2.9 (Turbopack)
+✓ Compiled successfully in 10.8s
+✓ TypeScript passed in 12.0s
+✓ Static pages generated: 12/12
+```
+
+**Status: ✅ PASSED — 0 errors, 0 warnings**
+
+---
+
+---
+
+## 🗂️ Struktur Direktori Akhir
+
+```
+project-a2z-agentz/
+├── README.md                          # AMD-stack branding
+├── PRD.md                             # Full PRD w/ AMD alignment
+├── memory.md                          # File ini
+├── SUBMISSION.md                      # Checklist lablab.ai ACT II
+├── LICENSE                            # MIT
+├── .gitignore                         # Root gitignore
+├── agent_b.py                         # REST API FastAPI + Web3 executor
+├── database.py                        # DB Connection pooling
+├── database_schema.sql                # PostgreSQL SQL schema
+├── database_schema_patch.sql          # SQL patch
+├── requirements.txt                   # Backend dependencies
+├── web3_client.py                     # Multi-RPC client fallback wrapper
+├── plan.md                            # Implementation Plan
+├── task.md                            # Checklist Tracker
+├── docs/
+│   ├── 01-architecture.md             # Mermaid + AMD pipeline + Route Groups
+│   ├── 02-agent-a-scout.md            # AMD AI Workbench + AIM + SGLang
+│   ├── 03-agent-b-vault.md            # KMS, Gas, Multi-RPC
+│   ├── 04-communication-protocol.md   # ECDSA + SGLang endpoint
+│   ├── 05-setup-guide.md              # End-to-end AMD Cloud setup
+│   └── 06-amd-stack.md                # Alignment khusus juri
+└── dashboard/
+    ├── package.json
+    ├── tsconfig.json
+    ├── public/
+    │   ├── manifest.json              # PWA manifest
+    │   ├── sw.js                      # Service worker
+    │   ├── images/logo/               # A2Z logo assets
+    │   └── gif/                       # GIF rendering loop otonom
+    └── src/
+        ├── app/                       # Next.js Pages & Layouts (Route Groups)
+        │   ├── layout.tsx             # Root layout global
+        │   ├── (landing)/             # Rute Landing Page (/)
+        │   └── (dashboard)/           # Rute Dashboard (/dashboard/*)
+        ├── hooks/                     # Custom react hooks
+        └── components/                # React components & UI (termasuk landing/)
+```
+
+---
