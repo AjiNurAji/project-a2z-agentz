@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { CheckCircle, XCircle, AlertTriangle, Info, X } from "lucide-react";
+import { CheckCircle, XCircle, AlertTriangle, Info, X, LucideIcon } from "lucide-react";
 
 type ToastType = "success" | "error" | "warning" | "info";
 
@@ -30,7 +30,7 @@ export function useToast() {
   return ctx;
 }
 
-const ICONS: Record<ToastType, React.ElementType> = {
+const ICONS: Record<ToastType, LucideIcon> = {
   success: CheckCircle,
   error: XCircle,
   warning: AlertTriangle,

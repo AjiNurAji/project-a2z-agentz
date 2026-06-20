@@ -291,6 +291,83 @@ def get_contract(address: str, abi: list):
 
 
 # ----------------------------------------------------------------------------
+# Cross-agent signing helpers (Agent A signs, Agent B verifies — both MUST
+# agree on the exact canonical message format, so it lives here as the single
+# source of truth).
+# ----------------------------------------------------------------------------
+from eth_account.messages import encode_defunct  # noqa: E402  (kept local)
+
+
+def canonical_message_for_signing(
+    project_target_address: str,
+    timestamp: str | int | float,
+    amount_usd: float | int | str,
+    reason: str,
+) -> str:
+    """
+    Deterministic, human-readable payload that BOTH Agent A (signer) and
+    Agent B (verifier) must agree on, byte for byte. Newlines are part of
+    the contract — do not reformat.
+
+    This is the same format agent_b._canonical_message() used to produce
+    inline; we lifted it here so the two agents can never drift.
+    """
+    return (
+        f"project_target_address={project_target_address}\n"
+        f"timestamp={timestamp}\n"
+        f"amount_usd={amount_usd}\n"
+        f"reason={reason}"
+    )
+
+
+def sign_payload(
+    project_target_address: str,
+    timestamp: str | int | float,
+    amount_usd: float | int | str,
+    reason: str,
+) -> str:
+    """
+    Build the canonical message and ECDSA-sign it with Agent A's loaded
+    signer key. Returns the 0x-prefixed hex signature (65 bytes,
+    130 hex chars + '0x' = 132 chars), suitable for inclusion in a
+    ``VaultExecuteRequest`` to Agent B.
+
+    Raises:
+        RuntimeError if PRIVATE_KEY is not set / invalid (signer cannot
+        be loaded). Callers should treat this as a hard REJECT.
+    """
+    account = get_account()  # raises RuntimeError if PRIVATE_KEY missing
+    canonical = canonical_message_for_signing(
+        project_target_address, timestamp, amount_usd, reason,
+    )
+    signable = encode_defunct(text=canonical)
+    signed = account.sign_message(signable)
+    # NOTE: HexBytes.hex() ALREADY returns a 0x-prefixed hex string (132 chars).
+    # Adding another '0x' would produce '0x0x...' which Agent B's recover_message
+    # rejects as non-hex. Return as-is.
+    return signed.signature.hex()
+
+
+def recover_signer(
+    project_target_address: str,
+    timestamp: str | int | float,
+    amount_usd: float | int | str,
+    reason: str,
+    signature_hex: str,
+) -> str:
+    """
+    Recover the signer address from a (canonical_message, signature) pair.
+    Used by Agent B (and any external verifier). Lives here so the
+    canonical format and the recovery live in the same module.
+    """
+    canonical = canonical_message_for_signing(
+        project_target_address, timestamp, amount_usd, reason,
+    )
+    signable = encode_defunct(text=canonical)
+    return Account.recover_message(signable, signature=signature_hex)
+
+
+# ----------------------------------------------------------------------------
 # Optional smoke test: `python web3_client.py`
 # ----------------------------------------------------------------------------
 if __name__ == "__main__":  # pragma: no cover

@@ -64,5 +64,6 @@ test_cache/
 *.tmp
 *.bak
 .cache/
-.agents/
-.skill-archive/
+
+# ChromaDB persistent vector store (regenerated from scraper pipeline)
+chroma_db/
