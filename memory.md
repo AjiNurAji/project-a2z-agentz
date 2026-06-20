@@ -855,20 +855,20 @@ Sesi ini difokuskan pada penyatuan dua sisi backend (eksperimen awal vs struktur
 
 | Item | Detail |
 |------|--------|
-| **Penyatuan Backend** | Menggabungkan kode dari branch \eature/backend-experiment\ dengan \eat-agent-web3\. Memindahkan semua helper Agent A dan Agent B agar berjalan terpusat. |
-| **API Endpoints Baru** | Menambahkan \POST /api/analyze\ (untuk eksekusi sinkron full pipeline agent) dan \GET /api/status\ (untuk menarik log transaksi) ke \ackend/routes/api.py\. |
-| **Integrasi UI Dashboard** | Memperbarui \DashboardContext.tsx\ agar secara nyata menembak endpoint \localhost:8080/api/analyze\ saat tombol dieksekusi, dan menarik data via \localhost:8080/api/status\. |
-| **UI Fallback & Mock Data** | Menambahkan fitur fallback mock data (\use_mock=true\). Jika backend mati/maintenance, simulasi UI otomatis berjalan mencegah crash (sesuai struktur test.json). |
-| **UI Responsiveness** | Menerapkan UI State dinamis (\nalyzing\) yang langsung tampil saat request API berjalan, sebelum hasil dari Llama3 dikembalikan. |
-| **Merge Landing Page Redesign** | Menggabungkan branch \eature/landing-page-redesign\ untuk mengambil pembaruan UI (Particle canvas, animasi terminal, light/dark mode overhaul) tanpa merusak setup backend. |
+| **Penyatuan Backend** | Menggabungkan kode dari branch `feature/backend-experiment` dengan `feat-agent-web3`. Memindahkan semua helper Agent A dan Agent B agar berjalan terpusat. |
+| **API Endpoints Baru** | Menambahkan `POST /api/analyze` (untuk eksekusi sinkron full pipeline agent) dan `GET /api/status` (untuk menarik log transaksi) ke `backend/routes/api.py`. |
+| **Integrasi UI Dashboard** | Memperbarui `DashboardContext.tsx` agar secara nyata menembak endpoint `localhost:8080/api/analyze` saat tombol dieksekusi, dan menarik data via `localhost:8080/api/status`. |
+| **UI Fallback & Mock Data** | Menambahkan fitur fallback mock data (`use_mock=true`). Jika backend mati/maintenance, simulasi UI otomatis berjalan mencegah crash (sesuai struktur test.json). |
+| **UI Responsiveness** | Menerapkan UI State dinamis (`analyzing`) yang langsung tampil saat request API berjalan, sebelum hasil dari Llama3 dikembalikan. |
+| **Merge Landing Page Redesign** | Menggabungkan branch `feature/landing-page-redesign` untuk mengambil pembaruan UI (Particle canvas, animasi terminal, light/dark mode overhaul) tanpa merusak setup backend. |
 
 ### ✏️ File yang DIUBAH
 
 | File | Lokasi | Detail Perubahan |
 |------|--------|-----------------|
-| \pi.py\ | \ackend/routes/\ | Penambahan endpoint \/analyze\ dan \/status\ yang mengimpor seluruh modul Agent A & B. |
-| \DashboardContext.tsx\ | \dashboard/src/components/\ | Penggantian *interval live simulation* murni dengan *real fetch polling* ke \/api/status\ beserta state \nalyzeTarget\. |
-| \memory.md\ | \/\ | Resolusi *merge conflict* dan dokumentasi update sesi 15. |
+| `api.py` | `backend/routes/` | Penambahan endpoint `/analyze` dan `/status` yang mengimpor seluruh modul Agent A & B. |
+| `DashboardContext.tsx` | `dashboard/src/components/` | Penggantian *interval live simulation* murni dengan *real fetch polling* ke `/api/status` beserta state `analyzeTarget`. |
+| `memory.md` | `/` | Resolusi *merge conflict* dan dokumentasi update sesi 15. |
 
 **Status: ✅ INTEGRASI END-TO-END SELESAI — PIPELINE BERHASIL DIHUBUNGKAN KE UI DASHBOARD.**
 
