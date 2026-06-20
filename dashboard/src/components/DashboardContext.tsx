@@ -1,6 +1,9 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import { useAgentWebSocket } from "@/hooks/useAgentWebSocket";
+import { apiFetch } from "@/lib/api";
+import { mapLogToAgentMessage, mapRawTxToTransaction } from "@/lib/mappers";
 import { KpiGridSkeleton, ChartSkeleton, TableSkeleton } from "@/components/ui/Skeleton";
 import { Skeleton } from "@/components/ui/Skeleton";
 
@@ -149,6 +152,7 @@ interface DashboardContextType {
   sidebarOpen: boolean;
   setSidebarOpen: (v: boolean) => void;
   lastSync: number;
+  wsStatus: "connecting" | "connected" | "disconnected";
   notifications: AppNotification[];
   unreadCount: number;
   addNotification: (type: NotificationType, title: string, body: string, link?: string) => void;
@@ -323,6 +327,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     a: { latencyMs: 180, inferenceMs: 1400, successCount: 0, failCount: 0, queueDepth: 0, uptimePct: 99.8 },
     b: { latencyMs: 0, inferenceMs: 0, successCount: 0, failCount: 0, queueDepth: 0, uptimePct: 99.9 },
   });
+
+  // ─── Agent WebSocket (real data) ──────────────────────────────
+  const ws = useAgentWebSocket();
+  const usingReal = ws.status === "connected";
+
   const logCountRef = useRef(0);
 
   useEffect(() => {
@@ -385,15 +394,14 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     addLog("INFO", `Initiating analysis for ${projectName} (${targetAddress})...`);
     
     try {
-      const res = await fetch("http://localhost:8080/api/analyze", {
+      const data = await apiFetch<{
+        status: string;
+        score?: number;
+        reason?: string;
+      }>("/api/analyze", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target_address: targetAddress, description, project_name: projectName, use_mock: false })
+        body: JSON.stringify({ target_address: targetAddress, description, project_name: projectName, use_mock: false }),
       });
-      
-      if (!res.ok) throw new Error("Backend unavailable");
-      
-      const data = await res.json();
       setAgentAStatus("online");
       
       addLog("SUCCESS", `Analysis complete for ${projectName}: Score ${data.score}/100. Status: ${data.status}`);
@@ -417,33 +425,30 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     }
   }, [addLog, addNotification]);
 
+  // ─── Real WS data overrides mock when connected ────────────────────────────
+  useEffect(() => {
+    if (!usingReal) return;
+    setAgentMessages(ws.agentLogs.map(mapLogToAgentMessage).slice(-50) as AgentMessage[]);
+  }, [ws.agentLogs, usingReal]);
+
+  useEffect(() => {
+    if (!usingReal) return;
+    setTransactions(ws.transactions.map(mapRawTxToTransaction) as Transaction[]);
+  }, [ws.transactions, usingReal]);
+
   // ─── Real Backend Polling & Live Simulation ──────────────────────────────────────
   useEffect(() => {
-    if (isPaused) return;
+    if (isPaused || usingReal) return;
     const interval = setInterval(async () => {
       setLastSync(Date.now());
       
       try {
-        const res = await fetch("http://localhost:8080/api/status");
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.logs && data.logs.length > 0) {
-            // Update transactions based on backend logs
-            const mappedTxs = data.logs.map((log: any) => ({
-              id: log.tx_hash_id,
-              projectName: "On-Chain Target", // We could join with target_addresses in backend to get this
-              targetAddress: log.project_target_address,
-              amountUsd: log.amount_usd,
-              status: log.status.toLowerCase() === "success" ? "success" : log.status.toLowerCase() === "pending_approval" ? "pending" : "failed",
-              txHash: log.tx_hash_id,
-              timestamp: new Date(log.created_at),
-              reason: "Autonomous Execution",
-              gasUsedGwei: 42, // Mocked gas since execution_logs doesn't have it
-            }));
-            
-            // Only update if there are new transactions (simplified check by length)
-            setTransactions((prev) => mappedTxs.length > prev.length ? mappedTxs.slice(0, 50) : prev);
-          }
+        const data = await apiFetch<{ logs?: Array<{ tx_hash_id: string; project_target_address: string; amount_usd: number; status: string; created_at: string }> }>("/api/status");
+        if (data && data.logs && data.logs.length > 0) {
+          const mappedTxs = data.logs.map(mapRawTxToTransaction) as Transaction[];
+          
+          // Only update if there are new transactions (simplified check by length)
+          setTransactions((prev) => mappedTxs.length > prev.length ? mappedTxs.slice(0, 50) : prev);
         }
       } catch (e) {
         // Fallback to simulation if backend is down
@@ -472,7 +477,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       }
     }, 4000);
     return () => clearInterval(interval);
-  }, [isPaused, addLog, addNotification]);
+  }, [isPaused, usingReal, addLog, addNotification]);
 
   const kpiMetrics: KpiMetrics = {
     totalTvlAnalyzed: 42_800_000 + transactions.length * 180000,
@@ -567,7 +572,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         config, setConfig,
         handleApprove, handleReject, handleBlacklist, handleClearCache,
         agentMessages, sidebarOpen, setSidebarOpen,
-        lastSync, notifications, unreadCount: notifications.filter((n) => !n.read).length,
+        lastSync, wsStatus: ws.status, notifications, unreadCount: notifications.filter((n) => !n.read).length,
         addNotification, markNotificationsRead, clearNotifications,
         agentHealth, preferences, setPreferences, analyzeTarget,
       }}
