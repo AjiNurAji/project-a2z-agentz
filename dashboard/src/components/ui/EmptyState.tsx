@@ -1,10 +1,10 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Inbox, Search, FileX, ShieldCheck, Brain, Settings, History } from "lucide-react";
+import { Inbox, Search, FileX, ShieldCheck, Brain, Settings, History, LucideIcon } from "lucide-react";
 
 interface EmptyStateProps {
-  icon?: React.ElementType;
+  icon?: LucideIcon;
   title: string;
   description: string;
   action?: { label: string; onClick: () => void };

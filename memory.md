@@ -435,6 +435,42 @@ npm run build — 2026-06-19T15:00:34Z
 
 ---
 
+## Sesi 14 — 2026-06-19 | Landing Page Redesign & Overhaul, Interactive Particle Canvas & Responsive Layout
+
+### 📌 Ringkasan
+Sesi ini berfokus pada perombakan total Landing Page `/` menggunakan Next.js Route Groups (`(landing)` dan `(dashboard)`), penggantian visual background Three.js yang berat dengan interactive 2D `<canvas>` Particle Network, integrasi mockup terminal berisi GIF otonom loop multi-agent, penataan posisi tooltip label Agent A & B, serta perbaikan responsiveness layout di mobile dan desktop.
+
+### ✅ Hal yang Berhasil Dikerjakan
+
+| Item | Detail |
+|------|--------|
+| **Next.js Route Group Restructuring** | Mengelompokkan struktur folder `dashboard/src/app` ke dalam `(landing)` (rute `/`) dan `(dashboard)` (rute `/dashboard/*` dkk.) untuk isolasi layout visual yang bersih. |
+| **Interactive 2D Canvas Background** | Membuat canvas rendering loop di `AgentScene.tsx` dengan floating particle network dalam nuansa warna Cyan/Purple/Pink, mouse parallax tracker, grid breathing adaptif, dan efek scanline retro. |
+| **A2Z Terminal GIF Integration** | Mengintegrasikan `/gif/A2Z-animation.gif` (animasi multi-agent loop 10 detik) ke dalam mockup terminal retro dengan header bar di Landing Page. |
+| **Label Positioning Correction** | Menggeser posisi tooltip Agent A dan Agent B ke bawah (`top-[68%]`) agar berada tepat di bawah visual kepala/mata robot, mencegah label menutupi wajah robot. |
+| **Mobile & Desktop Responsiveness** | Menerapkan utility classes Tailwind di layout utama, teks grid, header, dan footer. Memperbaiki bug scroll cutoff di mobile dengan mengganti pembungkus background canvas menjadi `fixed inset-0`. |
+| **Next.js Turbopack Cache Resolution** | Mengatasi error compiler Turbopack `[browser] Uncaught Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'` dengan menghapus folder `.next` (`rm -rf .next` atau `Remove-Item -Recurse -Force .next`) secara berkala saat restrukturisasi file. |
+
+### ✏️ File yang DIUBAH
+
+| File | Lokasi | Detail Perubahan |
+|------|--------|-----------------|
+| `layout.tsx` | `dashboard/src/app/` | Menjadikan `layout.tsx` sebagai Root Layout global Next.js, memindahkan layout dashboard ke `(dashboard)/layout.tsx`. |
+| `page.tsx` (Root) | `dashboard/src/app/` | Dihapus / dipindahkan ke `(landing)/page.tsx` (Landing Page) dan `(dashboard)/dashboard/page.tsx` (Dashboard Utama). |
+| `Sidebar.tsx`, `AnalyticsCharts.tsx`, `AuditTrail.tsx`, `Toast.tsx`, `EmptyState.tsx`, `CommandPalette.tsx` | `dashboard/src/components/` | Perbaikan minor path imports dan types menyusul restrukturisasi folder. |
+| `01-architecture.md` | `docs/` | Memperbarui peta arsitektur Next.js route groups `(landing)` & `(dashboard)` serta deskripsi interactive particle canvas background. |
+
+### ✅ File Baru (Komponen, Halaman, & GIF)
+
+| File / Aset | Lokasi | Deskripsi |
+|-------------|--------|-----------|
+| `A2Z-animation.gif` | `dashboard/public/gif/` | Animasi GIF rendering 3D looping otonom Agent A & Agent B. |
+| `layout.tsx` & `page.tsx` | `dashboard/src/app/(landing)/` | Layout dan Landing Page baru dengan terminal mockup dan interactive canvas. |
+| `layout.tsx` & `dashboard/page.tsx` | `dashboard/src/app/(dashboard)/` | Layout dashboard lama dan halaman dashboard yang direlokasi ke sub-rute `/dashboard`. |
+| `AgentScene.tsx` | `dashboard/src/components/landing/` | Komponen background HTML5 2D `<canvas>` Particle Network interaktif berkinerja tinggi. |
+
+---
+
 ## 🗂️ Struktur Direktori Akhir
 
 ```
@@ -454,7 +490,7 @@ project-a2z-agentz/
 ├── plan.md                            # Implementation Plan
 ├── task.md                            # Checklist Tracker
 ├── docs/
-│   ├── 01-architecture.md             # Mermaid + AMD pipeline
+│   ├── 01-architecture.md             # Mermaid + AMD pipeline + Route Groups
 │   ├── 02-agent-a-scout.md            # AMD AI Workbench + AIM + SGLang
 │   ├── 03-agent-b-vault.md            # KMS, Gas, Multi-RPC
 │   ├── 04-communication-protocol.md   # ECDSA + SGLang endpoint
@@ -466,11 +502,15 @@ project-a2z-agentz/
     ├── public/
     │   ├── manifest.json              # PWA manifest
     │   ├── sw.js                      # Service worker
-    │   └── images/logo/               # A2Z logo assets
+    │   ├── images/logo/               # A2Z logo assets
+    │   └── gif/                       # GIF rendering loop otonom
     └── src/
-        ├── app/                       # Next.js Pages & Layouts
+        ├── app/                       # Next.js Pages & Layouts (Route Groups)
+        │   ├── layout.tsx             # Root layout global
+        │   ├── (landing)/             # Rute Landing Page (/)
+        │   └── (dashboard)/           # Rute Dashboard (/dashboard/*)
         ├── hooks/                     # Custom react hooks
-        └── components/                # React components & UI
+        └── components/                # React components & UI (termasuk landing/)
 ```
 
 ---

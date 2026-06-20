@@ -1,16 +1,8 @@
 import type { Metadata } from "next";
 import { Inter, IBM_Plex_Serif, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { DashboardProvider } from "@/components/DashboardContext";
 import { ToastProvider } from "@/components/ui/Toast";
-import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
-import { CommandPalette } from "@/components/ui/CommandPalette";
-import { KeyboardNavWrapper } from "@/components/ui/KeyboardNavWrapper";
-import Sidebar from "@/components/Sidebar";
-import Navbar from "@/components/Navbar";
 import PWARegister from "@/components/ui/PWARegister";
-import SkipToContent from "@/components/ui/SkipToContent";
-import ScrollToTop from "@/components/ui/ScrollToTop";
 import { RouteProgress } from "@/components/ui/RouteProgress";
 
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
@@ -52,9 +44,6 @@ export const metadata: Metadata = {
   },
 };
 
-import { KeyboardHelpOverlay } from "@/components/ui/KeyboardHelpOverlay";
-import { OnboardingTour } from "@/components/ui/OnboardingTour";
-
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -74,39 +63,10 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <PWARegister />
-        <SkipToContent />
-        <DashboardProvider>
-          <ToastProvider>
-            <KeyboardNavWrapper>
-              <RouteProgress />
-              <CommandPalette />
-              <KeyboardHelpOverlay />
-              <OnboardingTour />
-              <Sidebar />
-              <div className="flex flex-col flex-1 overflow-hidden min-w-0">
-                <Navbar />
-                <main className="flex-1 overflow-y-auto relative" id="main-content">
-                  <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
-                    <div
-                      className="absolute top-[-15%] right-[5%] w-[35%] h-[35%] rounded-full blur-[140px] opacity-7 mesh-blob-1"
-                      style={{ backgroundColor: "var(--color-brand)" }}
-                    />
-                    <div
-                      className="absolute bottom-[-10%] left-[20%] w-[30%] h-[30%] rounded-full blur-[120px] opacity-7 mesh-blob-2"
-                      style={{ backgroundColor: "var(--color-accent-purple)" }}
-                    />
-                  </div>
-                  <div className="relative z-10 p-4 md:p-6 lg:p-8">
-                    <ErrorBoundary section="Page">
-                      {children}
-                    </ErrorBoundary>
-                    <ScrollToTop />
-                  </div>
-                </main>
-              </div>
-            </KeyboardNavWrapper>
-          </ToastProvider>
-        </DashboardProvider>
+        <ToastProvider>
+          <RouteProgress />
+          {children}
+        </ToastProvider>
       </body>
     </html>
   );
