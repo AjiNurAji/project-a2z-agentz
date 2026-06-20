@@ -17,7 +17,7 @@ export default function LandingPage() {
   };
 
   const handleTransitionComplete = () => {
-    router.push("/dashboard");
+    router.push("/login");
   };
 
   return (
