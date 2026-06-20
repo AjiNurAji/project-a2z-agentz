@@ -15,6 +15,32 @@ from agent_a_inference import run_ai_inference, DEFAULT_MODEL
 from agent_b import _usd_to_wei, _idempotency_key, AUTONOMOUS_CAP_USD
 from web3_client import simulate_and_execute_tx
 
+# Also add backend directory so we can import auth module
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from auth import verify_access_token
+
+API_KEY = os.getenv("API_KEY", "your_secret_api_key_for_agents")
+
+def check_auth(request: Request) -> bool:
+    api_key = request.headers.get("X-API-Key")
+    if api_key and api_key == API_KEY:
+        return True
+    
+    token = request.cookies.get("a2z-token")
+    if token and verify_access_token(token):
+        return True
+        
+    return False
+
+def require_auth(func):
+    import functools
+    @functools.wraps(func)
+    async def wrapper(request: Request, *args, **kwargs):
+        if not check_auth(request):
+            return JSONResponse({"error": "Unauthorized"}, status_code=401)
+        return await func(request, *args, **kwargs)
+    return wrapper
+@require_auth
 async def get_stats(request: Request):
     """Returns global statistics for the dashboard."""
     try:
@@ -42,6 +68,7 @@ async def get_stats(request: Request):
     except Exception as e:
         return JSONResponse({"detail": str(e)}, status_code=500)
 
+@require_auth
 async def get_targets(request: Request):
     """Returns list of target addresses and their sentiment scores."""
     try:
@@ -52,6 +79,7 @@ async def get_targets(request: Request):
     except Exception as e:
         return JSONResponse({"detail": str(e)}, status_code=500)
 
+@require_auth
 async def get_transactions(request: Request):
     """Returns list of execution logs / transaction history."""
     try:
@@ -68,6 +96,7 @@ async def get_transactions(request: Request):
     except Exception as e:
         return JSONResponse({"detail": str(e)}, status_code=500)
 
+@require_auth
 async def circuit_breaker(request: Request):
     """Emergency pause or resume."""
     try:
@@ -84,6 +113,7 @@ async def circuit_breaker(request: Request):
     except Exception as e:
         return JSONResponse({"detail": str(e)}, status_code=500)
 
+@require_auth
 async def get_system_status(request: Request):
     """Returns health status of various components."""
     return JSONResponse({
@@ -93,6 +123,7 @@ async def get_system_status(request: Request):
         "circuit_breaker": "active"
     })
 
+@require_auth
 async def analyze_target(request: Request):
     """
     POST /analyze
@@ -202,6 +233,7 @@ async def analyze_target(request: Request):
 
     return JSONResponse(response_payload)
 
+@require_auth
 async def get_execution_status(request: Request):
     """
     GET /status

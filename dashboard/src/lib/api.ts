@@ -26,6 +26,17 @@ export async function apiFetch<T = unknown>(
   const body = await res.json().catch(() => null);
 
   if (!res.ok) {
+    if (res.status === 401 && typeof window !== "undefined") {
+      // Basic client-side redirect for protected routes
+      if (
+        window.location.pathname !== "/login" &&
+        window.location.pathname !== "/register" &&
+        window.location.pathname !== "/"
+      ) {
+        window.location.href = "/login";
+      }
+    }
+
     const err = new Error(
       (body as { error?: string })?.error || `Request failed (${res.status})`
     ) as ApiError;
