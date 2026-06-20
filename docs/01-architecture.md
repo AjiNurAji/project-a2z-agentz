@@ -55,6 +55,8 @@ graph TD
         CMD[Command Palette ⌘+K]
         SKELETON[Loading Skeletons]
         A11Y[Skip-to-Content + Reduced Motion]
+        AUTH[Auth System: Login / Register]
+        MW[Middleware: JWT Cookie Protection]
     end
 
     Scoring -->|JSON Payload| API
@@ -76,6 +78,8 @@ graph TD
    - **ChromaDB** — Long-term memory Agent A agar tidak menganalisis proyek yang sama berulang kali.
    - **PostgreSQL** — Log transaksi Agent B untuk memastikan status *idempotency* (mencegah *double-spending*).
 7. **Hybrid Approval Mode** — Semua transaksi < $2 berjalan otonom. Jika > $2, proses tertahan di *Dashboard Next.js* dan butuh klik "Approve" dari manusia.
+8. **Auth System** — Autentikasi email/password dengan JWT httpOnly cookie (7 hari). Backend Starlette: `POST /api/auth/register`, `/login`, `GET /me`, `POST /logout`. Tabel `users` di PostgreSQL (bcrypt hash). Frontend: `AuthProvider` React Context + Next.js middleware route protection. Optional wallet address saat register.
+9. **Route Protection** — Next.js middleware memeriksa keberadaan cookie `a2z-token`. Unauthenticated → redirect `/login`. Authenticated di halaman auth → redirect `/dashboard`.
 
 ## Alur AMD Pipeline (Inti)
 
