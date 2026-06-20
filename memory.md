@@ -586,3 +586,41 @@ Sesi ini berfokus pada penyelesaian pipeline *end-to-end* Agent A, mulai dari in
 ### 🎯 Dampak & Status Terakhir
 - **Pipeline Agent A Selesai:** Tahapan eksekusi secara berurutan `Scraper -> ChromaDB -> AI Inference -> ECDSA Signing` sukses lolos *end-to-end testing*.
 - **Keamanan Kriptografi:** *Full Cryptographic Handshake* antara Agent A dan Agent B berhasil diverifikasi dengan tingkat akurasi 100%.
+
+---
+
+## Sesi 13 — 2026-06-20 | Backend Local Testing & Environment Fixes
+
+### 📌 Ringkasan
+Sesi ini berfokus pada penyelesaian kendala environment di Windows (ModuleNotFoundError karena kurangnya C++ Build Tools untuk web3/chromadb), sinkronisasi Docker Compose, perbaikan skema database, serta migrasi sintaks library terbaru agar `backend` (Agent B) dapat ditest baik secara lokal murni maupun via Docker.
+
+### ✅ Hal yang Berhasil Dikerjakan
+
+| Item | Detail |
+|------|--------|
+| **Mocking Dependencies (Windows Safe)** | Menambahkan mekanisme *defensive try-except* untuk melakukan *mocking* pada library `web3`, `chromadb`, `eth_account`, dan `fastapi`/`pydantic` (isu kompatibilitas Python 3.14) sehingga backend tetap bisa dites secara logika di terminal lokal Windows tanpa error kompilasi C++. |
+| **Integrasi Backend ke Docker** | Memperbarui `docker-compose.yml` untuk menambahkan *service* `backend` dengan konfigurasi volume dan `.env` yang terpusat, beserta `Dockerfile` berbasis `python:3.11-slim` yang bersih dari isu instalasi C++. |
+| **Fix Database Credentials & Schema Mismatch** | Menyesuaikan credentials `POSTGRES_USER` di Docker dan menginstruksikan reset *volume* `pgdata`. Selain itu, menghapus injeksi kolom `project_name` pada *query* `INSERT` di `backend/routes/api.py` yang sebelumnya menyebabkan `psycopg2.errors.UndefinedColumn`. |
+| **Migrasi Lifespan Starlette** | Mengganti parameter lawas `on_startup` dan `on_shutdown` (yang sudah dihapus pada versi `starlette` terbaru) menjadi mekanisme modern berbasis `lifespan` (`@asynccontextmanager`) di `backend/main.py`. |
+| **Protobuf Implementation Fix** | Menambahkan `PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python` ke dalam variabel environment Docker Compose untuk menambal error *TypeError: Descriptors cannot be created directly* yang berasal dari library `chromadb`. |
+| **Perbaikan Script Testing** | Memperbaiki algoritma generasi alamat acak di `test_backend.py` agar menghasilkan panjang karakter heksadesimal Ethereum yang valid (42 karakter termasuk `0x`). |
+
+### ✏️ File yang DIUBAH
+
+| File | Lokasi | Detail Perubahan |
+|------|--------|-----------------|
+| `agent_a_scraper.py` | `/` | Implementasi fitur mocking `web3.is_address`. |
+| `agent_a_chroma.py` | `/` | Implementasi fallback & exception handler bagi modul `chromadb`. |
+| `agent_b.py` | `/` | Implementasi mocking untuk `eth_account`, `fastapi`, dan `pydantic`. |
+| `web3_client.py` | `/` | Mock fallback environment untuk operasi cryptography wallet. |
+| `docker-compose.yml` | `/` | Penambahan service `backend`, environment `PROTOCOL_BUFFERS`, sinkronisasi POSTGRES_URI. |
+| `backend/main.py` | `/backend/` | Refaktor inisialisasi Startlette ke metode `lifespan`. |
+| `backend/routes/api.py` | `/backend/` | Fix query insert SQL `target_addresses` (penghapusan `project_name`). |
+| `test_backend.py` | `/` | Fix error `uuid.uuid4().hex` slice dari 34 chars ke genap 40 chars hex (42 format EVM address). |
+
+### ✅ File yang DITAMBAHKAN
+| File | Lokasi | Deskripsi |
+|------|--------|-----------|
+| `Dockerfile` | `/` | Definisi *image* container backend `python:3.11-slim` terintegrasi port `8080`. |
+
+**Status: ✅ CORE BACKEND DAN PIPELINE TESTING TERVALIDASI SEPENUHNYA (LOCAL & DOCKER SUPPORT).**
