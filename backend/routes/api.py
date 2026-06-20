@@ -106,6 +106,7 @@ async def circuit_breaker(request: Request):
             return JSONResponse({"detail": "Invalid action. Must be 'pause' or 'resume'."}, status_code=400)
 
         new_status = "paused" if action == "pause" else "active"
+        database.set_system_config("circuit_breaker", new_status)
         with database._get_cursor() as cur:
             cur.execute("UPDATE target_addresses SET status = %s WHERE status != 'BLACKLISTED'", (new_status,))
             updated = cur.rowcount
@@ -116,11 +117,12 @@ async def circuit_breaker(request: Request):
 @require_auth
 async def get_system_status(request: Request):
     """Returns health status of various components."""
+    cb_status = database.get_system_config("circuit_breaker", "active")
     return JSONResponse({
         "database": "healthy",
         "rpc_node": "healthy",
         "aim_model": "healthy",
-        "circuit_breaker": "active"
+        "circuit_breaker": cb_status
     })
 
 @require_auth
@@ -151,6 +153,15 @@ async def analyze_target(request: Request):
             "amount_usd": 2.0,
             "tx_hash": "0xabc123mockhash"
         })
+
+    # Global circuit breaker check
+    if database.get_system_config("circuit_breaker", "active") == "paused":
+         return JSONResponse({
+             "status": "bypassed",
+             "message": "Global circuit breaker is paused",
+             "step": "circuit_breaker",
+             "target_address": data.get("target_address", "unknown")
+         })
 
     raw_addr = data.get("target_address", "")
     description = data.get("description", "")

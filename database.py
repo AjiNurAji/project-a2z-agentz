@@ -368,3 +368,46 @@ def update_last_login(user_id: int) -> None:
             cur.execute(query, (user_id,))
     except psycopg2.Error as exc:
         logger.error("update_last_login failed: %s", exc)
+
+# ==============================================================================
+# System Config Operations
+# ==============================================================================
+
+def get_system_config(key: str, default_value: str = None) -> str:
+    query = """
+        CREATE TABLE IF NOT EXISTS system_config (
+            key VARCHAR(50) PRIMARY KEY,
+            value VARCHAR(255) NOT NULL,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        SELECT value FROM system_config WHERE key = %s LIMIT 1;
+    """
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (key,))
+            row = cur.fetchone()
+            if row:
+                return row[0]
+            elif default_value is not None:
+                # Insert default if not exists
+                cur.execute('INSERT INTO system_config (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING;', (key, default_value))
+                return default_value
+    except psycopg2.Error as exc:
+        logger.error('get_system_config failed: %s', exc)
+    return default_value
+
+def set_system_config(key: str, value: str) -> None:
+    query = """
+        CREATE TABLE IF NOT EXISTS system_config (
+            key VARCHAR(50) PRIMARY KEY,
+            value VARCHAR(255) NOT NULL,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO system_config (key, value) VALUES (%s, %s)
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP;
+    """
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (key, value))
+    except psycopg2.Error as exc:
+        logger.error('set_system_config failed: %s', exc)
