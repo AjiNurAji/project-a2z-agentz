@@ -32,6 +32,7 @@ services:
       - .env
     environment:
       - POSTGRES_URI=postgresql://a2z_admin:a2z-project@postgres:5432/a2z_transactions
+      - PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 
 volumes:
   pgdata:
