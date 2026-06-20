@@ -631,3 +631,60 @@ Sesi ini difokuskan pada penyatuan dua sisi backend (eksperimen awal vs struktur
 
 **Status: ✅ INTEGRASI END-TO-END SELESAI — PIPELINE BERHASIL DIHUBUNGKAN KE UI DASHBOARD.**
 
+---
+
+## Sesi 16 — 2026-06-20 | Autentikasi (Login/Register) & Sinkronisasi Landing ↔ Dashboard
+
+### 📌 Ringkasan
+Menambahkan sistem autentikasi lengkap (email/password + optional Web3 wallet) dan menyinkronkan alur landing page → login → dashboard. Sebelumnya, tombol CTA di landing page langsung `router.push("/dashboard")` tanpa autentikasi. Sekarang dilindungi oleh middleware JWT cookie.
+
+### ✅ File yang DITAMBAHKAN
+
+| File | Lokasi | Deskripsi |
+|------|--------|-----------|
+| `database_schema_patch_users.sql` | `backend/` | DDL tabel `users` (email, password_hash bcrypt, wallet_address) |
+| `auth.py` | `backend/` | Pure functions: `hash_password`, `verify_password`, `create_jwt`, `decode_jwt` (PyJWT HS256) |
+| `routes/auth.py` | `backend/routes/` | 4 endpoint: `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout` |
+| `tests/test_auth.py` | `backend/tests/` | 21 test (10 unit bcrypt/JWT + 11 integration routes) |
+| `api.ts` | `dashboard/src/lib/` | Fetch wrapper dengan `credentials:'include'` + JSON parsing |
+| `auth.ts` | `dashboard/src/lib/` | Helper: `login`, `register`, `me`, `logout` memanggil backend API |
+| `middleware.ts` | `dashboard/src/` | Proteksi route: redirect unauthenticated → `/login`, authenticated away dari auth pages |
+| `AuthProvider.tsx` | `dashboard/src/components/` | React Context: `{ user, loading, login, register, logout, refresh }` |
+| `layout.tsx` | `dashboard/src/app/(auth)/` | Layout auth: AgentScene background + centered glass card |
+| `page.tsx` | `dashboard/src/app/(auth)/login/` | Form login responsive (email + password + wallet connect) |
+| `page.tsx` | `dashboard/src/app/(auth)/register/` | Form register responsive (email + password + confirm + optional wallet) |
+| `api.test.ts` | `dashboard/src/lib/__tests__/` | 4 test fetch wrapper |
+| `auth.test.ts` | `dashboard/src/lib/__tests__/` | 7 test auth helpers |
+| `middleware.test.ts` | `dashboard/src/lib/__tests__/` | 12 test middleware decision logic |
+| `AuthProvider.test.tsx` | `dashboard/src/components/__tests__/` | 3 test AuthProvider behavior |
+
+### 🔄 File yang DIUBAH
+
+| File | Lokasi | Perubahan |
+|------|--------|-----------|
+| `requirements.txt` | `backend/` | +`bcrypt`, +`PyJWT` |
+| `.env.example` | `backend/` | +`JWT_SECRET`, +`FRONTEND_ORIGIN` |
+| `main.py` | `backend/` | Mount `/api/auth` routes, fix CORS `allow_origins` dari `*` ke `FRONTEND_ORIGIN` |
+| `layout.tsx` | `dashboard/src/app/` | Wrap children dengan `AuthProvider` (di dalam `ToastProvider`) |
+| `Navbar.tsx` | `dashboard/src/components/` | + user email badge + tombol Logout |
+| `page.tsx` | `dashboard/src/app/(landing)/` | CTA `router.push("/dashboard")` → `router.push("/login")` |
+
+### 🏗️ Keputusan Desain
+
+| Aspek | Keputusan |
+|-------|-----------|
+| Metode login | Email/password default + optional wallet address saat register |
+| Sesi | JWT HS256 di httpOnly cookie, 7 hari expiry |
+| Proteksi route | Next.js middleware cek cookie existence (verify di backend `/me`) |
+| State management | React Context `AuthProvider` di root layout (inside `ToastProvider`) |
+| Layout auth | AgentScene reused sebagai background, form glass card centered |
+| Responsive | Form mobile-first: `max-w-sm` mobile, `max-w-md` desktop, touch target ≥44px |
+| Backend | Starlette `backend/` existing, tabel `users` baru, bcrypt + PyJWT |
+
+### 📊 Test Results
+
+- Backend: **21/21 PASS** (pytest)
+- Frontend: **26/26 PASS** (vitest)
+- Total: **47 tests passing**
+
+**Status: ✅ AUTENTIKASI & SINKRONISASI LANDING ↔ DASHBOARD SELESAI.**

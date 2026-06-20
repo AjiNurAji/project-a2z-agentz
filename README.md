@@ -72,4 +72,42 @@ Baca secara berurutan untuk pemahaman maksimal:
 
 ---
 
+## 🔐 Authentication Setup
+
+### Backend
+
+1. Set environment variables di `backend/.env`:
+   ```
+   JWT_SECRET=your-random-string-of-at-least-32-chars
+   FRONTEND_ORIGIN=http://localhost:3000
+   ```
+
+2. Jalankan migrasi tabel users:
+   ```bash
+   psql $POSTGRES_URI -f backend/database_schema_patch_users.sql
+   ```
+
+3. Install dependency baru:
+   ```bash
+   cd backend && pip install -r requirements.txt
+   ```
+
+### Frontend
+
+Set URL backend di `dashboard/.env.local`:
+```
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+### Alur Autentikasi
+
+1. Landing page → klik "Launch App" / "Log In" → redirect ke `/login`
+2. User daftar di `/register` (email + password + optional wallet) → auto-login → redirect ke `/dashboard`
+3. User login di `/login` → JWT cookie httpOnly diset → redirect ke `/dashboard`
+4. Middleware protect semua route `/dashboard/*` → redirect ke `/login` jika belum auth
+5. Navbar tampilkan email user + tombol Logout
+6. Logout → clear cookie → redirect ke landing page
+
+---
+
 *Dibangun untuk AMD Developer Hackathon: ACT II — menggunakan 100% AMD stack (AI Workbench → AIM → SGLang → MI300X → ROCm).*
