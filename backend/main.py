@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from routes.api import routes as api_routes
-from routes.auth import routes as auth_routes
 from routes.websockets import routes as ws_routes
 from routes.websockets import poll_and_broadcast
 from scheduler.agent_runner import start_scheduler, stop_scheduler
@@ -105,7 +104,7 @@ async def get_openapi(request):
     })
 
 middleware = [
-    Middleware(CORSMiddleware, allow_origins=[os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")], allow_methods=["*"], allow_headers=["*"], allow_credentials=True)
+    Middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], allow_credentials=True)
 ]
 
 app = Starlette(
@@ -114,7 +113,6 @@ app = Starlette(
         Route("/", read_root, methods=["GET"]),
         Route("/docs", get_docs, methods=["GET"]),
         Route("/openapi.json", get_openapi, methods=["GET"]),
-        Mount("/api/auth", routes=auth_routes),
         Mount("/api", routes=api_routes),
         Mount("/", routes=ws_routes) # /ws is defined in ws_routes
     ],
