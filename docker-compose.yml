@@ -5,19 +5,34 @@ services:
     image: postgres:15-alpine
     container_name: a2z_postgres
     environment:
-      POSTGRES_USER: a2z_user
-      POSTGRES_PASSWORD: a2z_password
-      POSTGRES_DB: a2z_db
+      POSTGRES_USER: a2z_admin
+      POSTGRES_PASSWORD: a2z-project
+      POSTGRES_DB: a2z_transactions
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./database_schema.sql:/docker-entrypoint-initdb.d/01_database_schema.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U a2z_user -d a2z_db"]
+      test: ["CMD-SHELL", "pg_isready -U a2z_admin -d a2z_transactions"]
       interval: 5s
       timeout: 5s
       retries: 5
+
+  backend:
+    build: .
+    container_name: a2z_backend
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/app
+    depends_on:
+      - postgres
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_URI=postgresql://a2z_admin:a2z-project@postgres:5432/a2z_transactions
+      - PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 
 volumes:
   pgdata:

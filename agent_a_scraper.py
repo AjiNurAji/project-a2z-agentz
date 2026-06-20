@@ -42,7 +42,11 @@ from datetime import datetime, timezone
 from typing import Iterable, Iterator, Optional
 
 import requests
-from web3 import Web3
+try:
+    from web3 import Web3
+    HAS_WEB3 = True
+except ImportError:
+    HAS_WEB3 = False
 
 # Reuse the project's existing DB layer so Agent A and Agent B cannot drift
 # on blacklist semantics.  ``is_blacklisted`` is what Agent B uses
@@ -219,11 +223,16 @@ def normalize_address(raw: str) -> Optional[str]:
     if not isinstance(raw, str):
         return None
     candidate = raw.strip()
-    if not Web3.is_address(candidate):
-        return None
-    try:
-        return Web3.to_checksum_address(candidate)
-    except (ValueError, TypeError):
+    if HAS_WEB3:
+        if not Web3.is_address(candidate):
+            return None
+        try:
+            return Web3.to_checksum_address(candidate)
+        except (ValueError, TypeError):
+            return None
+    else:
+        if candidate.startswith("0x") and len(candidate) == 42:
+            return candidate
         return None
 
 

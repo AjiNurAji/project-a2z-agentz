@@ -15,14 +15,17 @@ from routes.websockets import routes as ws_routes
 from routes.websockets import poll_and_broadcast
 from scheduler.agent_runner import start_scheduler, stop_scheduler
 
-async def startup():
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: Starlette):
     print("Starting A2Z Agentz Backend (Starlette)...")
     start_scheduler()
-    asyncio.create_task(poll_and_broadcast())
-
-async def shutdown():
+    task = asyncio.create_task(poll_and_broadcast())
+    yield
     print("Shutting down A2Z Agentz Backend...")
     stop_scheduler()
+    task.cancel()
 
 async def read_root(request):
     return JSONResponse({"message": "A2Z Agentz API is running."})
@@ -116,6 +119,5 @@ app = Starlette(
         Mount("/", routes=ws_routes) # /ws is defined in ws_routes
     ],
     middleware=middleware,
-    on_startup=[startup],
-    on_shutdown=[shutdown]
+    lifespan=lifespan
 )
