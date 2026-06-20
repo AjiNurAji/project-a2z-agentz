@@ -750,6 +750,29 @@ Sesi ini difokuskan untuk mengamankan seluruh rute _backend_ API dan koneksi Web
 
 **Status: ✅ OTENTIKASI GANDA BERHASIL DITERAPKAN — BACKEND & WEBSOCKET SEPENUHNYA AMAN TERTUTUP.**
 
+## Sesi 21 — 2026-06-20 | Perbaikan Circuit Breaker & OpenAPI Swagger
+
+### 📌 Ringkasan
+Sesi ini dilakukan untuk menambal (_bug-fixing_) logika endpoint /circuit-breaker yang sebelumnya hanya mengubah status baris di database tanpa merubah _state_ secara global, serta mendaftarkan rute yang belum terdokumentasi ke halaman /docs Swagger UI.
+
+### ✅ Hal yang Berhasil Dikerjakan
+
+| Item | Detail |
+|------|--------|
+| **Global State Circuit Breaker** | Mengimplementasikan tabel system_config di PostgresSQL via database.py untuk menyimpan kondisi _circuit breaker_ (ctive atau paused). |
+| **Proteksi Analisis** | Memperbarui logika di /api/analyze (Agent A) agar langsung menolak/_bypass_ data *wallet* baru apabila circuit_breaker global sedang paused. |
+| **Dokumentasi OpenAPI** | Menambahkan skema endpoint /api/analyze dan /api/status ke spesifikasi JSON OpenAPI di main.py agar dapat disimulasikan dari halaman /docs Swagger. |
+
+### ✏️ File yang DIUBAH
+
+| File | Lokasi | Detail Perubahan |
+|------|--------|-----------------|
+| database.py | ackend/ | Menambahkan utilitas integrasi get_system_config dan set_system_config. |
+| pi.py | ackend/routes/ | Memperbarui /circuit-breaker, /system-status, dan /analyze agar bertumpu pada system_config. |
+| main.py | ackend/ | Modifikasi JSON skema /openapi.json. |
+
+**Status: ✅ BUG TERATASI & DOKUMENTASI API LENGKAP.**
+
 ## 📊 Ringkasan Total Perubahan (Semua Sesi)
 
 | Kategori | Jumlah |
