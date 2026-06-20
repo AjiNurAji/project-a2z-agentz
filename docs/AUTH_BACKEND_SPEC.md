@@ -5,9 +5,12 @@
 ## Overview
 
 Frontend auth system menggunakan:
-- **JWT** di httpOnly cookie (nama cookie: `a2z-token`)
+- **JWT** di httpOnly cookie (nama cookie: `a2z-token`) untuk email/password auth
 - **bcrypt** untuk hash password
 - **PostgreSQL** tabel `users` baru
+- **Frontend-only wallet demo session** (`a2z-wallet-session`) untuk demo Connect Wallet sampai SIWE endpoint tersedia
+
+> Status wallet auth: UI sudah punya Connect Wallet modal, provider detection, demo fallback, dan dashboard readiness card. Backend production masih perlu endpoint SIWE agar wallet login bisa menerbitkan cookie JWT `a2z-token` yang aman.
 
 ## Database — Tabel `users`
 
@@ -153,6 +156,57 @@ Set-Cookie: a2z-token=; HttpOnly; Path=/; Max-Age=0
 
 **Logic:**
 1. Clear cookie `a2z-token` (set Max-Age=0)
+
+---
+
+### 5. Future Wallet Auth / SIWE Endpoints
+
+Frontend saat ini sudah siap untuk wallet UX, tetapi belum menganggap wallet session sebagai backend-authenticated identity. Untuk production, tambahkan endpoint SIWE berikut.
+
+#### `POST /api/auth/wallet/challenge`
+
+**Request:**
+```json
+{
+  "address": "0x1234567890abcdef1234567890abcdef12345678",
+  "chain_id": "0x2105"
+}
+```
+
+**Response Success (200):**
+```json
+{
+  "nonce": "random-nonce",
+  "message": "a2z.agentz wants you to sign in with your Ethereum account..."
+}
+```
+
+**Logic:**
+1. Validasi address EVM.
+2. Generate nonce one-time-use dengan expiry pendek (mis. 5 menit).
+3. Return SIWE message yang mencakup domain frontend, address, chain id, nonce, issued-at.
+
+#### `POST /api/auth/wallet/verify`
+
+**Request:**
+```json
+{
+  "address": "0x1234567890abcdef1234567890abcdef12345678",
+  "message": "SIWE message from challenge",
+  "signature": "0x..."
+}
+```
+
+**Response Success (200):** sama seperti `/api/auth/login`, plus `Set-Cookie: a2z-token=<JWT>; HttpOnly; Path=/; Max-Age=604800; SameSite=Lax`.
+
+**Logic:**
+1. Verify signature terhadap address.
+2. Verify nonce belum dipakai dan belum expired.
+3. Upsert/find user berdasarkan `wallet_address`.
+4. Set `last_login_at`.
+5. Issue JWT cookie `a2z-token`.
+
+**Catatan keamanan:** jangan gunakan cookie `a2z-wallet-session` untuk keputusan backend authorization. Cookie itu hanya frontend demo flag dan bukan httpOnly.
 
 ---
 

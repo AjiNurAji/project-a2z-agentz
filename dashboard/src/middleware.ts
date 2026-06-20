@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const COOKIE_NAME = "a2z-token";
+const WALLET_SESSION_COOKIE = "a2z-wallet-session";
 
 // Paths that don't require authentication
 const PUBLIC_PATHS = ["/", "/login", "/register"];
@@ -9,6 +10,8 @@ const PUBLIC_PATHS = ["/", "/login", "/register"];
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get(COOKIE_NAME)?.value;
+  const walletSession = request.cookies.get(WALLET_SESSION_COOKIE)?.value;
+  const hasFrontendWalletSession = walletSession === "1";
 
   const isPublic = PUBLIC_PATHS.includes(pathname);
   const isAuthPage = pathname === "/login" || pathname === "/register";
@@ -24,14 +27,14 @@ export function middleware(request: NextRequest) {
   }
 
   // Unauthenticated user trying to access protected route → redirect to login
-  if (!token && !isPublic && !isAuthPage) {
+  if (!token && !hasFrontendWalletSession && !isPublic && !isAuthPage) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
   // Authenticated user on auth pages → redirect to dashboard
-  if (token && isAuthPage) {
+  if ((token || hasFrontendWalletSession) && isAuthPage) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 

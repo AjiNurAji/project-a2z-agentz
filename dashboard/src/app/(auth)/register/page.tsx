@@ -2,18 +2,22 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import { Mail, Lock, Wallet, UserPlus, Loader2 } from "lucide-react";
+import { Mail, Lock, Wallet, UserPlus, Loader2, Link2 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
+import WalletConnectModal from "@/components/WalletConnectModal";
 
 export default function RegisterPage() {
   const { register } = useAuth();
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [walletAddress, setWalletAddress] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [walletModalOpen, setWalletModalOpen] = useState(false);
 
   const validate = (): boolean => {
     const e: Record<string, string> = {};
@@ -272,7 +276,7 @@ export default function RegisterPage() {
                 aria-describedby={
                   errors.walletAddress ? "reg-wallet-error" : undefined
                 }
-                className="w-full pl-10 pr-4 py-3 rounded-xl text-sm outline-none transition-all focus:ring-2 font-mono"
+                className="w-full pl-10 pr-24 py-3 rounded-xl text-sm outline-none transition-all focus:ring-2 font-mono text-ellipsis overflow-hidden"
                 style={{
                   background: "var(--color-neutral-secondary-medium)",
                   border: `1px solid ${
@@ -283,6 +287,18 @@ export default function RegisterPage() {
                   color: "var(--color-heading)",
                 }}
               />
+              <button
+                type="button"
+                onClick={() => setWalletModalOpen(true)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1 text-[10px] font-semibold rounded-lg border transition-all hover:opacity-85 focus-ring"
+                style={{
+                  borderColor: "var(--color-border-default)",
+                  color: "var(--color-body)",
+                  background: "var(--color-neutral-secondary-strong)",
+                }}
+              >
+                Connect
+              </button>
             </div>
             {errors.walletAddress && (
               <p
@@ -324,6 +340,13 @@ export default function RegisterPage() {
             )}
           </button>
         </form>
+
+        <WalletConnectModal
+          open={walletModalOpen}
+          onClose={() => setWalletModalOpen(false)}
+          onConnected={(session) => setWalletAddress(session.address)}
+          onContinue={() => router.push("/dashboard")}
+        />
 
         {/* Login link */}
         <p

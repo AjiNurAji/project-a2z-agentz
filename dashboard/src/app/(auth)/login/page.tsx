@@ -2,16 +2,20 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import { Mail, Lock, LogIn, Loader2 } from "lucide-react";
+import { Mail, Lock, LogIn, Loader2, Wallet } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
+import WalletConnectModal from "@/components/WalletConnectModal";
 
 export default function LoginPage() {
   const { login } = useAuth();
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [walletModalOpen, setWalletModalOpen] = useState(false);
 
   const validate = (): boolean => {
     const e: Record<string, string> = {};
@@ -250,7 +254,9 @@ export default function LoginPage() {
             />
           </div>
           <button
-            className="w-full py-2.5 rounded-xl text-sm font-medium border transition-all hover:opacity-80 focus-ring"
+            type="button"
+            onClick={() => setWalletModalOpen(true)}
+            className="w-full py-2.5 rounded-xl text-sm font-medium border transition-all hover:opacity-80 focus-ring flex items-center justify-center gap-2"
             style={{
               borderColor: "var(--color-border-default)",
               color: "var(--color-body)",
@@ -258,9 +264,16 @@ export default function LoginPage() {
             }}
             aria-label="Connect Web3 wallet"
           >
-            🦊 Connect Wallet
+            <Wallet className="w-4 h-4" aria-hidden="true" />
+            Connect Wallet
           </button>
         </div>
+
+        <WalletConnectModal
+          open={walletModalOpen}
+          onClose={() => setWalletModalOpen(false)}
+          onContinue={() => router.push("/dashboard")}
+        />
 
         {/* Register link */}
         <p

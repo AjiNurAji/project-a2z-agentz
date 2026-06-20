@@ -8,6 +8,9 @@ import ApprovalQueue from "@/components/ApprovalQueue";
 import DashboardKpis from "@/components/DashboardKpis";
 import PageHeader from "@/components/PageHeader";
 import AgentCommPanel from "@/components/AgentCommPanel";
+import A2AIdentityReadiness from "@/components/A2AIdentityReadiness";
+import { useDashboard } from "@/components/DashboardContext";
+import { useAuth } from "@/components/AuthProvider";
 import { LayoutDashboard } from "lucide-react";
 
 const containerVariants = {
@@ -24,6 +27,9 @@ const itemVariants = {
 };
 
 export default function Home() {
+  const { wsStatus } = useDashboard();
+  const { user } = useAuth();
+
   return (
     <motion.div
       className="space-y-6"
@@ -41,6 +47,10 @@ export default function Home() {
 
       <motion.div variants={itemVariants}>
         <DashboardKpis />
+      </motion.div>
+
+      <motion.div variants={itemVariants}>
+        <A2AIdentityReadiness wsStatus={wsStatus} user={user} />
       </motion.div>
 
       <motion.div variants={itemVariants}>

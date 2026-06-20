@@ -29,6 +29,7 @@ Sistem ini terdiri dari dua agen utama yang bekerja secara asinkron menggunakan 
 | **Icons** | Lucide React |
 | **Animations** | Motion (motion.dev) |
 | **PWA** | Service Worker, Web App Manifest (offline-capable) |
+| **Wallet UX** | EIP-1193 provider detection (MetaMask, Coinbase Wallet, Rabby, Injected) + frontend-only demo session |
 
 ## 📚 Dokumentasi
 
@@ -107,6 +108,18 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 4. Middleware protect semua route `/dashboard/*` → redirect ke `/login` jika belum auth
 5. Navbar tampilkan email user + tombol Logout
 6. Logout → clear cookie → redirect ke landing page
+
+### Wallet Connect Demo Mode
+
+Frontend juga menyediakan tombol **Connect Wallet** di `/login` dan `/register`:
+
+- Mendeteksi provider EIP-1193: **MetaMask**, **Coinbase Wallet**, **Rabby**, dan generic injected wallet.
+- Jika wallet extension tersedia, frontend meminta `eth_requestAccounts` dan membaca `eth_chainId`.
+- Jika wallet extension tidak tersedia, frontend memakai **demo fallback session** agar flow hackathon/demo tetap bisa dilanjutkan.
+- Session wallet disimpan secara lokal sebagai `a2z-wallet-session` dan cookie non-httpOnly untuk membuka akses demo ke dashboard.
+- Dashboard menampilkan **Identity Handshake Status**: wallet session, backend auth readiness, dan A2A WebSocket status.
+
+> Catatan keamanan: wallet login saat ini **frontend-only**. Backend production masih perlu endpoint SIWE (`challenge` + `verify`) untuk menerbitkan cookie JWT `a2z-token` yang setara dengan email/password login.
 
 ---
 

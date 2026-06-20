@@ -42,15 +42,39 @@ npm start
 | Animations | Motion (motion.dev) |
 | Fonts | Inter (data), Outfit (heading), Geist Mono (logs) |
 | PWA | Service Worker + Web App Manifest |
-| Real-time | WebSocket (planned) / SSE (planned) |
+| Real-time | Agent A/B WebSocket + polling fallback |
+| Wallet UX | EIP-1193 provider detection + frontend-only demo session |
 
 ## Halaman
 
-- `/` — Dashboard utama: KPI, Circuit Breaker, Live Log, Approval Queue, Transaction List
+- `/` — Landing page cinematic + A2A positioning
+- `/login` — Email/password login + Connect Wallet modal
+- `/register` — Register form + wallet connect autofill
+- `/dashboard` — Dashboard utama: KPI, Identity Handshake Status, Circuit Breaker, Live Log, Approval Queue, Transaction List
 - `/analytics` — Chart TVL, gas, success rate (Recharts)
 - `/memory` — ChromaDB vector memory explorer
 - `/settings` — Config Agent A (cron, weights) + Agent B (RPC, KMS, cap)
 - `/history` — Audit trail paginated
+
+## Wallet Connect & Demo Auth
+
+Komponen wallet berada di:
+
+- `src/lib/wallet.ts` — provider detection, session persistence, address formatting
+- `src/hooks/useWalletConnect.ts` — connect flow + demo fallback when no wallet extension exists
+- `src/components/WalletConnectModal.tsx` — modal selector with continue-to-dashboard action
+- `src/components/A2AIdentityReadiness.tsx` — dashboard readiness card for wallet/backend/WebSocket state
+
+Behavior saat ini:
+
+1. Klik **Connect Wallet** di login/register.
+2. Pilih MetaMask/Coinbase/Rabby/Browser Wallet.
+3. Jika provider asli ada, browser memanggil `eth_requestAccounts`.
+4. Jika provider tidak ada, app membuat **mock demo wallet session** agar demo tetap bisa lanjut.
+5. Setelah session aktif, tombol **Continue to dashboard** muncul.
+6. Middleware menerima cookie `a2z-wallet-session=1` sebagai akses demo frontend-only.
+
+> Production note: wallet auth belum menggantikan backend JWT. Tambahkan SIWE challenge/verify endpoint untuk menerbitkan `a2z-token` httpOnly sebelum digunakan production.
 
 ## Aksesibilitas (a11y)
 
@@ -109,6 +133,8 @@ npm start
 20. **CommandPalette Actions** — Real navigation & actions wired to command palette
 21. **Design Tokens (LiveLog)** — All hardcoded hex replaced with CSS variables
 22. **Design Tokens (AnalyticsCharts)** — Chart colors use CSS variables
+23. **Wallet Connect Modal** — MetaMask/Coinbase/Rabby/Injected detection + demo fallback
+24. **A2A Identity Readiness** — dashboard card for wallet session, backend auth, and WebSocket status
 
 ## 📦 Komponen Inventori (30+)
 
@@ -118,6 +144,9 @@ npm start
 - `Navbar.tsx` — Context-aware top bar + AMD badge
 - `PageHeader.tsx` — Consistent page header
 - `AgentCommPanel.tsx` — Agent communication panel
+- `WalletConnectModal.tsx` — Wallet selector modal with frontend-only/demo session flow
+- `A2AIdentityReadiness.tsx` — Wallet/backend/WebSocket readiness panel on dashboard
+- `ClientOnly.tsx` — Client-only rendering guard for extension-induced hydration mismatches
 
 ### Data Components
 - `KpiCard.tsx` — Reusable metric card (5 color variants)
@@ -155,6 +184,14 @@ npm start
 
 ### Hooks
 - `useReducedMotion.ts` — `prefers-reduced-motion` detection
+- `useAgentWebSocket.ts` — Agent A/B WebSocket stream with reconnect/backoff
+- `useWalletConnect.ts` — EIP-1193 wallet connect flow with demo fallback
+
+### Library Helpers
+- `api.ts` — typed API fetch wrapper with credentials and 401 handling
+- `mappers.ts` — backend payload mapping for logs/transactions
+- `wallet.ts` — wallet provider detection and session persistence
+- `ws.ts` — WebSocket client factory
 
 ### SEO & Meta
 - `opengraph-image.tsx` — OG image generator (1200×630)

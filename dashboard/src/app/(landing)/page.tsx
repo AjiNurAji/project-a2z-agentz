@@ -6,8 +6,9 @@ import { motion, AnimatePresence } from "motion/react";
 import { Bot, Shield, Cpu, Activity, ArrowRight, Zap, Sparkles } from "lucide-react";
 
 import AgentScene from "@/components/landing/AgentScene";
+import { ClientOnly } from "@/components/ClientOnly";
 
-export default function LandingPage() {
+function LandingContent() {
   const router = useRouter();
   const [isTransitioning, setIsTransitioning] = useState(false);
 
@@ -21,11 +22,11 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="relative min-h-screen bg-[#13111C] text-[var(--color-body)] overflow-hidden flex flex-col font-sans" suppressHydrationWarning={true}>
+    <div className="relative min-h-screen bg-[#13111C] text-[var(--color-body)] overflow-hidden flex flex-col font-sans">
       {/* Dynamic 3D Scene Background */}
-      <AgentScene 
-        isTransitioning={isTransitioning} 
-        onTransitionComplete={handleTransitionComplete} 
+      <AgentScene
+        isTransitioning={isTransitioning}
+        onTransitionComplete={handleTransitionComplete}
       />
 
       {/* Screen Overlay/Vignette for atmospheric glow */}
@@ -288,5 +289,21 @@ export default function LandingPage() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+export default function LandingPage() {
+  return (
+    <ClientOnly
+      fallback={
+        <div className="relative min-h-screen bg-[#13111C] flex items-center justify-center">
+          <div className="animate-pulse text-[var(--color-body-subtle)] font-mono text-sm">
+            Loading...
+          </div>
+        </div>
+      }
+    >
+      <LandingContent />
+    </ClientOnly>
   );
 }
