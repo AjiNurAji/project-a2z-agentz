@@ -65,6 +65,9 @@ test_cache/
 *.bak
 .cache/
 
+# Superpowers brainstorming mockups (local only)
+.superpowers/
+
 # ChromaDB persistent vector store (regenerated from scraper pipeline)
 chroma_db/
 .agents/
