@@ -192,11 +192,11 @@ async def analyze_target(request: Request):
         # Blacklist if <= 85
         with database._get_cursor() as cur:
             query = """
-                INSERT INTO target_addresses (address, project_name, sentiment_score, status)
-                VALUES (%s, %s, %s, 'BLACKLISTED')
+                INSERT INTO target_addresses (address, sentiment_score, status)
+                VALUES (%s, %s, 'BLACKLISTED')
                 ON CONFLICT (address) DO UPDATE SET status = 'BLACKLISTED', sentiment_score = EXCLUDED.sentiment_score, updated_at = CURRENT_TIMESTAMP
             """
-            cur.execute(query, (checksum, project_name, ai_result.score))
+            cur.execute(query, (checksum, ai_result.score))
         response_payload["status"] = "blacklisted"
         response_payload["message"] = "Score too low, blacklisted."
 
