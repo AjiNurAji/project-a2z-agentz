@@ -725,6 +725,31 @@ Sesi ini berfokus pada melengkapi kepingan terakhir dari sistem autentikasi di *
 
 ---
 
+## Sesi 20 — 2026-06-20 | Pengamanan Ekstra API & Autentikasi Ganda
+
+### 📌 Ringkasan
+Sesi ini difokuskan untuk mengamankan seluruh rute _backend_ API dan koneksi WebSocket yang sebelumnya berstatus publik. Implementasi ini menggunakan pendekatan Autentikasi Ganda, yaitu JWT Cookie untuk akses via peramban (_browser_ frontend) dan HTTP Header X-API-Key statis untuk akses server-to-server oleh bot otonom (Agent A & B).
+
+### ✅ Hal yang Berhasil Dikerjakan
+
+| Item | Detail |
+|------|--------|
+| **Proteksi Rute Backend (REST API)** | Menerapkan *dependency checker* check_auth dan dekorator @require_auth ke seluruh rute REST di ackend/routes/api.py. Segala koneksi yang tidak dilengkapi *cookie* otentikasi atau kunci API yang benar akan ditolak dengan respons HTTP 401 Unauthorized. |
+| **Proteksi WebSocket** | Menerapkan check_ws_auth pada *event* koneksi websocket_endpoint untuk secara instan memutus aliran _socket_ yang tidak dilengkapi token yang sah dengan kode terminasi koneksi 1008 Policy Violation. |
+| **Otentikasi Server-to-Server** | Memasukkan fungsi deteksi X-API-Key di *backend* agar sistem agen yang dipicu oleh APScheduler tetap dapat mendaftarkan riwayat log transaksi ke database dengan _API Key_ statis yang disembunyikan di dalam .env. |
+| **Frontend Interceptor 401** | Mengamodifikasi fail *wrapper* piFetch dalam dashboard/src/lib/api.ts sehingga ketika pengguna kehabisan masa aktif *cookie* (terdeteksi dari respon 401), sistem klien secara agresif mengembalikan (*redirect*) paksa pengguna ke halaman /login. |
+
+### ✏️ File yang DIUBAH
+
+| File | Lokasi | Detail Perubahan |
+|------|--------|-----------------|
+| pi.py | ackend/routes/ | Penambahan dekorator @require_auth pada endpoint /stats, /targets, /transactions, /circuit-breaker, /system-status, /analyze, /status. |
+| websockets.py | ackend/routes/ | Penambahan validasi token otentikasi sebelum mengeksekusi wait websocket.accept(). |
+| .env.example & .env | ackend/ | Penambahan atribut variabel rahasia API_KEY. |
+| pi.ts | dashboard/src/lib/ | Penambahan interseptor blok logika status 401 Unauthorized dengan aksi *client-side redirect*. |
+
+**Status: ✅ OTENTIKASI GANDA BERHASIL DITERAPKAN — BACKEND & WEBSOCKET SEPENUHNYA AMAN TERTUTUP.**
+
 ## 📊 Ringkasan Total Perubahan (Semua Sesi)
 
 | Kategori | Jumlah |
