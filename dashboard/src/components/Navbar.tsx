@@ -1,9 +1,10 @@
 "use client";
 
 import { useDashboard } from "./DashboardContext";
-import { Bell, Cpu, Menu } from "lucide-react";
+import { Cpu, Menu } from "lucide-react";
 import { CommandCenterToggle } from "./ui/CommandCenter";
 import { ThemeToggle } from "./ui/ThemeToggle";
+import { NotificationsPanel } from "./ui/NotificationsPanel";
 import { motion } from "motion/react";
 
 export default function Navbar() {
@@ -51,20 +52,7 @@ export default function Navbar() {
           <CommandCenterToggle />
             <kbd className="text-[10px] px-1.5 py-0.5 rounded font-mono hidden sm:inline-flex items-center" style={{ background: "var(--color-neutral-secondary-medium)", color: "var(--color-body-subtle)", border: "1px solid var(--color-border-default)" }}>⌘K</kbd>
           </div>
-          {kpiMetrics.activeAlerts > 0 && (
-            <button
-              className="relative p-1.5 rounded-xl hover:bg-[var(--color-neutral-secondary-medium)] focus-ring transition-colors"
-              aria-label={`${kpiMetrics.activeAlerts} pending approvals`}
-            >
-              <Bell className="w-5 h-5 text-[var(--color-body-subtle)]" aria-hidden="true" />
-              <span
-                className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full text-[var(--color-heading)] text-[9px] flex items-center justify-center font-bold"
-                style={{ background: "var(--color-warning)" }}
-              >
-                {kpiMetrics.activeAlerts}
-              </span>
-            </button>
-          )}
+          <NotificationsPanel />
           <div className="flex items-center gap-3 text-xs">
             <div className="flex items-center gap-1.5">
               <span

@@ -3,7 +3,7 @@ import { useDashboard, type AgentMessage, type MessageStatus } from "./Dashboard
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  Bot, Shield, Check, X, Loader2, Clock, Send, Radio,
+  Bot, Shield, Check, X, Loader2, Send, Radio,
   Hash, TrendingUp, DollarSign, FolderOpen, Copy,
 } from "lucide-react";
 
@@ -316,10 +316,14 @@ export default function AgentCommPanel() {
 
   // Show typing indicator when new messages arrive
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let typingTimer: ReturnType<typeof setTimeout> | undefined;
     if (agentMessages.length > prevCountRef.current) {
       const lastMsg = agentMessages[agentMessages.length - 1];
       if (lastMsg && lastMsg.sender !== "system") {
-        setTypingAgent(lastMsg.sender as "agent_a" | "agent_b");
+        typingTimer = setTimeout(() => {
+          setTypingAgent(lastMsg.sender as "agent_a" | "agent_b");
+        }, 0);
         
         // Dynamic typing delay based on message length
         const baseDelay = 600;
@@ -327,11 +331,14 @@ export default function AgentCommPanel() {
         const randomDelay = Math.random() * 400;
         const totalDelay = Math.min(2000, Math.max(600, baseDelay + lengthDelay + randomDelay));
         
-        const timer = setTimeout(() => setTypingAgent(null), totalDelay);
-        return () => clearTimeout(timer);
+        timer = setTimeout(() => setTypingAgent(null), totalDelay);
       }
     }
     prevCountRef.current = agentMessages.length;
+    return () => {
+      if (typingTimer) clearTimeout(typingTimer);
+      if (timer) clearTimeout(timer);
+    };
   }, [agentMessages]);
 
   // Auto-scroll to bottom on new messages

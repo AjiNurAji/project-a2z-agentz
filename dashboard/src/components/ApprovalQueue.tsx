@@ -5,8 +5,11 @@ import { ListChecks, CheckCircle2, XCircle, Clock, Inbox, AlertTriangle } from "
 import { useToast } from "./ui/Toast";
 import { EmptyState } from "./ui/EmptyState";
 
+import { RadialGauge } from "./ui/RadialGauge";
+import { ScoreBreakdown } from "./ui/ScoreBreakdown";
+
 export default function ApprovalQueue() {
-  const { approvalQueue, handleApprove, handleReject } = useDashboard();
+  const { approvalQueue, handleApprove, handleReject, config } = useDashboard();
   const toast = useToast();
 
   const onApprove = (id: string) => {
@@ -103,19 +106,16 @@ export default function ApprovalQueue() {
                       {item.targetAddress.slice(0, 20)}...
                     </p>
                   </div>
-                  <div className="flex-shrink-0 text-right">
-                    <p
-                      className="text-lg font-bold tabular-nums"
-                      style={{ color: "var(--color-fg-warning)", fontFamily: "var(--font-serif)" }}
-                    >
-                      ${item.amountUsd}
-                    </p>
-                    <p className="text-[11px]" style={{ color: "var(--color-fg-disabled)" }}>
-                      Score:{" "}
-                      <span className="font-semibold" style={{ color: "var(--color-fg-success)" }}>
-                        {item.llmScore}/100
-                      </span>
-                    </p>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <RadialGauge value={item.llmScore} size={48} />
+                    <div className="text-right">
+                      <p
+                        className="text-lg font-bold tabular-nums"
+                        style={{ color: "var(--color-fg-warning)", fontFamily: "var(--font-serif)" }}
+                      >
+                        ${item.amountUsd}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
@@ -126,6 +126,14 @@ export default function ApprovalQueue() {
                 >
                   {item.reason}
                 </p>
+
+                <ScoreBreakdown
+                  sentimentPct={config.agentA.sentimentWeight}
+                  tvlPct={config.agentA.tvlWeight}
+                  sentimentPts={Math.round(item.llmScore * config.agentA.sentimentWeight / 100)}
+                  tvlPts={Math.round(item.llmScore * config.agentA.tvlWeight / 100)}
+                  total={item.llmScore}
+                />
 
                 {/* Footer: Time + Buttons */}
                 <div className="flex items-center gap-2 pt-1">

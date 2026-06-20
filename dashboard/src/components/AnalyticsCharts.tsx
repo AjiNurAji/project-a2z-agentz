@@ -1,7 +1,7 @@
 "use client";
 
-import { useDashboard, type GasDataPoint, type TvlDataPoint, type SuccessDataPoint } from "./DashboardContext";
-import { useTheme, type Theme } from "@/hooks/useTheme";
+import { useDashboard } from "./DashboardContext";
+import { useChartColors } from "@/hooks/useChartColors";
 import { motion } from "motion/react";
 import { BarChart3, TrendingUp, Activity, Zap } from "lucide-react";
 import {
@@ -9,34 +9,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 
-/** ── Design System Chart Colors ─────────────────────────────
- *  Mapped from CSS custom properties in globals.css.
- *  Recharts requires hex values — these are the resolved palette.
- *  Update here when the design tokens change.
- */
-const CHART_COLORS_DARK = {
-  brand:    "#42344B", // var(--color-brand)
-  accent:   "#6E5A7C", // var(--color-accent-purple)
-  success:  "#6E9C7E", // var(--color-success)
-  danger:   "#C9596A", // var(--color-danger)
-  warning:  "#D49A5A", // var(--color-warning)
-  grid:     "#221F2B", // var(--color-border-muted) / card surface
-  muted:    "#A8A3B0", // var(--color-body-subtle)
-} as const;
 
-const CHART_COLORS_LIGHT = {
-  brand:    "#6B4F8A", // var(--color-brand)
-  accent:   "#7E5FA0", // var(--color-accent-purple)
-  success:  "#2D7A4A", // var(--color-success)
-  danger:   "#B91C3A", // var(--color-danger)
-  warning:  "#A16B1A", // var(--color-warning)
-  grid:     "#F0EDE8", // var(--color-border-muted)
-  muted:    "#6B6380", // var(--color-body-subtle)
-} as const;
-
-function getChartColors(theme: Theme) {
-  return theme === "light" ? CHART_COLORS_LIGHT : CHART_COLORS_DARK;
-}
 
 /* ── Custom Tooltip ─────────────────────────── */
 function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; name: string; color: string }>; label?: string }) {
@@ -84,8 +57,7 @@ function StatCard({ label, value, icon: Icon, color }: { label: string; value: s
 /* ── Main Component ─────────────────────────── */
 export default function AnalyticsCharts() {
   const { gasHistory, tvlHistory, successHistory } = useDashboard();
-  const { theme } = useTheme();
-  const CHART_COLORS = getChartColors(theme);
+  const { colors: CHART_COLORS } = useChartColors();
 
   const latestGas = gasHistory[gasHistory.length - 1]?.gwei ?? 0;
   const latestTvl = tvlHistory[tvlHistory.length - 1]?.tvl ?? 0;

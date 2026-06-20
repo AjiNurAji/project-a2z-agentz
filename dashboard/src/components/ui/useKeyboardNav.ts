@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 
 const PAGE_SHORTCUTS: Record<string, string> = {
   "1": "/",
@@ -14,33 +14,44 @@ const PAGE_SHORTCUTS: Record<string, string> = {
 export function useKeyboardNav() {
   const router = useRouter();
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      // Ignore if typing in input
-      const target = e.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
-
-      // Page shortcuts 1-5
-      if (PAGE_SHORTCUTS[e.key] && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        e.preventDefault();
-        router.push(PAGE_SHORTCUTS[e.key]);
+  // Navigation shortcuts: 1-5
+  useKeyboardShortcut(
+    ["1", "2", "3", "4", "5"],
+    (e) => {
+      if (!e.metaKey && !e.ctrlKey && !e.altKey) {
+        const path = PAGE_SHORTCUTS[e.key];
+        if (path) {
+          router.push(path);
+        }
       }
+    },
+    { preventDefault: true }
+  );
 
-      // Escape to close mobile sidebar
-      if (e.key === "Escape") {
-        const sidebar = document.querySelector("[data-sidebar]");
-        if (sidebar) sidebar.dispatchEvent(new CustomEvent("close-sidebar"));
+  // Escape to close mobile sidebar
+  useKeyboardShortcut(
+    ["Escape"],
+    () => {
+      const sidebar = document.querySelector("[data-sidebar]");
+      if (sidebar) {
+        sidebar.dispatchEvent(new CustomEvent("close-sidebar"));
       }
+    },
+    { preventDefault: false }
+  );
 
-      // / to focus search
-      if (e.key === "/" && !e.metaKey && !e.ctrlKey) {
-        e.preventDefault();
+  // '/' to focus search input
+  useKeyboardShortcut(
+    ["/"],
+    (e) => {
+      if (!e.metaKey && !e.ctrlKey) {
         const searchInput = document.querySelector<HTMLInputElement>("[data-search-input]");
-        if (searchInput) searchInput.focus();
+        if (searchInput) {
+          searchInput.focus();
+        }
       }
-    };
-
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [router]);
+    },
+    { preventDefault: true }
+  );
 }
+
