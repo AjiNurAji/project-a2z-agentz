@@ -773,17 +773,89 @@ Sesi ini dilakukan untuk menambal (_bug-fixing_) logika endpoint /circuit-breake
 
 **Status: ✅ BUG TERATASI & DOKUMENTASI API LENGKAP.**
 
+
+---
+
+## Sesi 14 — 2026-06-21 | Wallet Connect Demo Auth, Hydration Guard, A2A Readiness, dan Dokumentasi
+
+### 📌 Ringkasan
+Sesi ini menyelesaikan sinkronisasi terbaru pada frontend dashboard: memperbaiki hydration mismatch akibat browser extension, mengaktifkan tombol **Connect Wallet** yang sebelumnya masih placeholder, menambahkan demo/static fallback wallet session, dan memperbarui dokumentasi utama agar selaras dengan status implementasi terbaru.
+
+### ✅ Hal yang Berhasil Dikerjakan
+
+| Item | Detail |
+|------|--------|
+| **Fix Hydration Mismatch Landing** | Menambahkan `ClientOnly` untuk menghindari mismatch dari atribut eksternal seperti `bis_skin_checked` yang disisipkan browser extension sebelum React hydrate. |
+| **Wallet Connect Modal** | Membuat modal selector wallet untuk MetaMask, Coinbase Wallet, Rabby, dan generic injected EVM provider. |
+| **Demo / Static Wallet Fallback** | Jika tidak ada EIP-1193 provider di browser, klik wallet tetap membuat mock frontend-only session agar demo hackathon dapat dilanjutkan. |
+| **Continue to Dashboard** | Tombol **Continue to dashboard** kini muncul setelah real/demo wallet session aktif dan mengarahkan user ke `/dashboard`. |
+| **Register Wallet Autofill** | Halaman register dapat membuka wallet modal dan mengisi wallet address otomatis setelah connect. |
+| **Middleware Demo Access** | Middleware menerima cookie `a2z-wallet-session=1` sebagai akses demo frontend-only, sambil tetap memprioritaskan JWT `a2z-token` untuk auth production. |
+| **A2A Identity Readiness** | Dashboard menampilkan status Wallet Session, Backend Auth, dan A2A WebSocket readiness. |
+| **Modal Visual Polish** | Menghapus border hitam yang terlalu keras pada modal wallet dan menggantinya dengan glassmorphism border transparan. |
+| **Dokumentasi Markdown** | Memperbarui `README.md`, `dashboard/README.md`, `docs/AUTH_BACKEND_SPEC.md`, dan plan wallet connect dengan status terbaru + SIWE backend note. |
+
+### ✅ File yang DITAMBAHKAN
+
+| File | Lokasi | Deskripsi |
+|------|--------|-----------|
+| `wallet.ts` | `/dashboard/src/lib/` | EIP-1193 provider detection, wallet session helpers, address formatting. |
+| `wallet.test.ts` | `/dashboard/src/lib/__tests__/` | Unit test wallet detection/session helper. |
+| `useWalletConnect.ts` | `/dashboard/src/hooks/` | Hook connect wallet dengan real provider + demo fallback. |
+| `WalletConnectModal.tsx` | `/dashboard/src/components/` | Modal selector wallet + frontend-only warning + continue CTA. |
+| `WalletConnectModal.test.tsx` | `/dashboard/src/components/__tests__/` | Test modal real provider, rejection, continue, dan demo fallback. |
+| `A2AIdentityReadiness.tsx` | `/dashboard/src/components/` | Panel dashboard untuk wallet/backend/WebSocket readiness. |
+| `A2AIdentityReadiness.test.tsx` | `/dashboard/src/components/__tests__/` | Test readiness panel untuk state disconnected, wallet session, dan JWT user. |
+| `ClientOnly.tsx` | `/dashboard/src/components/` | Client-only wrapper untuk menghindari hydration mismatch eksternal. |
+| `2026-06-21-wallet-connect-a2a-dashboard.md` | `/docs/superpowers/plans/` | Plan implementasi wallet connect + status completed. |
+| `A2Z-animation1.gif` | `/dashboard/public/gif/` | Asset GIF tambahan untuk animasi/dashboard visual. |
+
+### ✏️ File yang DIUBAH
+
+| File | Lokasi | Detail Perubahan |
+|------|--------|-----------------|
+| `login/page.tsx` | `/dashboard/src/app/(auth)/login/` | Tombol Connect Wallet membuka modal dan flow continue dashboard. |
+| `register/page.tsx` | `/dashboard/src/app/(auth)/register/` | Integrasi modal wallet + autofill wallet address. |
+| `dashboard/page.tsx` | `/dashboard/src/app/(dashboard)/dashboard/` | Menambahkan A2A Identity Readiness setelah KPI. |
+| `page.tsx` | `/dashboard/src/app/(landing)/` | Wrap landing content dengan `ClientOnly`. |
+| `middleware.ts` | `/dashboard/src/` | Menambahkan support cookie demo `a2z-wallet-session`. |
+| `README.md` | `/` | Menambahkan wallet UX, demo fallback, dan catatan SIWE production. |
+| `dashboard/README.md` | `/dashboard/` | Update stack, halaman, komponen, hooks, library helpers, dan wallet demo behavior. |
+| `AUTH_BACKEND_SPEC.md` | `/docs/` | Menambahkan status frontend-only wallet demo dan spesifikasi endpoint SIWE future. |
+| `A2Z-animation.gif` | `/dashboard/public/gif/` | Update asset GIF animasi. |
+
+### 🧪 Verifikasi
+
+```bash
+cd dashboard
+npm run test:e2e
+# 15 test files passed, 205 tests passed
+
+npm run build
+# TypeScript/Next.js build completed successfully
+```
+
+### 🌿 Git
+
+- Branch: `feature/wallet-connect-demo-dashboard-docs`
+- Commit: `44cd118 feat: add wallet demo auth and dashboard readiness`
+- Remote: `origin/feature/wallet-connect-demo-dashboard-docs`
+
+**Status: ✅ WALLET CONNECT DEMO FLOW, DASHBOARD READINESS, HYDRATION GUARD, DAN DOKUMENTASI TERBARU TELAH SELESAI.**
+
+---
+
 ## 📊 Ringkasan Total Perubahan (Semua Sesi)
 
 | Kategori | Jumlah |
 |----------|--------|
-| File baru ditambahkan | **75+ file** (termasuk dashboard & backend) |
-| File yang diubah/direfaktor | **40+ file** |
+| File baru ditambahkan | **85+ file** (termasuk dashboard, backend, wallet auth, dan dokumentasi) |
+| File yang diubah/direfaktor | **50+ file** |
 | File dihapus | **0 file** |
 | Dependensi baru | **5 paket** (`recharts`, `lucide-react`, `motion.dev`, backend `requirements.txt`, PWA) |
-| Route/halaman baru | **5 route** (termasuk /agents) |
-| Komponen baru | **45+ komponen** |
-| **Total sesi** | **13 sesi** |
+| Route/halaman baru | **7+ route** (landing, auth, dashboard, analytics, memory, settings, history, agents) |
+| Komponen baru | **50+ komponen** |
+| **Total sesi** | **14 sesi** |
 
 ---
 
@@ -792,15 +864,15 @@ Sesi ini dilakukan untuk menambal (_bug-fixing_) logika endpoint /circuit-breake
 ## 🔍 Status Build Terakhir
 
 ```
-npm run build — 2026-06-19T15:00:34Z
+npm run test:e2e — 2026-06-21
+✓ Test Files: 15 passed
+✓ Tests: 205 passed
 
-▲ Next.js 16.2.9 (Turbopack)
-✓ Compiled successfully in 10.8s
-✓ TypeScript passed in 12.0s
-✓ Static pages generated: 12/12
+npm run build — 2026-06-21
+✓ TypeScript/Next.js build completed successfully
 ```
 
-**Status: ✅ PASSED — 0 errors, 0 warnings**
+**Status: ✅ PASSED — tests green dan build tanpa error TypeScript**
 
 ---
 
@@ -830,7 +902,9 @@ project-a2z-agentz/
 │   ├── 03-agent-b-vault.md            # KMS, Gas, Multi-RPC
 │   ├── 04-communication-protocol.md   # ECDSA + SGLang endpoint
 │   ├── 05-setup-guide.md              # End-to-end AMD Cloud setup
-│   └── 06-amd-stack.md                # Alignment khusus juri
+│   ├── 06-amd-stack.md                # Alignment khusus juri
+│   ├── AUTH_BACKEND_SPEC.md           # JWT auth + future SIWE spec
+│   └── superpowers/plans/              # Implementation plans
 └── dashboard/
     ├── package.json
     ├── tsconfig.json
@@ -843,9 +917,11 @@ project-a2z-agentz/
         ├── app/                       # Next.js Pages & Layouts (Route Groups)
         │   ├── layout.tsx             # Root layout global
         │   ├── (landing)/             # Rute Landing Page (/)
+        │   ├── (auth)/                # Login/Register + wallet connect
         │   └── (dashboard)/           # Rute Dashboard (/dashboard/*)
-        ├── hooks/                     # Custom react hooks
-        └── components/                # React components & UI (termasuk landing/)
+        ├── hooks/                     # Custom react hooks (WebSocket, wallet, motion)
+        ├── lib/                       # API, auth, websocket, wallet helpers
+        └── components/                # React components & UI (termasuk wallet modal dan readiness panel)
 ```
 
 ---
