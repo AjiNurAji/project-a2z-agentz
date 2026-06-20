@@ -472,3 +472,122 @@ project-a2z-agentz/
         ├── hooks/                     # Custom react hooks
         └── components/                # React components & UI
 ```
+
+---
+
+## Sesi 14 — 2026-06-19 | Implementasi Core Backend & Database (Starlette)
+
+### 📌 Ringkasan
+Sesi ini berfokus pada implementasi jembatan backend antara sistem agen Python (Agent A/B) dengan dashboard Next.js. Backend ini awalnya dirancang menggunakan FastAPI, namun di-*refactor* ke **Starlette murni** demi menghindari isu kompilasi dependensi `pydantic-core` berbasis Rust di environment **Python 3.14** yang belum disupport penuh oleh ekosistem.
+
+### ✅ Hal yang Berhasil Dikerjakan
+
+| Item | Detail |
+|------|--------|
+| **Setup Docker Compose** | Menyusun `docker-compose.yml` untuk menjalankan PostgreSQL 15-alpine lokal beserta _auto-migration_ skema `database_schema.sql`. |
+| **Starlette API Core** | Mengganti *engine* FastAPI ke Starlette untuk kompatibilitas penuh dengan Python 3.14. Membuat REST API endpoints (`/api/stats`, `/api/targets`, `/api/transactions`, `/api/circuit-breaker`). |
+| **Real-time WebSockets** | Membangun `ConnectionManager` dan sistem *polling* database (5 detik) untuk mendorong (*push*) update log transaksi `execution_logs` secara instan ke dashboard. |
+| **Agent Scheduler** | Mengintegrasikan `APScheduler` (BackgroundScheduler) ke dalam *lifecycle* Starlette untuk menjalankan loop Agent A (setiap 5 menit) dan Agent B (setiap 1 menit). |
+| **Environment Fix** | Mengatasi konflik port mapping internal Docker dan merapikan sistem module import Python. |
+
+### ✏️ File yang DITAMBAHKAN / DIUBAH
+
+| File | Lokasi | Detail Perubahan |
+|------|--------|-----------------|
+| `docker-compose.yml` | `/` | File orkestrasi container untuk database PostgreSQL `a2z_db`. |
+| `main.py` | `/backend/` | *Entry point* Starlette server, CORS middleware, mounting API & WebSocket router, dan inisialisasi *scheduler*. |
+| `api.py` | `/backend/routes/` | Kumpulan *route* REST yang melakukan _query_ ke `database.py`. |
+| `websockets.py` | `/backend/routes/` | Handler `ws://` dan *background task* polling DB untuk disiarkan ke client. |
+| `agent_runner.py` | `/backend/scheduler/` | Pengaturan cron/interval `APScheduler` untuk simulasi _agent background loop_. |
+| `requirements.txt` | `/backend/` | Daftar dependensi `starlette`, `uvicorn`, `psycopg2-binary`, dll (tanpa strict versioning untuk Pydantic/FastAPI). |
+| `.env.example` | `/backend/` | _Template_ variabel lingkungan. |
+
+**Status: ✅ BACKEND API & WEBSOCKETS LIVE — KOMPATIBEL DENGAN PYTHON 3.14.**
+
+---
+
+## 🗂️ Struktur Direktori Akhir (Update Sesi 14)
+
+```
+project-a2z-agentz/
+├── README.md                          # AMD-stack branding
+├── docker-compose.yml                 # Database orchestration
+├── agent_b.py                         # Web3 executor
+├── database.py                        # DB Connection pooling
+├── database_schema.sql                # PostgreSQL SQL schema
+├── backend/                           # Backend API
+│   ├── main.py                        # Starlette entrypoint
+│   ├── requirements.txt               # Backend dependencies
+│   ├── .env.example                   # Env vars template
+│   ├── routes/
+│   │   ├── api.py                     # REST endpoints
+│   │   └── websockets.py              # WebSocket handlers
+│   └── scheduler/
+│       └── agent_runner.py            # APScheduler cron jobs
+├── docs/                              # Project Documentation
+└── dashboard/                         # Next.js Frontend
+```
+
+
+## Sesi 14 ΓÇö 2026-06-19 | Landing Page Redesign & Overhaul, Interactive Particle Canvas & Responsive Layout
+
+### ≡ƒôî Ringkasan
+Sesi ini berfokus pada perombakan total Landing Page `/` menggunakan Next.js Route Groups (`(landing)` dan `(dashboard)`), penggantian visual background Three.js yang berat dengan interactive 2D `<canvas>` Particle Network, integrasi mockup terminal berisi GIF otonom loop multi-agent, penataan posisi tooltip label Agent A & B, serta perbaikan responsiveness layout di mobile dan desktop.
+
+### Γ£à Hal yang Berhasil Dikerjakan
+
+| Item | Detail |
+|------|--------|
+| **Next.js Route Group Restructuring** | Mengelompokkan struktur folder `dashboard/src/app` ke dalam `(landing)` (rute `/`) dan `(dashboard)` (rute `/dashboard/*` dkk.) untuk isolasi layout visual yang bersih. |
+| **Interactive 2D Canvas Background** | Membuat canvas rendering loop di `AgentScene.tsx` dengan floating particle network dalam nuansa warna Cyan/Purple/Pink, mouse parallax tracker, grid breathing adaptif, dan efek scanline retro. |
+| **A2Z Terminal GIF Integration** | Mengintegrasikan `/gif/A2Z-animation.gif` (animasi multi-agent loop 10 detik) ke dalam mockup terminal retro dengan header bar di Landing Page. |
+| **Label Positioning Correction** | Menggeser posisi tooltip Agent A dan Agent B ke bawah (`top-[68%]`) agar berada tepat di bawah visual kepala/mata robot, mencegah label menutupi wajah robot. |
+| **Mobile & Desktop Responsiveness** | Menerapkan utility classes Tailwind di layout utama, teks grid, header, dan footer. Memperbaiki bug scroll cutoff di mobile dengan mengganti pembungkus background canvas menjadi `fixed inset-0`. |
+| **Next.js Turbopack Cache Resolution** | Mengatasi error compiler Turbopack `[browser] Uncaught Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'` dengan menghapus folder `.next` (`rm -rf .next` atau `Remove-Item -Recurse -Force .next`) secara berkala saat restrukturisasi file. |
+
+### Γ£Å∩╕Å File yang DIUBAH
+
+| File | Lokasi | Detail Perubahan |
+|------|--------|-----------------|
+| `layout.tsx` | `dashboard/src/app/` | Menjadikan `layout.tsx` sebagai Root Layout global Next.js, memindahkan layout dashboard ke `(dashboard)/layout.tsx`. |
+| `page.tsx` (Root) | `dashboard/src/app/` | Dihapus / dipindahkan ke `(landing)/page.tsx` (Landing Page) dan `(dashboard)/dashboard/page.tsx` (Dashboard Utama). |
+| `Sidebar.tsx`, `AnalyticsCharts.tsx`, `AuditTrail.tsx`, `Toast.tsx`, `EmptyState.tsx`, `CommandPalette.tsx` | `dashboard/src/components/` | Perbaikan minor path imports dan types menyusul restrukturisasi folder. |
+| `01-architecture.md` | `docs/` | Memperbarui peta arsitektur Next.js route groups `(landing)` & `(dashboard)` serta deskripsi interactive particle canvas background. |
+
+### Γ£à File Baru (Komponen, Halaman, & GIF)
+
+| File / Aset | Lokasi | Deskripsi |
+|-------------|--------|-----------|
+| `A2Z-animation.gif` | `dashboard/public/gif/` | Animasi GIF rendering 3D looping otonom Agent A & Agent B. |
+| `layout.tsx` & `page.tsx` | `dashboard/src/app/(landing)/` | Layout dan Landing Page baru dengan terminal mockup dan interactive canvas. |
+| `layout.tsx` & `dashboard/page.tsx` | `dashboard/src/app/(dashboard)/` | Layout dashboard lama dan halaman dashboard yang direlokasi ke sub-rute `/dashboard`. |
+| `AgentScene.tsx` | `dashboard/src/components/landing/` | Komponen background HTML5 2D `<canvas>` Particle Network interaktif berkinerja tinggi. |
+
+---
+
+## Sesi 15 — 2026-06-19 | Penyatuan Backend & Integrasi Frontend (API Mapping)
+
+### 📌 Ringkasan
+Sesi ini difokuskan pada penyatuan dua sisi backend (eksperimen awal vs struktur Agent Web3) dan pengikatan (mapping) API tersebut ke dashboard frontend. Pipeline logika end-to-end (Scraper -> ChromaDB -> AI Inference -> Agent B) berhasil digabungkan dalam satu server Starlette.
+
+### ✅ Hal yang Berhasil Dikerjakan
+
+| Item | Detail |
+|------|--------|
+| **Penyatuan Backend** | Menggabungkan kode dari branch \eature/backend-experiment\ dengan \eat-agent-web3\. Memindahkan semua helper Agent A dan Agent B agar berjalan terpusat. |
+| **API Endpoints Baru** | Menambahkan \POST /api/analyze\ (untuk eksekusi sinkron full pipeline agent) dan \GET /api/status\ (untuk menarik log transaksi) ke \ackend/routes/api.py\. |
+| **Integrasi UI Dashboard** | Memperbarui \DashboardContext.tsx\ agar secara nyata menembak endpoint \localhost:8080/api/analyze\ saat tombol dieksekusi, dan menarik data via \localhost:8080/api/status\. |
+| **UI Fallback & Mock Data** | Menambahkan fitur fallback mock data (\use_mock=true\). Jika backend mati/maintenance, simulasi UI otomatis berjalan mencegah crash (sesuai struktur test.json). |
+| **UI Responsiveness** | Menerapkan UI State dinamis (\nalyzing\) yang langsung tampil saat request API berjalan, sebelum hasil dari Llama3 dikembalikan. |
+| **Merge Landing Page Redesign** | Menggabungkan branch \eature/landing-page-redesign\ untuk mengambil pembaruan UI (Particle canvas, animasi terminal, light/dark mode overhaul) tanpa merusak setup backend. |
+
+### ✏️ File yang DIUBAH
+
+| File | Lokasi | Detail Perubahan |
+|------|--------|-----------------|
+| \pi.py\ | \ackend/routes/\ | Penambahan endpoint \/analyze\ dan \/status\ yang mengimpor seluruh modul Agent A & B. |
+| \DashboardContext.tsx\ | \dashboard/src/components/\ | Penggantian *interval live simulation* murni dengan *real fetch polling* ke \/api/status\ beserta state \nalyzeTarget\. |
+| \memory.md\ | \/\ | Resolusi *merge conflict* dan dokumentasi update sesi 15. |
+
+**Status: ✅ INTEGRASI END-TO-END SELESAI — PIPELINE BERHASIL DIHUBUNGKAN KE UI DASHBOARD.**
+
