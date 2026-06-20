@@ -24,8 +24,8 @@ if __name__ == "__main__":
     print("Mulai pengujian end-to-end (Flowchart Test)...")
     
     # Generate unique addresses so we don't hit old blacklists across runs
-    good_address = "0x" + uuid.uuid4().hex[:40]
-    bad_address = "0x" + uuid.uuid4().hex[:40]
+    good_address = "0x" + (uuid.uuid4().hex + uuid.uuid4().hex)[:40]
+    bad_address = "0x" + (uuid.uuid4().hex + uuid.uuid4().hex)[:40]
 
     # Test A: Golden Path (Good Project)
     # The AI should score this > 85, so it should be executed.
