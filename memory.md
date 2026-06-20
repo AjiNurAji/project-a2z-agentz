@@ -931,3 +931,38 @@ Menambahkan sistem autentikasi lengkap (email/password + optional Web3 wallet) d
 **Status: ✅ AUTENTIKASI & SINKRONISASI LANDING ↔ DASHBOARD SELESAI.**
 
 **Status: ✅ CORE BACKEND DAN PIPELINE TESTING TERVALIDASI SEPENUHNYA (LOCAL & DOCKER SUPPORT).**
+
+---
+
+## Sesi 14 — 2026-06-20 | Implementasi Backend Authentication System (JWT + bcrypt)
+
+### 📌 Ringkasan
+Sesi ini berfokus pada melengkapi kepingan terakhir dari sistem autentikasi di *backend* agar dapat mensinkronkan sesi kredensial *Frontend* (dashboard). Pengembangan ini mengacu penuh pada spesifikasi internal `docs/AUTH_BACKEND_SPEC.md` yang disiapkan oleh *teammate*. Backend Auth System ini sudah bersifat *Production-ready* untuk mengelola pengguna.
+
+### ✅ Hal yang Berhasil Dikerjakan
+
+| Item | Detail |
+|------|--------|
+| **Auth Middleware & Cryptography** | Mengembangkan utilitas enkripsi di `auth.py` menggunakan `bcrypt` untuk operasi *hashing* sandi, serta menggunakan `PyJWT` untuk menandatangani otorisasi kuki sesi pengguna (`a2z-token`) dengan batas kedaluwarsa 7 hari (algoritma HS256). |
+| **Integrasi Rute REST API** | Menyediakan 4 *endpoint* absolut di `backend/routes/auth.py`: `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, dan `POST /api/auth/logout`. Seluruh rute sudah mengikuti kaidah respons seragam JSON. |
+| **Suntikan Skema Tabel Users** | Memperbarui `database_schema.sql` dan secara mulus menginjeksi tabel relasional `users` baru (kolom: `id`, `email`, `password_hash`, `wallet_address`) langsung ke dalam *container* PostgreSQL yang menyala menggunakan *query* manual `docker exec`. |
+| **Pemecahan Isu CORS Lintas Protokol** | Memodifikasi `CORSMiddleware` di `main.py` agar mengizinkan kredensial *cookie* lintas porta secara parsial dengan menarik parameter origin dinamis `FRONTEND_ORIGIN` (menggantikan aturan wildcard `*` yang ditolak *browser*). |
+| **Swagger API Docs Integration** | Memutakhirkan fungsi pembangkit `get_openapi()` untuk memastikan keempat struktur API autentikasi baru terekam ke halaman `/docs` dengan skema *requestBody* dan dokumentasi respon yang akurat. |
+
+### ✏️ File yang DIUBAH
+
+| File | Lokasi | Detail Perubahan |
+|------|--------|-----------------|
+| `database.py` | `/` | Menambahkan 4 fungsi *helper*: `create_user`, `get_user_by_email`, `get_user_by_id`, `update_last_login`. |
+| `database_schema.sql` | `/` | Melampirkan *DDL query* tabel `users`. |
+| `backend/main.py` | `/backend/` | Memasang variabel environment CORS khusus untuk autentikasi kredensial dan melakukan integrasi ke *Swagger docs*. |
+| `requirements.txt` | `/` | Menginstal pustaka global `bcrypt` & `PyJWT`. |
+| `backend/requirements.txt` | `/backend/` | Menyinkronisasi pustaka backend lokal untuk `bcrypt` & `PyJWT`. |
+
+### ✅ File yang DITAMBAHKAN
+| File | Lokasi | Deskripsi |
+|------|--------|-----------|
+| `backend/auth.py` | `/backend/` | Berisi logika kriptografi (*hashing* sandi) dan *handler* penandatanganan JWT. |
+| `backend/routes/auth.py` | `/backend/routes/` | Mengandung arsitektur *endpoints* register, login, profil diri, dan pembersihan token (logout). |
+
+**Status: ✅ SISTEM AUTENTIKASI BACKEND SELESAI DAN TERINTEGRASI. PENGUJIAN FRONTEND-TO-BACKEND SIAP DILAKSANAKAN.**
