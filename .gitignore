@@ -72,3 +72,4 @@ test_cache/
 chroma_db/
 .agents/
 .skill-archive/
+.worktrees/
