@@ -317,6 +317,14 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [gasHistory, setGasHistory] = useState<GasDataPoint[]>([]);
   const [tvlHistory, setTvlHistory] = useState<TvlDataPoint[]>([]);
   const [successHistory, setSuccessHistory] = useState<SuccessDataPoint[]>([]);
+  const [kpiMetrics, setKpiMetrics] = useState<KpiMetrics>({
+    totalTvlAnalyzed: 42800000,
+    successRate: 0,
+    totalTransactions: 0,
+    gasSavedUsd: 0,
+    projectsScanned: 1247,
+    activeAlerts: 0,
+  });
   const [config, setConfig] = useState<DashboardConfig>(DEFAULT_CONFIG);
   const [agentMessages, setAgentMessages] = useState<AgentMessage[]>(genAgentConversation());
   const [sidebarOpen, setSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
@@ -372,18 +380,44 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      const [statusData, statsData] = await Promise.all([
+        apiFetch<{ logs?: Array<{ tx_hash_id: string; project_target_address: string; amount_usd: number; status: string; created_at: string }> }>("/api/status"),
+        apiFetch<{ total_transactions: number; success_rate: number; total_usd_sent: number; active_targets: number }>("/api/stats")
+      ]);
+
+      if (statusData?.logs) {
+        const mappedTxs = statusData.logs.map(mapRawTxToTransaction) as Transaction[];
+        setTransactions(mappedTxs.slice(0, 50));
+      }
+
+      if (statsData) {
+        setKpiMetrics(prev => ({
+          ...prev,
+          successRate: statsData.success_rate,
+          totalTransactions: statsData.total_transactions,
+          gasSavedUsd: +(statsData.total_transactions * 0.08).toFixed(2),
+        }));
+      }
+    } catch (e) {
+      console.error("Failed to fetch dashboard data:", e);
+    }
+  }, []);
+
   useEffect(() => {
-    const t = setTimeout(() => {
-      setTransactions(genInitialTransactions());
-      setApprovalQueue(genInitialApprovals());
+    const initData = async () => {
+      // Set some initial history metrics for the charts since API doesn't provide them yet
       setVectorMemory(genInitialVectorMemory());
       setGasHistory(genGasHistory());
       setTvlHistory(genTvlHistory());
       setSuccessHistory(genSuccessHistory());
+      
+      await fetchDashboardData();
       setMounted(true);
-    }, 0);
-    return () => clearTimeout(t);
-  }, []);
+    };
+    initData();
+  }, [fetchDashboardData]);
   const addLog = useCallback((level: LogEntry["level"], message: string) => {
     setLogs((prev) => [{ id: genId(), timestamp: new Date(), level, message }, ...prev].slice(0, 100));
     logCountRef.current++;
@@ -441,52 +475,15 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     if (isPaused || usingReal) return;
     const interval = setInterval(async () => {
       setLastSync(Date.now());
-      
-      try {
-        const data = await apiFetch<{ logs?: Array<{ tx_hash_id: string; project_target_address: string; amount_usd: number; status: string; created_at: string }> }>("/api/status");
-        if (data && data.logs && data.logs.length > 0) {
-          const mappedTxs = data.logs.map(mapRawTxToTransaction) as Transaction[];
-          
-          // Only update if there are new transactions (simplified check by length)
-          setTransactions((prev) => mappedTxs.length > prev.length ? mappedTxs.slice(0, 50) : prev);
-        }
-      } catch (e) {
-        // Fallback to simulation if backend is down
-        const roll = Math.random();
-
-        if (roll < 0.35) {
-          addLog("AGENT_A", randFrom(FARCASTER_MSGS));
-        } else if (roll < 0.6) {
-          addLog("AGENT_B", randFrom(AGENT_B_MSGS));
-        } else {
-          const proj = randFrom(PROJECTS);
-          const success = Math.random() > 0.15;
-          const newTx: Transaction = {
-            id: genId(),
-            projectName: proj,
-            targetAddress: genAddress(),
-            amountUsd: +(Math.random() * 1.8 + 0.2).toFixed(2),
-            status: success ? "success" : "failed",
-            txHash: genTxHash(),
-            timestamp: new Date(),
-            reason: "Llama 3 score: " + randInt(86, 99) + "/100",
-            gasUsedGwei: randInt(35, 65),
-          };
-          setTransactions((prev) => [newTx, ...prev].slice(0, 50));
-        }
-      }
+      await fetchDashboardData();
     }, 4000);
     return () => clearInterval(interval);
-  }, [isPaused, usingReal, addLog, addNotification]);
+  }, [isPaused, usingReal, fetchDashboardData]);
 
-  const kpiMetrics: KpiMetrics = {
-    totalTvlAnalyzed: 42_800_000 + transactions.length * 180000,
-    successRate: Math.round((transactions.filter((t) => t.status === "success").length / Math.max(transactions.length, 1)) * 100),
-    totalTransactions: transactions.length,
-    gasSavedUsd: +(transactions.filter((t) => t.status === "success").length * 0.08).toFixed(2),
-    projectsScanned: 1247 + transactions.length * 3,
-    activeAlerts: approvalQueue.length,
-  };
+  // Sync active alerts count into KPI
+  useEffect(() => {
+    setKpiMetrics(prev => ({ ...prev, activeAlerts: approvalQueue.length }));
+  }, [approvalQueue.length]);
 
   const handleApprove = useCallback(
     (id: string) => {
