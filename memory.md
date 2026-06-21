@@ -931,6 +931,32 @@ Sesi ini berfokus pada perbaikan responsivitas layout komponen header pada layar
 
 ---
 
+## Sesi 21 — 2026-06-21 | Fitur Demo/Guest Login & Perbaikan Infinite Redirect Loop
+
+### 📌 Ringkasan
+Sesi ini ditujukan untuk membangun fitur otentikasi "Guest / Demo" yang diperuntukkan bagi juri hackathon, memungkinkan akses penuh ke Dashboard tanpa perlu mendaftar atau menyambungkan dompet Web3 (*wallet*). Selain itu, kami juga menambal *bug* kritis (*infinite redirect loop*) yang terjadi akibat konflik antara respons 401 Unauthorized dari backend dengan proteksi rute di *frontend*.
+
+### ✅ Hal yang Berhasil Dikerjakan
+
+| Item | Detail |
+|------|--------|
+| **Fitur Guest Login (`loginAsGuest`)** | Menambahkan metode instan *login as guest* pada `AuthProvider.tsx` yang secara otomatis menginjeksi identitas *mock* (`judge@a2z.demo`) dan memasang *flag* `a2z-guest-session` ke `localStorage` agar sesi tetap bertahan (*persisted*) saat halaman di-*refresh*. |
+| **Penambahan UI Tombol Guest** | Menempatkan tombol "Continue as Demo / Guest" tepat di bawah tombol "Connect Web3 Wallet" di halaman `/login`. Tombol ini dibuat lebar (*full-width*), disematkan efek animasi sentuh (*group hover border & glow*), serta ikon `User` dari Lucide React agar sejajar dan konsisten dengan tata letak tombol dompet. |
+| **Fix Infinite Redirect Loop** | Memecahkan *bug* *refresh* berulang yang terjadi ketika sistem API (`apiFetch`) terus-menerus memaksa *redirect* ke `/login` setiap kali menerima status *401 Unauthorized* (karena sesi *Guest*/*Demo Wallet* tidak memiliki JWT riil). *Fix* dilakukan dengan mem- *bypass* aturan *redirect* tersebut jika *flag* sesi terdeteksi di sisi klien (`api.ts`). |
+| **Fix Missing Loading State** | Memperbaiki potensi *infinite loading* di dashboard akibat tidak terpanggilnya `setLoading(false)` saat proses inisialisasi sesi *Guest* berjalan di *Context API*. |
+
+### ✏️ File yang DIUBAH
+
+| File | Lokasi | Detail Perubahan |
+|------|--------|-----------------|
+| `AuthProvider.tsx` | `dashboard/src/components/` | Penambahan fungsi `loginAsGuest`, modifikasi logika `refresh` agar membaca *localStorage*, perbaikan stat `loading`, dan pembersihan *session* pada saat `logout`. |
+| `page.tsx` | `dashboard/src/app/(auth)/login/` | Implementasi UI baru untuk tombol *Guest/Demo* lengkap dengan ikon dan kelas animasi *Tailwind*. |
+| `api.ts` | `dashboard/src/lib/` | Modifikasi penanganan *error response* `401 Unauthorized` agar mengabaikan instruksi *redirect* apabila sesi *Guest* atau sesi *Demo Wallet* terdeteksi aktif di browser pengguna. |
+
+---
+
+---
+
 ## 🗂️ Struktur Direktori Akhir
 
 ```
