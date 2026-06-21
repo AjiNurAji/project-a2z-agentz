@@ -57,7 +57,7 @@ export function mapRawTxToTransaction(tx: RawTransaction): MappedTransaction {
     amountUsd: tx.amount_usd,
     status,
     txHash: tx.tx_hash_id,
-    timestamp: new Date(tx.created_at),
+    timestamp: new Date(tx.created_at.replace(" ", "T") + "Z"),
     reason: "Autonomous Execution",
     gasUsedGwei: 42,
   };

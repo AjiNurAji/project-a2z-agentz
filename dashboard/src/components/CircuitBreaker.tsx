@@ -5,6 +5,7 @@ import { ShieldOff, ShieldCheck, AlertTriangle, Power } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useState } from "react";
 import { ConfirmModal } from "./ui/ConfirmModal";
+import { apiFetch } from "@/lib/api";
 
 export default function CircuitBreaker() {
   const { isPaused, setIsPaused } = useDashboard();
@@ -64,9 +65,8 @@ export default function CircuitBreaker() {
             if (!isPaused) setConfirming(true);
             else {
               try {
-                await fetch("/api/circuit-breaker", {
+                await apiFetch("/api/circuit-breaker", {
                   method: "POST",
-                  headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ action: "resume" })
                 });
                 setIsPaused(false);
@@ -138,9 +138,8 @@ export default function CircuitBreaker() {
         confirmLabel="Pause execution"
         onConfirm={async () => {
           try {
-            await fetch("/api/circuit-breaker", {
+            await apiFetch("/api/circuit-breaker", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ action: "pause" })
             });
             setIsPaused(true);

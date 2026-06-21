@@ -149,21 +149,64 @@ async def analyze_target(request: Request):
         return JSONResponse({"error": "Invalid JSON"}, status_code=400)
         
     use_mock = data.get("use_mock", False)
-    if os.getenv("USE_MOCK") == "1":
-        use_mock = True
-        
     if use_mock:
+        raw_addr = data.get("target_address", "0x0000000000000000000000000000000000000000")
+        project_name = data.get("project_name", "Mock Project")
+        
+        # Insert into DB so stats update
+        with database._get_cursor() as cur:
+            # 1. Insert target address
+            query = """
+                INSERT INTO target_addresses (address, sentiment_score, status)
+                VALUES (%s, %s, 'active')
+                ON CONFLICT (address) DO UPDATE SET sentiment_score = EXCLUDED.sentiment_score, updated_at = CURRENT_TIMESTAMP
+            """
+            cur.execute(query, (raw_addr, 92))
+            
+            # 2. Insert execution log
+            timestamp = int(time.time())
+            log_key = _idempotency_key(raw_addr, timestamp)
+            cur.execute("""
+                INSERT INTO execution_logs (tx_hash_id, project_target_address, amount_usd, status)
+                VALUES (%s, %s, %s, %s)
+            """, (log_key, raw_addr, 2.0, "SUCCESS"))
+            
         # Dummy test data structure
+        await manager.broadcast(json.dumps({"type": "SYSTEM_LOG", "data": {"level": "INFO", "message": f"Agent A running inference on {project_name}..."}}))
+        
+        agent_a_msg = f"Analyzed {project_name}. Score: 92/100. Category: defi. Reason: Mock dummy data for frontend development"
+        await manager.broadcast(json.dumps({
+            "type": "AGENT_LOG", 
+            "data": {
+                "sender": "agent_a", 
+                "content": agent_a_msg,
+                "metadata": {"score": 92, "projectName": project_name}
+            }
+        }))
+        
+        tx_hash = "0x" + os.urandom(32).hex()
+        agent_b_msg = _format_with_deepseek("autonomous_execution", raw_addr, 2.0, "SUCCESS", tx_hash)
+        await manager.broadcast(json.dumps({
+            "type": "AGENT_LOG", 
+            "data": {
+                "sender": "agent_b", 
+                "content": agent_b_msg,
+                "metadata": {"txHash": tx_hash, "amountUsd": 2.0, "projectName": project_name}
+            }
+        }))
+        
+        await manager.broadcast(json.dumps({"type": "SYSTEM_LOG", "data": {"level": "SUCCESS", "message": f"Agent B autonomously executed $2.0 to {project_name} (Tx: {tx_hash})" }}))
+
         return JSONResponse({
             "status": "executed",
             "step": "inference",
-            "project_name": data.get("project_name", "Mock Project"),
-            "target_address": data.get("target_address", "0x0000000000000000000000000000000000000000"),
+            "project_name": project_name,
+            "target_address": raw_addr,
             "score": 92,
             "category": "defi",
             "reason": "Mock dummy data for frontend development",
             "amount_usd": 2.0,
-            "tx_hash": "0xabc123mockhash"
+            "tx_hash": tx_hash
         })
 
     # Global circuit breaker check

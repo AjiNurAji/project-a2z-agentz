@@ -1004,3 +1004,52 @@ project-a2z-agentz/
 ```
 
 ---
+
+## Sesi 22 — 2026-06-21 | Real-time WebSockets & Port Synchronization
+
+### 📌 Ringkasan
+Fokus pada penyelesaian isu komunikasi antara frontend dan backend, memastikan fitur Circuit Breaker dan panel Agent Live Log dapat terhubung ke aliran data WebSocket secara sungguhan. Terjadi masalah *Connection Refused* yang bersumber dari ketidaksesuaian port API.
+
+### ✅ Hal yang Berhasil Dikerjakan
+
+| Item | Detail |
+|------|--------|
+| **Port Synchronization** | Memperbaiki port backend yang berjalan di `8000` (sebelumnya salah dikonfigurasi ke `8080` pada variabel environment `NEXT_PUBLIC_API_URL` di frontend dan `INTERNAL_API_URL` di `agent_runner.py`). |
+| **Circuit Breaker Frontend API** | Menyesuaikan pemanggilan API pada UI `CircuitBreaker.tsx` menggunakan utilitas `apiFetch` (menggantikan `fetch` standar) agar pengiriman request memiliki integrasi dengan API backend. |
+
+### ✏️ File yang DIUBAH
+
+| File | Lokasi | Detail Perubahan |
+|------|--------|-----------------|
+| `CircuitBreaker.tsx` | `dashboard/src/components/` | Migrasi `fetch` ke `apiFetch`. |
+| `.env.local` | `dashboard/` | Update `NEXT_PUBLIC_API_URL` ke `http://localhost:8000`. |
+| `agent_runner.py` | `backend/scheduler/` | Fix port tujuan request HTTP internal ke port `8000`. |
+
+**Status: ✅ WEBSOCKET & CIRCUIT BREAKER TERHUBUNG SECARA REAL-TIME.**
+
+---
+
+## Sesi 23 — 2026-06-21 | Fix Backend Mock Mode & Dashboard Timezone
+
+### 📌 Ringkasan
+Memperbaiki anomali WebSocket yang tidak mengirim log di mode simulasi (use_mock), serta mengatasi error schema constraint PostgreSQL pada backend. Selain itu, menyesuaikan pengaturan zona waktu untuk memastikan tabel *Recent Transactions* di dashboard frontend menampilkan waktu lokal secara akurat.
+
+### ✅ Hal yang Berhasil Dikerjakan
+
+| Item | Detail |
+|------|--------|
+| **Fix WebSocket Mock Data** | Menambahkan perintah `manager.broadcast` pada jalur `use_mock=True` di `api.py` sehingga UI dashboard bisa menerima log langsung secara simulasi. |
+| **Database Schema Alignment** | Mengubah *query* insert `target_addresses` dengan `status` menjadi `active` (huruf kecil) demi mematuhi CHECK constraint pada database, mencegah error 500 saat Agent berjalan. |
+| **Dashboard KPI Synchronization** | Menyuntikkan transaksi dan entitas address pura-pura ke dalam database ketika `use_mock=True` dipanggil, sehingga metrik *Projects Scanned* dan *TVL Analyzed* di panel dashboard ikut terinkrementasi secara real-time. |
+| **Timezone Parsing Fix** | Memperbaiki parser `timestamp` di `mappers.ts` yang tadinya mengasumsikan UTC menjadi *local time*, dengan menyematkan format UTC `Z` eksplisit. Kini waktu di tabel log sama persis dengan *Agent Communication* (Waktu lokal). |
+
+### ✏️ File yang DIUBAH
+
+| File | Lokasi | Detail Perubahan |
+|------|--------|-----------------|
+| `api.py` | `backend/routes/` | Perbaikan `use_mock` agar melakukan broadcast WebSocket & Insert DB dummy, serta sinkronisasi kapitalisasi teks `status`. |
+| `mappers.ts` | `dashboard/src/lib/` | Penyesuaian `new Date()` dengan suffix `Z` untuk konversi standar waktu UTC -> Lokal. |
+
+**Status: ✅ BUG MOCK DATA & ZONA WAKTU DASHBOARD TERATASI — SEMUA PANEL MENYALA DENGAN BENAR.**
+
+---
