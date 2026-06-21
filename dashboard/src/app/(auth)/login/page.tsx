@@ -4,12 +4,12 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import { Mail, Lock, LogIn, Loader2, Wallet } from "lucide-react";
+import { Mail, Lock, LogIn, Loader2, Wallet, User } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import WalletConnectModal from "@/components/WalletConnectModal";
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, loginAsGuest } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -267,6 +267,21 @@ export default function LoginPage() {
             
             <Wallet className="w-4 h-4 text-[var(--color-fg-brand)] group-hover:scale-110 transition-transform duration-300 relative z-10" aria-hidden="true" />
             <span className="relative z-10">Connect Web3 Wallet</span>
+          </button>
+
+          {/* Demo / Guest Login */}
+          <button
+            type="button"
+            onClick={loginAsGuest}
+            className="group mt-3 w-full py-2.5 rounded-xl text-sm font-semibold border transition-all duration-300 hover:border-[var(--color-border-brand)] hover:shadow-[0_0_10px_rgba(110,90,124,0.1)] active:scale-[0.98] focus-ring flex items-center justify-center gap-2"
+            style={{ 
+              borderColor: "var(--color-border-default)",
+              color: "var(--color-heading)",
+              background: "color-mix(in srgb, var(--color-surface) 60%, transparent)",
+            }}
+          >
+            <User className="w-4 h-4 text-[var(--color-fg-brand)] group-hover:scale-110 transition-transform duration-300 relative z-10" aria-hidden="true" />
+            <span className="relative z-10">Continue as Demo / Guest</span>
           </button>
         </div>
 

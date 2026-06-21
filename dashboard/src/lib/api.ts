@@ -27,8 +27,13 @@ export async function apiFetch<T = unknown>(
 
   if (!res.ok) {
     if (res.status === 401 && typeof window !== "undefined") {
+      const isGuest = localStorage.getItem("a2z-guest-session") === "1";
+      const isWalletDemo = localStorage.getItem("a2z-wallet-session") !== null;
+
       // Basic client-side redirect for protected routes
       if (
+        !isGuest &&
+        !isWalletDemo &&
         window.location.pathname !== "/login" &&
         window.location.pathname !== "/register" &&
         window.location.pathname !== "/"

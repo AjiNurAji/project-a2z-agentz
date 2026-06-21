@@ -23,6 +23,7 @@ interface AuthContextValue {
   ) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
+  loginAsGuest: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -42,6 +43,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
+      const isGuest = typeof window !== "undefined" && localStorage.getItem("a2z-guest-session") === "1";
+      if (isGuest) {
+        setUser({ id: 999, email: "judge@a2z.demo", wallet_address: "0xDemoWallet999" });
+        setLoading(false);
+        return;
+      }
       const u = await authLib.me();
       setUser(u);
     } catch {
@@ -93,11 +100,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [router, toast]
   );
 
+  const loginAsGuest = useCallback(() => {
+    setUser({ id: 999, email: "judge@a2z.demo", wallet_address: "0xDemoWallet999" });
+    if (typeof window !== "undefined") {
+      localStorage.setItem("a2z-guest-session", "1");
+      // Set dummy token so it passes middleware if enabled
+      document.cookie = "a2z-token=guest; path=/";
+    }
+    router.push("/dashboard");
+  }, [router]);
+
   const handleLogout = useCallback(async () => {
     try {
       await authLib.logout();
     } catch {
       // Ignore logout errors — clear local state regardless
+    }
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("a2z-guest-session");
+      document.cookie = "a2z-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     }
     setUser(null);
     router.push("/");
@@ -112,6 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         register: handleRegister,
         logout: handleLogout,
         refresh,
+        loginAsGuest,
       }}
     >
       {children}
