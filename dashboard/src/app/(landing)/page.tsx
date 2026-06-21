@@ -58,7 +58,7 @@ function LandingContent() {
           <button 
             onClick={handleEnterDashboard}
             disabled={isTransitioning}
-            className="hidden sm:inline-block text-xs font-semibold px-4 py-2 rounded-xl text-[var(--color-heading)] hover:text-white transition-colors"
+            className="hidden sm:inline-block text-xs font-semibold px-4 py-2 rounded-xl text-[var(--color-heading)] hover:bg-black/5! dark:hover:bg-white/10 transition-colors"
           >
             Log In
           </button>
@@ -70,7 +70,7 @@ function LandingContent() {
               background: "linear-gradient(135deg, var(--color-brand), var(--color-accent-purple))",
               border: "1px solid var(--color-border-brand)",
               boxShadow: "0 4px 14px rgba(110, 90, 124, 0.4)",
-              color: "var(--color-heading)",
+              color: "#ffffff",
             }}
           >
             <span className="flex items-center gap-1.5 md:gap-2">
@@ -82,8 +82,8 @@ function LandingContent() {
       </header>
 
       {/* Main Content Area */}
-      <main className="relative z-10 flex-1 flex flex-col justify-center px-4 md:px-12 lg:px-20 py-8 md:py-12 lg:py-20 max-w-7xl mx-auto w-full">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+      <main className="relative z-10 flex-1 flex flex-col justify-center px-4 md:px-8 lg:px-12 py-6 md:py-10 lg:py-12 max-w-7xl mx-auto w-full">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
           {/* Left Column: Title & Cards (Glassmorphism overlays) */}
           <div className="lg:col-span-6 space-y-5 md:space-y-6 text-left">
             {/* Tagline */}
@@ -116,7 +116,7 @@ function LandingContent() {
                   background: "linear-gradient(135deg, var(--color-brand), var(--color-accent-purple))",
                   border: "1px solid var(--color-border-brand)",
                   boxShadow: "0 8px 24px rgba(110, 90, 124, 0.3)",
-                  color: "var(--color-heading)",
+                  color: "#ffffff",
                 }}
               >
                 Enter Mission Control

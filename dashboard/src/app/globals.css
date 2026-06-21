@@ -306,6 +306,10 @@ html[data-theme="light"] .focus-ring:focus-visible {
 /* ── Base ───────────────────────────────────── */
 * { box-sizing: border-box; }
 
+button:hover {
+  cursor: pointer;
+}
+
 body {
   background-color: var(--color-surface);
   color: var(--color-body);

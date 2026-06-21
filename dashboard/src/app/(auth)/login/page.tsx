@@ -43,12 +43,13 @@ export default function LoginPage() {
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="w-full max-w-sm sm:max-w-md"
-    >
+    <>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-sm sm:max-w-md"
+      >
       <div
         className="rounded-2xl p-6 sm:p-8 backdrop-blur-xl border shadow-2xl"
         style={{
@@ -60,16 +61,13 @@ export default function LoginPage() {
         {/* Logo + heading */}
         <div className="flex items-center gap-3 mb-6">
           <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center"
+            className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden shrink-0"
             style={{
-              background:
-                "linear-gradient(135deg, var(--color-brand), var(--color-accent-purple))",
+              background: "var(--color-neutral-secondary-medium)",
+              border: "1px solid var(--color-border-brand-subtle)",
             }}
           >
-            <LogIn
-              className="w-5 h-5"
-              style={{ color: "var(--color-heading)" }}
-            />
+            <img src="/images/logo/logo.svg" className="w-6 h-6 object-contain" alt="A2Z Logo" />
           </div>
           <div>
             <h1
@@ -214,7 +212,7 @@ export default function LoginPage() {
             style={{
               background:
                 "linear-gradient(135deg, var(--color-fg-brand), var(--color-accent-purple))",
-              color: "var(--color-heading)",
+              color: "#ffffff",
             }}
             aria-label="Log in to Mission Control"
           >
@@ -256,24 +254,23 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={() => setWalletModalOpen(true)}
-            className="w-full py-2.5 rounded-xl text-sm font-medium border transition-all hover:opacity-80 focus-ring flex items-center justify-center gap-2"
+            className="group relative w-full py-3 rounded-xl text-sm font-bold border transition-all duration-300 overflow-hidden focus-ring flex items-center justify-center gap-2 hover:border-[var(--color-border-brand)] hover:shadow-[0_0_15px_rgba(110,90,124,0.15)] active:scale-[0.98]"
             style={{
-              borderColor: "var(--color-border-default)",
-              color: "var(--color-body)",
-              background: "var(--color-neutral-secondary-medium)",
+              borderColor: "var(--color-border-brand-subtle)",
+              color: "var(--color-heading)",
+              background: "color-mix(in srgb, var(--color-surface) 40%, transparent)",
             }}
             aria-label="Connect Web3 wallet"
           >
-            <Wallet className="w-4 h-4" aria-hidden="true" />
-            Connect Wallet
+            {/* Subtle background glow on hover */}
+            <div className="absolute inset-0 bg-gradient-to-r from-[var(--color-brand)]/10 via-[var(--color-accent-purple)]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            
+            <Wallet className="w-4 h-4 text-[var(--color-fg-brand)] group-hover:scale-110 transition-transform duration-300 relative z-10" aria-hidden="true" />
+            <span className="relative z-10">Connect Web3 Wallet</span>
           </button>
         </div>
 
-        <WalletConnectModal
-          open={walletModalOpen}
-          onClose={() => setWalletModalOpen(false)}
-          onContinue={() => router.push("/dashboard")}
-        />
+
 
         {/* Register link */}
         <p
@@ -291,5 +288,12 @@ export default function LoginPage() {
         </p>
       </div>
     </motion.div>
+
+    <WalletConnectModal
+      open={walletModalOpen}
+      onClose={() => setWalletModalOpen(false)}
+      onContinue={() => router.push("/dashboard")}
+    />
+    </>
   );
 }

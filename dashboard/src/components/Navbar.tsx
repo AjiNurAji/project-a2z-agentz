@@ -1,5 +1,7 @@
 "use client";
 
+import React, { useState, useRef, useEffect } from "react";
+
 import { useDashboard } from "./DashboardContext";
 import { useAuth } from "./AuthProvider";
 import { Cpu, Menu, LogOut, User } from "lucide-react";
@@ -11,6 +13,18 @@ import { motion } from "motion/react";
 export default function Navbar() {
   const { kpiMetrics, agentAStatus, agentBStatus, setSidebarOpen } = useDashboard();
   const { user, loading, logout } = useAuth();
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setProfileOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
     <motion.header
@@ -59,22 +73,53 @@ export default function Navbar() {
           {loading ? (
             <div className="w-20 h-7 rounded-full animate-pulse" style={{ background: "var(--color-neutral-secondary-medium)" }} />
           ) : user ? (
-            <div className="flex items-center gap-2">
-              <div
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs"
-                style={{ background: "var(--color-neutral-secondary-medium)", border: "1px solid var(--color-border-default)" }}
-              >
-                <User className="w-3 h-3" style={{ color: "var(--color-fg-brand)" }} aria-hidden="true" />
-                <span className="text-[var(--color-body-subtle)] max-w-[120px] truncate hidden sm:inline-block">{user.email}</span>
-              </div>
+            <div className="relative" ref={profileRef}>
               <button
-                onClick={logout}
-                className="p-2 rounded-xl text-[var(--color-body-subtle)] hover:text-[var(--color-fg-danger)] hover:bg-[var(--color-neutral-secondary-medium)] transition-colors focus-ring"
-                aria-label="Log out"
-                title="Log out"
+                onClick={() => setProfileOpen(!profileOpen)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs hover:bg-[var(--color-neutral-secondary-medium)] transition-all focus-ring"
+                style={{ 
+                  background: profileOpen ? "var(--color-neutral-secondary-strong)" : "var(--color-neutral-secondary-medium)", 
+                  border: "1px solid var(--color-border-default)" 
+                }}
+                aria-label="User profile menu"
+                aria-expanded={profileOpen}
               >
-                <LogOut className="w-4 h-4" />
+                <User className="w-3.5 h-3.5" style={{ color: "var(--color-fg-brand)" }} aria-hidden="true" />
+                <span className="text-[var(--color-heading)] font-medium max-w-[120px] truncate hidden sm:inline-block">
+                  {user.email}
+                </span>
               </button>
+
+              {/* Profile Dropdown */}
+              {profileOpen && (
+                <div 
+                  className="absolute right-0 mt-2 w-56 rounded-xl shadow-2xl overflow-hidden py-1 border z-50 origin-top-right animate-in fade-in slide-in-from-top-2"
+                  style={{
+                    background: "var(--color-surface)",
+                    borderColor: "var(--color-border-default)",
+                  }}
+                >
+                  <div className="px-4 py-3 border-b mb-1" style={{ borderColor: "var(--color-border-default)" }}>
+                    <p className="text-[10px] font-bold tracking-wider uppercase mb-0.5" style={{ color: "var(--color-body-subtle)" }}>
+                      Signed in as
+                    </p>
+                    <p className="text-sm font-semibold truncate" style={{ color: "var(--color-heading)" }}>
+                      {user.email}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setProfileOpen(false);
+                      logout();
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm font-medium flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors focus-ring"
+                    style={{ color: "var(--color-fg-danger)" }}
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Log Out
+                  </button>
+                </div>
+              )}
             </div>
           ) : null}
           <div className="hidden xl:flex items-center gap-3 text-xs">

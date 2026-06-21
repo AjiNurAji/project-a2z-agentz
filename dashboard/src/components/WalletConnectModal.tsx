@@ -40,7 +40,7 @@ export default function WalletConnectModal({ open, onClose, onConnected, onConti
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 backdrop-blur-sm" role="presentation">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4 backdrop-blur-md transition-all" role="presentation">
       <div
         role="dialog"
         aria-modal="true"
@@ -48,14 +48,14 @@ export default function WalletConnectModal({ open, onClose, onConnected, onConti
         className="w-full max-w-md rounded-2xl p-6 shadow-2xl transition-all"
         style={{
           background: "color-mix(in srgb, var(--color-surface) 90%, transparent)",
-          border: "1px solid rgba(255, 255, 255, 0.08)",
+          border: "1px solid var(--color-border-default)",
           backdropFilter: "blur(20px)",
         }}
       >
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: "linear-gradient(135deg, var(--color-brand), var(--color-accent-purple))" }}>
-              <Wallet className="h-5 w-5" aria-hidden="true" style={{ color: "var(--color-heading)" }} />
+              <Wallet className="h-5 w-5" aria-hidden="true" style={{ color: "#ffffff" }} />
             </div>
             <div>
               <h2 id="wallet-connect-title" className="text-lg font-bold" style={{ color: "var(--color-heading)" }}>Connect Wallet</h2>
@@ -65,7 +65,7 @@ export default function WalletConnectModal({ open, onClose, onConnected, onConti
           <button
             onClick={onClose}
             aria-label="Close wallet connect modal"
-            className="rounded-lg p-2 focus-ring transition-colors hover:bg-white/5"
+            className="rounded-lg p-2 focus-ring transition-all hover:bg-black/5 dark:hover:bg-white/5"
             style={{ color: "var(--color-body-subtle)" }}
           >
             <X className="h-4 w-4" />
@@ -82,17 +82,17 @@ export default function WalletConnectModal({ open, onClose, onConnected, onConti
               }}
               disabled={wallet.state === "connecting"}
               aria-label={`Connect ${option.name}`}
-              className="flex w-full items-center justify-between gap-3 rounded-xl px-4 py-3 text-left transition-all hover:bg-white/5 disabled:opacity-60 focus-ring"
+              className="flex w-full items-center justify-between gap-3 rounded-xl px-4 py-3 text-left transition-all hover:border-[var(--color-border-brand)] hover:shadow-md disabled:opacity-60 focus-ring"
               style={{
-                border: "1px solid rgba(255, 255, 255, 0.06)",
-                background: "rgba(255, 255, 255, 0.02)",
+                border: "1px solid var(--color-border-default)",
+                background: "color-mix(in srgb, var(--color-neutral-secondary-soft) 40%, transparent)",
               }}
             >
-              <span>
-                <span className="block text-sm font-semibold" style={{ color: "var(--color-heading)" }}>{option.name}</span>
-                <span className="block text-xs" style={{ color: "var(--color-body-subtle)" }}>{option.description}</span>
-              </span>
-              <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${statusClass(option.status)}`}>{statusLabel(option.status)}</span>
+              <div className="flex-1 min-w-0 pr-3">
+                <span className="block text-sm font-semibold truncate" style={{ color: "var(--color-heading)" }}>{option.name}</span>
+                <span className="block text-xs mt-0.5" style={{ color: "var(--color-body-subtle)", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{option.description}</span>
+              </div>
+              <span className={`shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] font-semibold ${statusClass(option.status)}`}>{statusLabel(option.status)}</span>
             </button>
           ))}
         </div>
@@ -109,7 +109,7 @@ export default function WalletConnectModal({ open, onClose, onConnected, onConti
           </p>
         )}
 
-        <div className="mt-4 rounded-xl p-3 text-xs leading-relaxed" style={{ color: "var(--color-body-subtle)", border: "1px solid rgba(255, 255, 255, 0.04)", background: "rgba(255, 255, 255, 0.01)" }}>
+        <div className="mt-4 rounded-xl p-3 text-xs leading-relaxed" style={{ color: "var(--color-body-subtle)", border: "1px solid var(--color-border-default)", background: "color-mix(in srgb, var(--color-neutral-secondary-soft) 50%, transparent)" }}>
           Wallet login currently creates a frontend-only session until backend SIWE is implemented.
         </div>
 

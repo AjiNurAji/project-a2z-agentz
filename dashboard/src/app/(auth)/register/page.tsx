@@ -55,12 +55,13 @@ export default function RegisterPage() {
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="w-full max-w-sm sm:max-w-md"
-    >
+    <>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-sm sm:max-w-md"
+      >
       <div
         className="rounded-2xl p-6 sm:p-8 backdrop-blur-xl border shadow-2xl"
         style={{
@@ -72,16 +73,13 @@ export default function RegisterPage() {
         {/* Logo + heading */}
         <div className="flex items-center gap-3 mb-6">
           <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center"
+            className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden shrink-0"
             style={{
-              background:
-                "linear-gradient(135deg, var(--color-brand), var(--color-accent-purple))",
+              background: "var(--color-neutral-secondary-medium)",
+              border: "1px solid var(--color-border-brand-subtle)",
             }}
           >
-            <UserPlus
-              className="w-5 h-5"
-              style={{ color: "var(--color-heading)" }}
-            />
+            <img src="/images/logo/logo.svg" className="w-6 h-6 object-contain" alt="A2Z Logo" />
           </div>
           <div>
             <h1
@@ -290,14 +288,20 @@ export default function RegisterPage() {
               <button
                 type="button"
                 onClick={() => setWalletModalOpen(true)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1 text-[10px] font-semibold rounded-lg border transition-all hover:opacity-85 focus-ring"
+                className="group absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 text-[10px] font-bold rounded-lg border transition-all duration-300 focus-ring overflow-hidden flex items-center hover:border-[var(--color-border-brand)] hover:shadow-[0_0_10px_rgba(110,90,124,0.15)] active:scale-95"
                 style={{
-                  borderColor: "var(--color-border-default)",
-                  color: "var(--color-body)",
-                  background: "var(--color-neutral-secondary-strong)",
+                  borderColor: "var(--color-border-brand-subtle)",
+                  color: "var(--color-heading)",
+                  background: "color-mix(in srgb, var(--color-surface) 80%, transparent)",
                 }}
               >
-                Connect
+                {/* Subtle background glow on hover */}
+                <div className="absolute inset-0 bg-gradient-to-r from-[var(--color-brand)]/10 to-[var(--color-accent-purple)]/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                
+                <span className="relative z-10 flex items-center gap-1.5">
+                  <Wallet className="w-3 h-3 text-[var(--color-fg-brand)] group-hover:scale-110 transition-transform duration-300" aria-hidden="true" />
+                  Connect
+                </span>
               </button>
             </div>
             {errors.walletAddress && (
@@ -320,7 +324,7 @@ export default function RegisterPage() {
             style={{
               background:
                 "linear-gradient(135deg, var(--color-fg-brand), var(--color-accent-purple))",
-              color: "var(--color-heading)",
+              color: "#ffffff",
             }}
             aria-label="Create account"
           >
@@ -341,12 +345,7 @@ export default function RegisterPage() {
           </button>
         </form>
 
-        <WalletConnectModal
-          open={walletModalOpen}
-          onClose={() => setWalletModalOpen(false)}
-          onConnected={(session) => setWalletAddress(session.address)}
-          onContinue={() => router.push("/dashboard")}
-        />
+
 
         {/* Login link */}
         <p
@@ -364,5 +363,13 @@ export default function RegisterPage() {
         </p>
       </div>
     </motion.div>
+
+    <WalletConnectModal
+      open={walletModalOpen}
+      onClose={() => setWalletModalOpen(false)}
+      onConnected={(session) => setWalletAddress(session.address)}
+      onContinue={() => router.push("/dashboard")}
+    />
+    </>
   );
 }

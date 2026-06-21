@@ -845,6 +845,34 @@ npm run build
 
 ---
 
+## Sesi 21 — 2026-06-21 | Penyempurnaan UI/UX & Refaktor Komponen Dashboard
+
+### 📌 Ringkasan
+Sesi ini difokuskan pada penyempurnaan UI/UX di berbagai bagian aplikasi, terutama pada halaman otentikasi (Login/Register), *Landing Page*, dan *Navbar Dashboard*. Penyesuaian dilakukan untuk memastikan komponen terlihat premium, responsif, dan konsisten di mode terang (Light Mode) maupun gelap (Dark Mode).
+
+### ✅ Hal yang Berhasil Dikerjakan
+
+| Item | Detail |
+|------|--------|
+| **Wallet Connect Modal UI** | Menyesuaikan modal agar mendukung Light/Dark mode sepenuhnya. Memperbaiki *backdrop blur* yang sebelumnya terlalu gelap, dan mencegah background tumpah (*spill-out*) akibat konflik konteks z-index dengan motion.div. Menambahkan efek *glassmorphism* pada tombol pilihan wallet. |
+| **Penyelarasan Warna & Kontras** | Memperbaiki kontras teks pada seluruh tombol *primary gradient* (seperti Launch App, Enter Mission Control, dll) sehingga teks diubah menjadi putih secara permanen. Memperbaiki warna ikon pada popup *Wallet Connect* yang sebelumnya hitam di Light Mode. |
+| **Ikon App Logo** | Mengganti *placeholder icon* (lucide icons) pada halaman *Login* dan *Register* dengan aset SVG logo A2Z Agentz yang digunakan di Navbar. |
+| **Responsive Landing Page** | Mengurangi *padding* vertikal dan horizontal pada layout utama *Landing Page* (py-20 menjadi py-12) agar konten dapat termuat di layar tanpa menyebabkan *scroll bar* berlebih. |
+| **Refaktor Navbar Dashboard** | Memindahkan tombol *Log Out* yang sebelumnya berdiri sendiri di *header* ke dalam sebuah komponen *Dropdown Menu* yang terintegrasi dengan lencana profil pengguna (*Profile Badge*), membuat *header* lebih rapi dan elegan. |
+| **Hapus Middleware.ts** | Menghapus file middleware.ts dari folder src/ karena aplikasi sudah memanfaatkan sistem *proxy* pada konfigurasi 
+ext.config.ts, serta fitur routing AuthProvider sisi *client* yang sudah cukup robust. |
+
+### ✏️ File yang DIUBAH
+
+| File | Lokasi | Detail Perubahan |
+|------|--------|-----------------|
+| page.tsx | /dashboard/src/app/(auth)/login/ | Memperbarui desain *button*, mengubah ikon menjadi logo SVG, dan memperbaiki letak komponen *Wallet Connect Modal*. |
+| page.tsx | /dashboard/src/app/(auth)/register/ | Memperbarui desain *button*, mengubah ikon menjadi logo SVG, dan memperbaiki letak komponen *Wallet Connect Modal*. |
+| page.tsx | /dashboard/src/app/(landing)/ | Menyesuaikan _spacing_ layout utama agar tidak meluber, mengubah *hover behavior* tombol navigasi, dan menyesuaikan warna teks kontras pada Light Mode. |
+| WalletConnectModal.tsx | /dashboard/src/components/ | Menyesuaikan palet warna, transparansi, warna font/ikon, serta layout lex deskripsi wallet yang terlalu panjang. |
+| Navbar.tsx | /dashboard/src/components/ | Membungkus lencana profil dan tombol _Log Out_ dalam komponen antarmuka menu *dropdown* dengan _click-outside handler_. |
+| middleware.ts | /dashboard/src/ | **[DIHAPUS]** File *middleware* ditiadakan untuk merapikan *routing*. |
+
 ## 📊 Ringkasan Total Perubahan (Semua Sesi)
 
 | Kategori | Jumlah |

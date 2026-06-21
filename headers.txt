@@ -1,0 +1,29 @@
+Line 7: ## Sesi 1 — 2026-06-16 | Inisialisasi Dokumentasi & Arsitektur
+Line 25: ## Sesi 2 — 2026-06-16 | Pembangunan Frontend Phase 1 (Dashboard MVP)
+Line 46: ## Sesi 3 — 2026-06-16 | Peningkatan UI/UX Pro Max (Phase 1.5)
+Line 63: ## Sesi 4 — 2026-06-16 | Pembuatan PRD.md
+Line 73: ## Sesi 5 — 2026-06-16 | Perluasan Frontend Multi-Halaman (Phase 2)
+Line 110: ## Sesi 6 — 2026-06-17 | **AMD Stack Alignment — Migrasi ke Toolchain AMD-Native**
+Line 152: ## 📊 Ringkasan Total Perubahan (Semua Sesi)
+Line 172: ## 🔍 Status Build Terakhir
+Line 195: ## 🗂️ Struktur Direktori Akhir
+Line 279: ## Sesi 6 — 2026-06-17 | Pondasi Modular Agent B, Fix raw_transaction, dan Async JSON Task Listener
+Line 307: ## Sesi 7 — 2026-06-18 | Bug Fixes & Peningkatan UX Dashboard
+Line 331: ## Sesi 9 — 2026-06-19 | Infrastruktur Backend Akhir & Deployment Engine Agent B
+Line 347: ## Sesi 8 — 2026-06-18 | Lanjutan Perbaikan Bug UI & Hydration Dashboard
+Line 383: ## Sesi 9 — 2026-06-18 | UI/UX Audit — 16 Fitur Baru + TypeUI Design System
+Line 470: ## Sesi 10 — 2026-06-18 | Dashboard Overhaul — Bug Fixes, Component Integration & Visual Polish
+Line 537: ## Sesi 11 — 2026-06-19 | Visual Overhaul v2 — Signature Animations & Theme System
+Line 563: ## Sesi 12 — 2026-06-19 | Full Pipeline Agent A & Cryptographic Handshake
+Line 569: ## Sesi 12 — 2026-06-19 | Infrastruktur Backend Akhir & Deployment Engine Agent B
+Line 612: ## Sesi 13 — 2026-06-20 | Backend Local Testing & Environment Fixes
+Line 650: ## 📊 Ringkasan Total Perubahan (Semua Sesi)
+Line 664: ## 🔍 Status Build Terakhir
+Line 679: ## Sesi 14 — 2026-06-19 | Landing Page Redesign & Overhaul, Interactive Particle Canvas & Responsive Layout
+Line 715: ## 🗂️ Struktur Direktori Akhir
+Line 759: ## Sesi 14 — 2026-06-19 | Implementasi Core Backend & Database (Starlette)
+Line 790: ## 🗂️ Struktur Direktori Akhir (Update Sesi 14)
+Line 813: ## Sesi 14 ΓÇö 2026-06-19 | Landing Page Redesign & Overhaul, Interactive Particle Canvas & Responsive Layout
+Line 849: ## Sesi 15 — 2026-06-19 | Penyatuan Backend & Integrasi Frontend (API Mapping)
+Line 877: ## Sesi 16 — 2026-06-20 | Autentikasi (Login/Register) & Sinkronisasi Landing ↔ Dashboard
+Line 937: ## Sesi 14 — 2026-06-20 | Implementasi Backend Authentication System (JWT + bcrypt)
