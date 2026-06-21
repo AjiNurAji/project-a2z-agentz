@@ -876,6 +876,31 @@ npm run build — 2026-06-21
 
 ---
 
+## Sesi 20 — 2026-06-21 | Perbaikan UI/UX Responsivitas & Bug Tema Terang
+
+### 📌 Ringkasan
+Sesi ini berfokus pada perbaikan responsivitas layout komponen header pada layar kecil (mobile) serta penyelesaian bug sinkronisasi status tema (Light/Dark mode) yang menyebabkan komponen 3D canvas di Landing Page tidak ter-render dengan benar saat berpindah mode.
+
+### ✅ Hal yang Berhasil Dikerjakan
+
+| Item | Detail |
+|------|--------|
+| **Responsivitas Navbar Dashboard** | Mengatasi tata letak header yang berantakan di layar kecil dengan menerapkan `hidden sm:inline-block` pada email pengguna dan `hidden xl:flex` pada panel status agen. Ini membuat ruang header lebih ringkas di mobile. |
+| **Integrasi ThemeToggle di Landing** | Menambahkan komponen `ThemeToggle` ke bagian header dari Landing Page (`page.tsx`) agar pengguna dapat mengubah tema secara langsung dari halaman depan tanpa harus login terlebih dahulu. Mengganti semua hardcoded hex gelap menjadi CSS Variables (`var(--color-surface)`). |
+| **Fix State Mismatch AgentScene** | Mengubah pendekatan styling `AgentScene.tsx` dari yang awalnya bergantung pada *React state local* (`isLight` dari `useTheme()`) menjadi murni CSS Variables. Ini mengatasi efek kusam abu-abu pada Landing Page karena *state mismatch* antara DOM Global dan React State. |
+| **Penyesuaian Vignette & Blend Mode** | Menambahkan `.blend-scene` class di `globals.css` untuk otomatis mengubah `mix-blend-screen` (gelap) menjadi `mix-blend-multiply` (terang). Selain itu, memperbaiki bug *vignette* hitam di ujung layar pada light mode dengan fungsi `color-mix(in srgb, var(--color-surface) 85%, black)` agar bayangan beradaptasi secara natural. |
+
+### ✏️ File yang DIUBAH
+
+| File | Lokasi | Detail Perubahan |
+|------|--------|-----------------|
+| `Navbar.tsx` | `dashboard/src/components/` | Penambahan class responsif (`hidden`) pada elemen email dan status agen. |
+| `page.tsx` | `dashboard/src/app/(landing)/` | Penambahan `ThemeToggle`, penggantian warna *background* hex ke `var(--color-surface)`. |
+| `globals.css` | `dashboard/src/app/` | Penambahan class `.blend-scene` untuk penanganan *mix-blend-mode* otomatis. |
+| `AgentScene.tsx` | `dashboard/src/components/landing/` | Penghapusan `useTheme()`, penerapan CSS variables penuh, pembaruan gradasi *vignette* dengan `color-mix`. |
+
+---
+
 ---
 
 ## 🗂️ Struktur Direktori Akhir
