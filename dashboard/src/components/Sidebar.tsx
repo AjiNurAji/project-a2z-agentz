@@ -37,9 +37,10 @@ function StatusDot({ status }: { status: string }) {
 
 
 
-// Generate mock heartbeat data
+// Static heartbeat data to prevent random jumping on every render
+const STATIC_HEARTBEAT = [0.5, 0.5, 0.6, 1.0, 0.2, 0.5, 0.5, 0.5, 0.4, 0.5];
 function generateHeartbeatData(): number[] {
-  return Array.from({ length: 10 }, () => Math.random() * 0.7 + 0.3);
+  return STATIC_HEARTBEAT;
 }
 
 export default function Sidebar() {

@@ -172,134 +172,25 @@ export function useDashboard() {
   return ctx;
 }
 
-// ─── Generators ─────────────────────────────────────────────
-const PROJECTS = [
-  "ZeroGravity Protocol", "NeuralFi", "BaseSwap V3", "OmniLayer DAO",
-  "CryptoNest", "DeFi Nexus", "ChainLink Base", "Arbitrage Bot X",
-  "Yield Optimizer Pro", "FlashLoan Gate",
-];
-
-const FARCASTER_MSGS = [
-  "Scanning Farcaster channel /defi — 342 casts analyzed",
-  "High-alpha signal detected: ZeroGravity Protocol gaining traction",
-  "KOL @vitalik.eth mentioned NeuralFi in thread",
-  "Llama 3 sentiment analysis: 78% positive on BaseSwap V3",
-  "Embedding 128 new posts into ChromaDB vector store",
-  "Similarity score 0.91 — project not in cache, proceeding",
-  "On-chain check: Contract verified on Basescan",
-  "TVL fetched: $2.1M — above $500k threshold",
-  "Score Engine: Sentiment 70pts + TVL 28pts = Total 98/100",
-  "Payload assembled, signing with Agent A private key...",
-  "Cryptographic signature attached (ECDSA secp256k1)",
-  "Sending to Agent B Vault API: POST /api/v1/vault/execute",
-];
-
-const AGENT_B_MSGS = [
-  "Vault received payload from Agent A",
-  "Signature verified — public key matches whitelist",
-  "Timestamp freshness check passed (< 30s)",
-  "Idempotency check: Hash not found in PostgreSQL",
-  "Gas oracle pinged: 42 Gwei avg, setting maxFee to 48.3 Gwei",
-  "Running Tenderly dry-run simulation...",
-  "Simulation passed — no revert detected",
-  "Broadcasting tx to Base mainnet via Alchemy RPC...",
-  "Tx included in block #21,847,392",
-];
-
 function randInt(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-function randFrom<T>(arr: T[]): T {
-  return arr[randInt(0, arr.length - 1)];
 }
 function genId() {
   return Math.random().toString(36).slice(2, 10);
 }
-function genAddress() {
-  return "0x" + Array.from({ length: 40 }, () => "0123456789abcdef"[randInt(0, 15)]).join("");
-}
 function genTxHash() {
   return "0x" + Array.from({ length: 64 }, () => "0123456789abcdef"[randInt(0, 15)]).join("");
 }
-
-function genInitialTransactions(): Transaction[] {
-  return Array.from({ length: 8 }, (_, i) => ({
-    id: genId(),
-    projectName: PROJECTS[i % PROJECTS.length],
-    targetAddress: genAddress(),
-    amountUsd: +(Math.random() * 1.8 + 0.2).toFixed(2),
-    status: (["success", "success", "success", "failed"] as TxStatus[])[randInt(0, 3)],
-    txHash: genTxHash(),
-    timestamp: new Date(Date.now() - (8 - i) * 4 * 60000),
-    reason: "High positive sentiment on Farcaster + Verified TVL > 500k",
-    gasUsedGwei: randInt(35, 65),
-  }));
+function genAddress() {
+  return "0x" + Array.from({ length: 40 }, () => "0123456789abcdef"[randInt(0, 15)]).join("");
 }
 
-function genInitialApprovals(): ApprovalItem[] {
-  return Array.from({ length: 3 }, () => ({
-    id: genId(),
-    projectName: randFrom(PROJECTS),
-    targetAddress: genAddress(),
-    amountUsd: +(Math.random() * 8 + 2.1).toFixed(2),
-    reason: "TVL > $5M & KOL engagement detected. Exceeds $2 cap — requires manual approval.",
-    llmScore: randInt(86, 99),
-    createdAt: new Date(Date.now() - randInt(1, 15) * 60000),
-    signature: "0x" + Array.from({ length: 20 }, () => "0123456789abcdef"[randInt(0, 15)]).join("") + "...",
-  }));
-}
-
-function genInitialVectorMemory(): VectorMemoryItem[] {
-  return Array.from({ length: 12 }, (_, i) => ({
-    id: genId(),
-    projectName: PROJECTS[i % PROJECTS.length],
-    contractAddress: genAddress(),
-    similarityScore: +(Math.random() * 0.5 + 0.5).toFixed(3),
-    embeddingStatus: (["indexed", "indexed", "indexed", "processing", "blacklisted"] as VectorMemoryItem["embeddingStatus"][])[randInt(0, 4)],
-    source: (["Farcaster", "Twitter", "On-Chain"] as VectorMemoryItem["source"][])[randInt(0, 2)],
-    tvl: randInt(100000, 8000000),
-    indexedAt: new Date(Date.now() - randInt(5, 120) * 60000),
-  }));
-}
-
-function genGasHistory(): GasDataPoint[] {
-  const now = Date.now();
-  return Array.from({ length: 24 }, (_, i) => ({
-    time: new Date(now - (23 - i) * 3600000).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-    gwei: randInt(28, 85),
-  }));
-}
-
-function genTvlHistory(): TvlDataPoint[] {
-  let tvl = 1200000;
-  return Array.from({ length: 30 }, (_, i) => {
-    tvl += randInt(-50000, 180000);
-    return { time: `Day ${i + 1}`, tvl: Math.max(tvl, 800000) };
-  });
-}
-
-function genSuccessHistory(): SuccessDataPoint[] {
-  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  return days.map((d) => ({ time: d, success: randInt(8, 24), failed: randInt(0, 5) }));
-}
+// (Dummy generators removed)
 
 const DEFAULT_CONFIG: DashboardConfig = {
   agentA: { cronSchedule: "0 * * * *", sentimentWeight: 70, tvlWeight: 30, scoreThreshold: 85, sources: ["Farcaster", "Twitter", "On-Chain"] },
   agentB: { kmsRegion: "us-east-1", primaryRpc: "https://base-mainnet.g.alchemy.com/v2/YOUR_KEY", fallbackRpc: "https://mainnet.base.org", autonomousCap: 2.0, gasBuffer: 15 },
 };
-
-// ─── A2A Message Generator ──────────────────────────────────
-function genAgentConversation(): AgentMessage[] {
-  const now = Date.now();
-  return [
-    { id: genId(), sender: "system", content: "A2A session initialized. Agents connected via secure channel.", timestamp: new Date(now - 120000), status: "done" },
-    { id: genId(), sender: "agent_a", content: "Starting DeFi scan cycle. Analyzing Farcaster + Twitter signals...", timestamp: new Date(now - 100000), status: "done" },
-    { id: genId(), sender: "agent_a", content: "Found candidate: ZeroGravity Protocol. TVL $2.1M, sentiment 92% positive.", timestamp: new Date(now - 80000), status: "done", metadata: { projectName: "ZeroGravity Protocol", score: 92 } },
-    { id: genId(), sender: "agent_b", content: "Received payload. Verifying signature and running dry-run simulation...", timestamp: new Date(now - 60000), status: "done" },
-    { id: genId(), sender: "agent_b", content: "Simulation passed. Broadcasting tx to Base mainnet.", timestamp: new Date(now - 40000), status: "done", metadata: { txHash: genTxHash().slice(0, 18) + "..." } },
-    { id: genId(), sender: "agent_a", content: "Tx confirmed. Moving to next candidate: NeuralFi (KOL signal detected).", timestamp: new Date(now - 20000), status: "done" },
-  ];
-}
 
 export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
@@ -326,7 +217,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     activeAlerts: 0,
   });
   const [config, setConfig] = useState<DashboardConfig>(DEFAULT_CONFIG);
-  const [agentMessages, setAgentMessages] = useState<AgentMessage[]>(genAgentConversation());
+  const [agentMessages, setAgentMessages] = useState<AgentMessage[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
   const [lastSync, setLastSync] = useState<number>(Date.now());
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -407,11 +298,19 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const initData = async () => {
-      // Set some initial history metrics for the charts since API doesn't provide them yet
-      setVectorMemory(genInitialVectorMemory());
-      setGasHistory(genGasHistory());
-      setTvlHistory(genTvlHistory());
-      setSuccessHistory(genSuccessHistory());
+      // Start with flatline histories to represent real data state
+      const now = Date.now();
+      const flatGas = Array.from({ length: 24 }, (_, i) => ({
+        time: new Date(now - (23 - i) * 3600000).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+        gwei: 0,
+      }));
+      const flatTvl = Array.from({ length: 30 }, (_, i) => ({ time: `Day ${i + 1}`, tvl: 0 }));
+      const flatSuccess = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => ({ time: d, success: 0, failed: 0 }));
+
+      setVectorMemory([]);
+      setGasHistory(flatGas);
+      setTvlHistory(flatTvl);
+      setSuccessHistory(flatSuccess);
       
       await fetchDashboardData();
       setMounted(true);

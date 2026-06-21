@@ -6,19 +6,10 @@ import KpiCard from "./KpiCard";
 import { Activity, TrendingUp, Zap, Fuel, ScanSearch, AlertTriangle } from "lucide-react";
 
 export default function DashboardKpis() {
-  const { kpiMetrics } = useDashboard();
+  const { kpiMetrics, tvlHistory, successHistory } = useDashboard();
   const prevMetricsRef = useRef(kpiMetrics);
   const [lastChangedIndex, setLastChangedIndex] = useState<number>(-1);
   const pulseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Sparkline generator helper
-  const genSpark = (base: number, n = 7): number[] => {
-    let v = base;
-    return Array.from({ length: n }, () => {
-      v += (Math.random() - 0.45) * base * 0.1;
-      return Math.max(0, v);
-    });
-  };
 
   useEffect(() => {
     const prev = prevMetricsRef.current;
@@ -50,7 +41,7 @@ export default function DashboardKpis() {
         iconTooltip="Total value locked across all scanned DeFi protocols"
         index={0}
         showPulse={lastChangedIndex === 0}
-        sparkData={genSpark(kpiMetrics.totalTvlAnalyzed / 1_000_000)}
+        sparkData={tvlHistory && tvlHistory.length > 0 ? tvlHistory.map(t => t.tvl / 1000000) : [0, 0, 0, 0]}
       />
       <KpiCard
         label="Success Rate"
@@ -66,7 +57,7 @@ export default function DashboardKpis() {
         iconTooltip="Percentage of transactions that completed successfully"
         index={1}
         showPulse={lastChangedIndex === 1}
-        sparkData={genSpark(kpiMetrics.successRate)}
+        sparkData={successHistory && successHistory.length > 0 ? successHistory.map(s => s.success) : [0, 0, 0, 0]}
       />
       <KpiCard
         label="Total Txs"
@@ -79,7 +70,7 @@ export default function DashboardKpis() {
         iconTooltip="Total transactions executed on Base Network"
         index={2}
         showPulse={lastChangedIndex === 2}
-        sparkData={genSpark(kpiMetrics.totalTransactions || 1)}
+        sparkData={successHistory && successHistory.length > 0 ? successHistory.map(s => s.success + s.failed) : [0, 0, 0, 0]}
       />
       <KpiCard
         label="Gas Saved"

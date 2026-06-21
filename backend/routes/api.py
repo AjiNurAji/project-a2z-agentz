@@ -12,7 +12,7 @@ import database
 from agent_a_scraper import normalize_address
 from agent_a_chroma import check_semantic_similarity
 from agent_a_inference import run_ai_inference, DEFAULT_MODEL
-from agent_b import _usd_to_wei, _idempotency_key, AUTONOMOUS_CAP_USD
+from agent_b import _usd_to_wei, _idempotency_key, AUTONOMOUS_CAP_USD, _format_with_deepseek
 from web3_client import simulate_and_execute_tx
 
 # Also add backend directory so we can import auth module
@@ -224,14 +224,20 @@ async def analyze_target(request: Request):
                 val_wei = _usd_to_wei(ai_result.amount_usd)
                 tx_hash = simulate_and_execute_tx(checksum, val_wei)
                 database.insert_execution_log(tx_hash_id=log_key, address=checksum, amount=ai_result.amount_usd, status="SUCCESS")
+                
+                ai_message = _format_with_deepseek("autonomous_execution", checksum, ai_result.amount_usd, "SUCCESS", tx_hash)
                 response_payload["status"] = "executed"
                 response_payload["tx_hash"] = tx_hash
+                response_payload["message"] = ai_message
             except Exception as exc:
                 response_payload["status"] = "execution_failed"
                 response_payload["message"] = str(exc)
         else:
             database.insert_execution_log(tx_hash_id=log_key, address=checksum, amount=ai_result.amount_usd, status="PENDING_APPROVAL")
+            
+            ai_message = _format_with_deepseek("queue_for_approval", checksum, ai_result.amount_usd, "PENDING_APPROVAL", None)
             response_payload["status"] = "pending_approval"
+            response_payload["message"] = ai_message
     else:
         # Blacklist if <= 85
         with database._get_cursor() as cur:

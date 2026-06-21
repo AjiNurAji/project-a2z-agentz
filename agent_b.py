@@ -58,6 +58,8 @@ from web3_client import (
     recover_signer,
     simulate_and_execute_tx,
 )
+import requests
+import json
 
 
 # ----------------------------------------------------------------------------
@@ -159,6 +161,57 @@ def _usd_to_wei(amount_usd: float) -> int:
     return int((float(amount_usd) / ETH_USD_RATE) * 10**18)
 
 
+def _format_with_deepseek(action: str, target: str, amount: float, status: str, tx_hash: Optional[str] = None) -> str:
+    """
+    Format a clean JSON response message using DeepSeek Coder (or fallback mock).
+    """
+    endpoint = os.getenv("DEEPSEEK_ENDPOINT", "").strip()
+    api_key = os.getenv("DEEPSEEK_API_KEY", "").strip()
+    
+    prompt = (
+        f"Format the following transaction execution result into a clean, single-line JSON string. "
+        f"Action: {action}, Target: {target}, Amount USD: {amount}, Status: {status}, TxHash: {tx_hash}. "
+        f"Return ONLY valid JSON with keys: action, target, amount_usd, status, message."
+    )
+    
+    if not endpoint or not api_key:
+        logger.debug("DEEPSEEK_ENDPOINT or DEEPSEEK_API_KEY missing. Using mock DeepSeek formatter.")
+        return json.dumps({
+            "action": action,
+            "target": target,
+            "amount_usd": amount,
+            "status": status,
+            "message": f"DeepSeek Mock: Successfully formatted {status} execution."
+        })
+        
+    try:
+        url = endpoint.rstrip("/") + "/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": "deepseek-coder",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.1
+        }
+        resp = requests.post(url, headers=headers, json=payload, timeout=10.0)
+        resp.raise_for_status()
+        content = resp.json()["choices"][0]["message"]["content"]
+        # Ensure it's valid JSON
+        json.loads(content)
+        return content.strip()
+    except Exception as exc:
+        logger.warning(f"DeepSeek formatting failed, using fallback. Error: {exc}")
+        return json.dumps({
+            "action": action,
+            "target": target,
+            "amount_usd": amount,
+            "status": status,
+            "message": f"DeepSeek formatting failed: {exc}"
+        })
+
+
 # ----------------------------------------------------------------------------
 # FastAPI app
 # ----------------------------------------------------------------------------
@@ -244,13 +297,18 @@ def vault_execute(req: VaultExecuteRequest) -> VaultExecuteResponse:
                 ),
             )
 
+        ai_message = _format_with_deepseek(
+            action="autonomous_execution",
+            target=req.project_target_address,
+            amount=req.amount_usd,
+            status="SUCCESS",
+            tx_hash=tx_hash
+        )
+
         return VaultExecuteResponse(
             status="SUCCESS",
             tx_hash=tx_hash,
-            message=(
-                f"Autonomous execution OK within ${AUTONOMOUS_CAP_USD} cap "
-                f"(amount=${req.amount_usd})."
-            ),
+            message=ai_message,
         )
 
     # Above cap: queue for manual approval, no on-chain action.
@@ -268,13 +326,18 @@ def vault_execute(req: VaultExecuteRequest) -> VaultExecuteResponse:
             detail=f"Failed to queue for approval: {exc}",
         )
 
+    ai_message = _format_with_deepseek(
+        action="queue_for_approval",
+        target=req.project_target_address,
+        amount=req.amount_usd,
+        status="PENDING_APPROVAL",
+        tx_hash=None
+    )
+
     return VaultExecuteResponse(
         status="PENDING_APPROVAL",
         tx_hash=None,
-        message=(
-            f"Amount ${req.amount_usd} exceeds autonomous cap "
-            f"(${AUTONOMOUS_CAP_USD}); queued for manual approval."
-        ),
+        message=ai_message,
     )
 
 
