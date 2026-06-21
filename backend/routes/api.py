@@ -59,13 +59,22 @@ async def get_stats(request: Request):
             cur.execute("SELECT SUM(amount_usd) as total_usd FROM execution_logs WHERE UPPER(status) = 'SUCCESS'")
             total_usd = cur.fetchone()["total_usd"] or 0.0
 
+            # Projects Scanned
+            cur.execute("SELECT COUNT(*) as scanned FROM target_addresses")
+            projects_scanned = cur.fetchone()["scanned"] or 0
+            
+            # Simulated TVL Analyzed (For demo, assume average project has $1.2M TVL)
+            total_tvl = projects_scanned * 1200000
+
             success_rate = (success_tx / total_tx * 100) if total_tx > 0 else 0
 
             return JSONResponse({
                 "total_transactions": total_tx,
                 "success_rate": round(success_rate, 2),
                 "total_usd_sent": float(total_usd),
-                "active_targets": 0
+                "active_targets": 0,
+                "projects_scanned": projects_scanned,
+                "total_tvl": total_tvl
             })
     except Exception as e:
         return JSONResponse({"detail": str(e)}, status_code=500)

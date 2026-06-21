@@ -275,7 +275,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     try {
       const [statusData, statsData] = await Promise.all([
         apiFetch<{ logs?: Array<{ tx_hash_id: string; project_target_address: string; amount_usd: number; status: string; created_at: string }> }>("/api/status"),
-        apiFetch<{ total_transactions: number; success_rate: number; total_usd_sent: number; active_targets: number }>("/api/stats")
+        apiFetch<{ total_transactions: number; success_rate: number; total_usd_sent: number; active_targets: number; projects_scanned?: number; total_tvl?: number }>("/api/stats")
       ]);
 
       if (statusData?.logs) {
@@ -289,6 +289,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           successRate: statsData.success_rate,
           totalTransactions: statsData.total_transactions,
           gasSavedUsd: +(statsData.total_transactions * 0.08).toFixed(2),
+          projectsScanned: statsData.projects_scanned || 0,
+          totalTvlAnalyzed: statsData.total_tvl || 0,
         }));
       }
     } catch (e) {
