@@ -19,9 +19,15 @@ export interface AgentLogPayload {
   };
 }
 
+export interface SystemLogPayload {
+  level: "INFO" | "WARN" | "SUCCESS" | "ERROR" | "AGENT_A" | "AGENT_B";
+  message: string;
+}
+
 export interface WsMessageHandlers {
   onTransactions?: (txs: RawTransaction[]) => void;
   onAgentLog?: (log: AgentLogPayload) => void;
+  onSystemLog?: (log: SystemLogPayload) => void;
   onStatusChange?: (status: WsStatus) => void;
 }
 
@@ -74,6 +80,8 @@ export function createAgentSocket(handlers: WsMessageHandlers): AgentSocketContr
         handlers.onTransactions?.(msg.data as RawTransaction[]);
       } else if (msg.type === "AGENT_LOG") {
         handlers.onAgentLog?.(msg.data as AgentLogPayload);
+      } else if (msg.type === "SYSTEM_LOG") {
+        handlers.onSystemLog?.(msg.data as SystemLogPayload);
       }
     };
 

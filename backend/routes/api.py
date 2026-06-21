@@ -18,6 +18,7 @@ from web3_client import simulate_and_execute_tx
 # Also add backend directory so we can import auth module
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from auth import verify_access_token
+from routes.websockets import manager
 
 API_KEY = os.getenv("API_KEY", "your_secret_api_key_for_agents")
 
@@ -186,6 +187,7 @@ async def analyze_target(request: Request):
     # 2. Blacklist Check
     status_db = database.get_target_status(checksum)
     if isinstance(status_db, str) and status_db.strip().upper() == "BLACKLISTED":
+        await manager.broadcast(json.dumps({"type": "SYSTEM_LOG", "data": {"level": "WARN", "message": f"{project_name} ({checksum}) is blacklisted. Bypassing."}}))
         return JSONResponse({
             "status": "bypassed", 
             "message": "Address is blacklisted", 
@@ -205,7 +207,19 @@ async def analyze_target(request: Request):
         })
 
     # 4. AI Inference
+    await manager.broadcast(json.dumps({"type": "SYSTEM_LOG", "data": {"level": "INFO", "message": f"Agent A running inference on {project_name}..."}}))
     ai_result = run_ai_inference(description, checksum, DEFAULT_MODEL)
+    
+    # Broadcast Agent A log to Agent Communication UI
+    agent_a_msg = f"Analyzed {project_name}. Score: {ai_result.score}/100. Category: {ai_result.category}. Reason: {ai_result.reason}"
+    await manager.broadcast(json.dumps({
+        "type": "AGENT_LOG", 
+        "data": {
+            "sender": "agent_a", 
+            "content": agent_a_msg,
+            "metadata": {"score": ai_result.score, "projectName": project_name}
+        }
+    }))
     
     response_payload = {
         "step": "inference",
@@ -235,16 +249,41 @@ async def analyze_target(request: Request):
                 database.insert_execution_log(tx_hash_id=log_key, address=checksum, amount=ai_result.amount_usd, status="SUCCESS")
                 
                 ai_message = _format_with_deepseek("autonomous_execution", checksum, ai_result.amount_usd, "SUCCESS", tx_hash)
+                
+                # Broadcast Agent B log
+                await manager.broadcast(json.dumps({
+                    "type": "AGENT_LOG", 
+                    "data": {
+                        "sender": "agent_b", 
+                        "content": ai_message,
+                        "metadata": {"txHash": tx_hash, "amountUsd": ai_result.amount_usd, "projectName": project_name}
+                    }
+                }))
+                await manager.broadcast(json.dumps({"type": "SYSTEM_LOG", "data": {"level": "SUCCESS", "message": f"Agent B autonomously executed ${ai_result.amount_usd} to {project_name} (Tx: {tx_hash})" }}))
+                
                 response_payload["status"] = "executed"
                 response_payload["tx_hash"] = tx_hash
                 response_payload["message"] = ai_message
             except Exception as exc:
                 response_payload["status"] = "execution_failed"
                 response_payload["message"] = str(exc)
+                await manager.broadcast(json.dumps({"type": "SYSTEM_LOG", "data": {"level": "ERROR", "message": f"Execution failed for {project_name}: {exc}" }}))
         else:
             database.insert_execution_log(tx_hash_id=log_key, address=checksum, amount=ai_result.amount_usd, status="PENDING_APPROVAL")
             
             ai_message = _format_with_deepseek("queue_for_approval", checksum, ai_result.amount_usd, "PENDING_APPROVAL", None)
+            
+            # Broadcast Agent B log
+            await manager.broadcast(json.dumps({
+                "type": "AGENT_LOG", 
+                "data": {
+                    "sender": "agent_b", 
+                    "content": ai_message,
+                    "metadata": {"amountUsd": ai_result.amount_usd, "projectName": project_name}
+                }
+            }))
+            await manager.broadcast(json.dumps({"type": "SYSTEM_LOG", "data": {"level": "WARN", "message": f"Amount ${ai_result.amount_usd} for {project_name} exceeds autonomous cap. Queued for approval." }}))
+            
             response_payload["status"] = "pending_approval"
             response_payload["message"] = ai_message
     else:

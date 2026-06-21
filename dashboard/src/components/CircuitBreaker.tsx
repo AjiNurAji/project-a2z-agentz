@@ -60,9 +60,20 @@ export default function CircuitBreaker() {
 
         {/* Toggle switch */}
         <button
-          onClick={() => {
+          onClick={async () => {
             if (!isPaused) setConfirming(true);
-            else setIsPaused(false);
+            else {
+              try {
+                await fetch("/api/circuit-breaker", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ action: "resume" })
+                });
+                setIsPaused(false);
+              } catch (e) {
+                console.error(e);
+              }
+            }
           }}
           aria-pressed={isPaused}
           aria-label={isPaused ? "Resume automated payouts" : "Pause automated payouts"}
@@ -125,8 +136,17 @@ export default function CircuitBreaker() {
           { label: "Action", value: "Pause execution" }
         ]}
         confirmLabel="Pause execution"
-        onConfirm={() => {
-          setIsPaused(true);
+        onConfirm={async () => {
+          try {
+            await fetch("/api/circuit-breaker", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "pause" })
+            });
+            setIsPaused(true);
+          } catch (e) {
+            console.error(e);
+          }
           setConfirming(false);
         }}
         onCancel={() => setConfirming(false)}

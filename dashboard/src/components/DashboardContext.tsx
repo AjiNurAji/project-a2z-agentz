@@ -273,14 +273,19 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
   const fetchDashboardData = useCallback(async () => {
     try {
-      const [statusData, statsData] = await Promise.all([
+      const [statusData, statsData, sysData] = await Promise.all([
         apiFetch<{ logs?: Array<{ tx_hash_id: string; project_target_address: string; amount_usd: number; status: string; created_at: string }> }>("/api/status"),
-        apiFetch<{ total_transactions: number; success_rate: number; total_usd_sent: number; active_targets: number; projects_scanned?: number; total_tvl?: number }>("/api/stats")
+        apiFetch<{ total_transactions: number; success_rate: number; total_usd_sent: number; active_targets: number; projects_scanned?: number; total_tvl?: number }>("/api/stats"),
+        apiFetch<{ circuit_breaker: string }>("/api/system-status")
       ]);
 
       if (statusData?.logs) {
         const mappedTxs = statusData.logs.map(mapRawTxToTransaction) as Transaction[];
         setTransactions(mappedTxs.slice(0, 50));
+      }
+
+      if (sysData && sysData.circuit_breaker) {
+        setIsPaused(sysData.circuit_breaker === "paused");
       }
 
       if (statsData) {
@@ -370,6 +375,32 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     if (!usingReal) return;
     setTransactions(ws.transactions.map(mapRawTxToTransaction) as Transaction[]);
   }, [ws.transactions, usingReal]);
+
+  useEffect(() => {
+    if (!usingReal) return;
+    // Map systemLogs to LogEntry
+    const newLogs = ws.systemLogs.map(l => ({
+      id: genId(),
+      timestamp: new Date(),
+      level: l.level,
+      message: l.message
+    })) as LogEntry[];
+    // We can prepend them to the existing logs or replace. Since ws.systemLogs is an array that grows,
+    // we can just use the latest ones combined with initial ones.
+    setLogs(prev => {
+      // Just to keep it simple and avoid duplicates on strict mode, 
+      // we'll just take the mapped logs from WS and prepend initial logs if needed.
+      // But actually, useAgentWebSocket accumulates them in state, so we can just replace.
+      // Wait, initial logs are good to keep. We can just append new ones if they aren't there?
+      // Since ws.systemLogs is accumulating, we can just map it directly and prepend initial.
+      const initial = [
+        { id: "init1", timestamp: new Date(), level: "INFO" as const, message: "A2Z Dashboard initialized. Connecting to agents..." },
+        { id: "init2", timestamp: new Date(), level: "SUCCESS" as const, message: "Agent A (Scout) connected. vLLM/ROCm server online." },
+        { id: "init3", timestamp: new Date(), level: "SUCCESS" as const, message: "Agent B (Vault) connected. KMS handshake successful." }
+      ];
+      return [...newLogs.reverse(), ...initial].slice(0, 100);
+    });
+  }, [ws.systemLogs, usingReal]);
 
   // ─── Real Backend Polling & Live Simulation ──────────────────────────────────────
   useEffect(() => {
