@@ -65,7 +65,7 @@ export default function Navbar() {
                 style={{ background: "var(--color-neutral-secondary-medium)", border: "1px solid var(--color-border-default)" }}
               >
                 <User className="w-3 h-3" style={{ color: "var(--color-fg-brand)" }} aria-hidden="true" />
-                <span className="text-[var(--color-body-subtle)] max-w-[120px] truncate">{user.email}</span>
+                <span className="text-[var(--color-body-subtle)] max-w-[120px] truncate hidden sm:inline-block">{user.email}</span>
               </div>
               <button
                 onClick={logout}
@@ -77,7 +77,7 @@ export default function Navbar() {
               </button>
             </div>
           ) : null}
-          <div className="flex items-center gap-3 text-xs">
+          <div className="hidden xl:flex items-center gap-3 text-xs">
             <div className="flex items-center gap-1.5">
               <span
                 className={`w-2 h-2 rounded-full ${

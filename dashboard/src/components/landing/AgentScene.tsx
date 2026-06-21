@@ -165,8 +165,9 @@ export default function AgentScene({
       const w = window.innerWidth;
       const h = window.innerHeight;
 
-      // Create trailing effect by drawing semi-transparent black background
-      ctx.fillStyle = "rgba(19, 17, 28, 0.3)";
+      // Create trailing effect by drawing semi-transparent background
+      const isLightMode = document.documentElement.getAttribute('data-theme') === 'light';
+      ctx.fillStyle = isLightMode ? "rgba(248, 250, 252, 0.3)" : "rgba(19, 17, 28, 0.3)";
       ctx.fillRect(0, 0, w, h);
 
       const particles = particlesRef.current;
@@ -224,15 +225,15 @@ export default function AgentScene({
         ctx.arc(drawX, drawY, p.size * pulse, 0, Math.PI * 2);
         
         // Use HSL for smooth color transitions
-        const saturation = p.isGlitching ? "100%" : "70%";
-        const lightness = p.layer === "fg" ? "65%" : "45%";
+        const saturation = p.isGlitching ? "100%" : (isLightMode ? "60%" : "70%");
+        const lightness = p.layer === "fg" ? (isLightMode ? "40%" : "65%") : (isLightMode ? "30%" : "45%");
         const opacity = p.isGlitching ? 0.8 : p.opacity;
         
         ctx.fillStyle = `hsla(${p.colorHue}, ${saturation}, ${lightness}, ${opacity})`;
         ctx.fill();
         
         // Glowing effect for foreground particles
-        if (p.layer === "fg") {
+        if (p.layer === "fg" && !isLightMode) {
           ctx.shadowBlur = 10;
           ctx.shadowColor = `hsla(${p.colorHue}, 100%, 60%, 0.5)`;
         } else {
@@ -273,7 +274,7 @@ export default function AgentScene({
             ctx.moveTo(p1.isGlitching ? p1.x + (Math.random() - 0.5)*10 : p1.x, p1.isGlitching ? p1.y : p1.y);
             ctx.lineTo(p2.isGlitching ? p2.x + (Math.random() - 0.5)*10 : p2.x, p2.isGlitching ? p2.y : p2.y);
             
-            ctx.strokeStyle = `hsla(${avgHue}, 80%, 60%, ${opacity})`;
+            ctx.strokeStyle = `hsla(${avgHue}, ${isLightMode ? '60%' : '80%'}, ${isLightMode ? '40%' : '60%'}, ${opacity})`;
             ctx.lineWidth = isGlitchLine ? 1.5 : (p1.layer === "fg" && p2.layer === "fg" ? 0.8 : 0.3);
             ctx.stroke();
           }
@@ -329,15 +330,15 @@ export default function AgentScene({
         
         // Base hue cycle + icon offset
         const cycleHue = 200 + Math.sin(timeRef.current * 0.005) * 80; // Cycles between cyan/blue/purple
-        ctx.fillStyle = `hsla(${cycleHue + icon.hueOffset}, 70%, 70%, ${Math.max(0, currentOpacity)})`;
+        ctx.fillStyle = `hsla(${cycleHue + icon.hueOffset}, 70%, ${isLightMode ? '40%' : '70%'}, ${Math.max(0, currentOpacity)})`;
         
         ctx.fillText(icon.symbol, 0, 0);
         
         // Double draw for glitch ghosting
         if (isGlobalGlitch || Math.random() < 0.002) {
-          ctx.fillStyle = `hsla(320, 100%, 60%, ${currentOpacity * 1.5})`; // Pink glitch ghost
+          ctx.fillStyle = `hsla(320, 100%, ${isLightMode ? '40%' : '60%'}, ${currentOpacity * 1.5})`; // Pink glitch ghost
           ctx.fillText(icon.symbol, 4, 0);
-          ctx.fillStyle = `hsla(180, 100%, 60%, ${currentOpacity * 1.5})`; // Cyan glitch ghost
+          ctx.fillStyle = `hsla(180, 100%, ${isLightMode ? '40%' : '60%'}, ${currentOpacity * 1.5})`; // Cyan glitch ghost
           ctx.fillText(icon.symbol, -4, 0);
         }
         
@@ -346,9 +347,9 @@ export default function AgentScene({
       
       // Draw Global Scanning Line
       const scanY = (timeRef.current * 2) % h;
-      ctx.fillStyle = `hsla(180, 100%, 50%, 0.03)`;
+      ctx.fillStyle = `hsla(180, 100%, ${isLightMode ? '40%' : '50%'}, 0.03)`;
       ctx.fillRect(0, scanY, w, 20);
-      ctx.fillStyle = `hsla(270, 100%, 60%, 0.01)`;
+      ctx.fillStyle = `hsla(270, 100%, ${isLightMode ? '40%' : '60%'}, 0.01)`;
       ctx.fillRect(0, scanY - 40, w, 40);
 
       animationRef.current = requestAnimationFrame(animate);
@@ -364,7 +365,7 @@ export default function AgentScene({
 
   return (
     <div
-      className="fixed inset-0 w-full h-full overflow-hidden bg-[#13111C]"
+      className="fixed inset-0 w-full h-full overflow-hidden bg-[var(--color-surface)]"
       style={{
         zIndex: 0,
         transition: "opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
@@ -374,7 +375,7 @@ export default function AgentScene({
       {/* Interactive Pro-Max Particle Network */}
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 w-full h-full mix-blend-screen"
+        className="absolute inset-0 w-full h-full blend-scene"
         style={{ pointerEvents: "auto" }} // Allow mouse events for interaction
       />
 
@@ -382,7 +383,7 @@ export default function AgentScene({
       <div 
         className="absolute inset-0 pointer-events-none opacity-80"
         style={{
-          background: "radial-gradient(circle at center, transparent 20%, #13111C 90%, #0a0910 100%)",
+          background: "radial-gradient(circle at center, transparent 20%, var(--color-surface) 90%, color-mix(in srgb, var(--color-surface) 85%, black) 100%)",
         }}
       />
 
@@ -391,8 +392,8 @@ export default function AgentScene({
         className="absolute inset-0 opacity-[0.05] pointer-events-none"
         style={{
           backgroundImage: `
-            linear-gradient(to right, rgba(127, 168, 168, 0.2) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(167, 143, 181, 0.2) 1px, transparent 1px)
+            linear-gradient(to right, color-mix(in srgb, var(--color-fg-cyan) 20%, transparent) 1px, transparent 1px),
+            linear-gradient(to bottom, color-mix(in srgb, var(--color-fg-purple) 20%, transparent) 1px, transparent 1px)
           `,
           backgroundSize: "60px 60px",
           maskImage: "radial-gradient(circle at center, black 40%, transparent 90%)",
@@ -402,23 +403,23 @@ export default function AgentScene({
 
       {/* Dynamic Glow Blooms */}
       <div 
-        className="absolute w-[800px] h-[800px] rounded-full blur-[180px] opacity-[0.12] -left-48 -top-48 animate-float-slow pointer-events-none mix-blend-screen"
+        className="absolute w-[800px] h-[800px] rounded-full blur-[180px] opacity-[0.12] -left-48 -top-48 animate-float-slow pointer-events-none blend-scene"
         style={{
-          background: "radial-gradient(circle, #7FA8A8 0%, transparent 70%)",
+          background: "radial-gradient(circle, var(--color-fg-cyan) 0%, transparent 70%)",
         }}
       />
       <div 
-        className="absolute w-[900px] h-[900px] rounded-full blur-[200px] opacity-[0.12] -right-48 -bottom-48 animate-float-medium pointer-events-none mix-blend-screen"
+        className="absolute w-[900px] h-[900px] rounded-full blur-[200px] opacity-[0.12] -right-48 -bottom-48 animate-float-medium pointer-events-none blend-scene"
         style={{
-          background: "radial-gradient(circle, #A78FB5 0%, transparent 70%)",
+          background: "radial-gradient(circle, var(--color-fg-purple) 0%, transparent 70%)",
         }}
       />
       
       {/* High-Tech Pulse Ring Center */}
       <div 
-        className="absolute w-[600px] h-[600px] rounded-full blur-[140px] opacity-[0.05] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none animate-pulse-slow mix-blend-screen"
+        className="absolute w-[600px] h-[600px] rounded-full blur-[140px] opacity-[0.05] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none animate-pulse-slow blend-scene"
         style={{
-          background: "radial-gradient(circle, #ff007f 0%, transparent 60%)",
+          background: "radial-gradient(circle, var(--color-fg-pink) 0%, transparent 60%)",
         }}
       />
 

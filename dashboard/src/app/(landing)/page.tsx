@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Bot, Shield, Cpu, Activity, ArrowRight, Zap, Sparkles } from "lucide-react";
 
 import AgentScene from "@/components/landing/AgentScene";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 export default function LandingPage() {
   const router = useRouter();
@@ -21,7 +22,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="relative min-h-screen bg-[#13111C] text-[var(--color-body)] overflow-hidden flex flex-col font-sans" suppressHydrationWarning={true}>
+    <div className="relative min-h-screen bg-[var(--color-surface)] text-[var(--color-body)] overflow-hidden flex flex-col font-sans" suppressHydrationWarning={true}>
       {/* Dynamic 3D Scene Background */}
       <AgentScene 
         isTransitioning={isTransitioning} 
@@ -32,7 +33,7 @@ export default function LandingPage() {
       <div className="fixed inset-0 z-0 bg-radial-vignette pointer-events-none" suppressHydrationWarning={true} />
 
       {/* Header / Navbar */}
-      <header className="relative z-20 w-full px-4 md:px-6 py-4 md:py-5 border-b border-[var(--color-border-brand-subtle)]/40 backdrop-blur-md bg-[#13111C]/30 flex items-center justify-between">
+      <header className="relative z-20 w-full px-4 md:px-6 py-4 md:py-5 border-b border-[var(--color-border-default)] backdrop-blur-md flex items-center justify-between" style={{ background: "color-mix(in srgb, var(--color-surface) 30%, transparent)" }}>
         <div className="flex items-center gap-2 md:gap-3">
           <div
             className="w-8 h-8 md:w-10 md:h-10 rounded-xl flex items-center justify-center overflow-hidden shrink-0"
@@ -52,6 +53,7 @@ export default function LandingPage() {
         </div>
 
         <div className="flex items-center gap-2 md:gap-4 shrink-0">
+          <ThemeToggle />
           <button 
             onClick={handleEnterDashboard}
             disabled={isTransitioning}
@@ -84,7 +86,7 @@ export default function LandingPage() {
           {/* Left Column: Title & Cards (Glassmorphism overlays) */}
           <div className="lg:col-span-6 space-y-5 md:space-y-6 text-left">
             {/* Tagline */}
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] md:text-[11px] font-mono text-[var(--color-fg-cyan)] bg-[#7FA8A8]/10 border border-[#7FA8A8]/20 backdrop-blur-sm">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] md:text-[11px] font-mono text-[var(--color-fg-cyan)] border backdrop-blur-sm" style={{ background: "color-mix(in srgb, var(--color-fg-cyan) 10%, transparent)", borderColor: "color-mix(in srgb, var(--color-fg-cyan) 20%, transparent)" }}>
               <Cpu className="w-3.5 h-3.5" />
               <span>AMD Hackathon ACT II Participant</span>
             </div>
@@ -130,7 +132,8 @@ export default function LandingPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-6">
               {/* Agent A Card */}
               <div 
-                className="p-5 rounded-2xl border border-[var(--color-border-default)]/30 backdrop-blur-md bg-[#181621]/40 flex flex-col space-y-3 transition-all duration-300 hover:border-[#7FA8A8]/40"
+                className="p-5 rounded-2xl border border-[var(--color-border-default)] backdrop-blur-md flex flex-col space-y-3 transition-all duration-300 hover:border-[var(--color-fg-cyan)]"
+                style={{ background: "color-mix(in srgb, var(--color-card) 40%, transparent)" }}
               >
                 <div className="flex items-center justify-between">
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[#7FA8A8]/10 text-[var(--color-fg-cyan)] border border-[#7FA8A8]/20">
@@ -146,7 +149,8 @@ export default function LandingPage() {
 
               {/* Agent B Card */}
               <div 
-                className="p-5 rounded-2xl border border-[var(--color-border-default)]/30 backdrop-blur-md bg-[#181621]/40 flex flex-col space-y-3 transition-all duration-300 hover:border-[#A78FB5]/40"
+                className="p-5 rounded-2xl border border-[var(--color-border-default)] backdrop-blur-md flex flex-col space-y-3 transition-all duration-300 hover:border-[var(--color-fg-purple)]"
+                style={{ background: "color-mix(in srgb, var(--color-card) 40%, transparent)" }}
               >
                 <div className="flex items-center justify-between">
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[#A78FB5]/10 text-[var(--color-fg-purple)] border border-[#A78FB5]/20">
@@ -169,13 +173,14 @@ export default function LandingPage() {
 
             {/* Futuristic Terminal Window */}
             <div 
-              className="relative w-full rounded-2xl border border-[var(--color-border-brand-subtle)]/40 bg-[#181621]/40 backdrop-blur-md overflow-hidden shadow-2xl flex flex-col group hover:border-[var(--color-fg-brand)]/40 transition-all duration-500"
+              className="relative w-full rounded-2xl border border-[var(--color-border-default)] backdrop-blur-md overflow-hidden shadow-2xl flex flex-col group hover:border-[var(--color-fg-brand)] transition-all duration-500"
               style={{
-                boxShadow: "0 20px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)"
+                background: "color-mix(in srgb, var(--color-card) 40%, transparent)",
+                boxShadow: "0 20px 40px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05)"
               }}
             >
               {/* Window Header */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border-brand-subtle)]/30 bg-black/30">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border-default)]" style={{ background: "color-mix(in srgb, var(--color-surface) 60%, transparent)" }}>
                 {/* Traffic Light Dots */}
                 <div className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-full bg-[#ff5f56]/70" />
@@ -195,7 +200,7 @@ export default function LandingPage() {
               </div>
 
               {/* Console Body containing the 16:9 GIF */}
-              <div className="relative aspect-[16/9] w-full bg-[#13111C]/90 overflow-hidden flex items-center justify-center">
+              <div className="relative aspect-[16/9] w-full overflow-hidden flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--color-surface) 90%, transparent)" }}>
                 {/* The GIF Animation */}
                 <img 
                   src="/gif/A2Z-animation.gif" 
@@ -221,24 +226,24 @@ export default function LandingPage() {
                 {/* Interactive labels matching robot position in the GIF */}
                 {/* Robot A (Scout) Label - Left side of the GIF */}
                 <div className="absolute top-[68%] left-[8%] animate-pulse pointer-events-auto cursor-help group/scout">
-                  <div className="px-2.5 py-1 bg-black/80 border border-[#7FA8A8]/40 rounded-lg text-[9px] font-mono flex items-center gap-1.5 backdrop-blur-sm shadow-lg hover:border-[#7FA8A8] transition-colors">
+                  <div className="px-2.5 py-1 border border-[var(--color-fg-cyan)] rounded-lg text-[9px] font-mono flex items-center gap-1.5 backdrop-blur-sm shadow-lg hover:border-[var(--color-fg-cyan)] transition-colors" style={{ background: "color-mix(in srgb, var(--color-surface) 80%, transparent)" }}>
                     <span className="w-1.5 h-1.5 rounded-full bg-[#7FA8A8]" />
                     <span>Agent A (Scout)</span>
                   </div>
                   {/* Tooltip detail */}
-                  <div className="absolute left-0 mt-1.5 w-44 p-2 bg-[#181621]/95 border border-[#7FA8A8]/30 rounded-lg text-[9px] font-mono text-[var(--color-body-subtle)] leading-normal opacity-0 group-hover/scout:opacity-100 transition-opacity duration-300 pointer-events-none shadow-2xl backdrop-blur-md z-30">
+                  <div className="absolute left-0 mt-1.5 w-44 p-2 border border-[var(--color-fg-cyan)] rounded-lg text-[9px] font-mono text-[var(--color-body-subtle)] leading-normal opacity-0 group-hover/scout:opacity-100 transition-opacity duration-300 pointer-events-none shadow-2xl backdrop-blur-md z-30" style={{ background: "color-mix(in srgb, var(--color-card) 95%, transparent)" }}>
                     <span className="text-[var(--color-fg-cyan)] font-bold">OSINT Scanner:</span> Scanning social feeds, scoring alpha sentiment score in &lt;1.2s.
                   </div>
                 </div>
 
                 {/* Robot B (Vault) Label - Right side of the GIF */}
                 <div className="absolute top-[68%] right-[8%] animate-pulse pointer-events-auto cursor-help group/vault" style={{ animationDelay: "0.8s" }}>
-                  <div className="px-2.5 py-1 bg-black/80 border border-[#A78FB5]/40 rounded-lg text-[9px] font-mono flex items-center gap-1.5 backdrop-blur-sm shadow-lg hover:border-[#A78FB5] transition-colors">
+                  <div className="px-2.5 py-1 border border-[var(--color-fg-purple)] rounded-lg text-[9px] font-mono flex items-center gap-1.5 backdrop-blur-sm shadow-lg hover:border-[var(--color-fg-purple)] transition-colors" style={{ background: "color-mix(in srgb, var(--color-surface) 80%, transparent)" }}>
                     <span className="w-1.5 h-1.5 rounded-full bg-[#A78FB5]" />
                     <span>Agent B (Vault)</span>
                   </div>
                   {/* Tooltip detail */}
-                  <div className="absolute right-0 mt-1.5 w-44 p-2 bg-[#181621]/95 border border-[#A78FB5]/30 rounded-lg text-[9px] font-mono text-[var(--color-body-subtle)] leading-normal opacity-0 group-hover/vault:opacity-100 transition-opacity duration-300 pointer-events-none shadow-2xl backdrop-blur-md z-30">
+                  <div className="absolute right-0 mt-1.5 w-44 p-2 border border-[var(--color-fg-purple)] rounded-lg text-[9px] font-mono text-[var(--color-body-subtle)] leading-normal opacity-0 group-hover/vault:opacity-100 transition-opacity duration-300 pointer-events-none shadow-2xl backdrop-blur-md z-30" style={{ background: "color-mix(in srgb, var(--color-card) 95%, transparent)" }}>
                     <span className="text-[var(--color-fg-purple)] font-bold">Secure Vault:</span> Validating transactions, resolving gas station, executing on Base L2.
                   </div>
                 </div>
@@ -260,18 +265,18 @@ export default function LandingPage() {
       </main>
 
       {/* Tech Stack / Bottom Footer */}
-      <footer className="relative z-20 w-full py-6 md:py-8 border-t border-[var(--color-border-brand-subtle)]/40 bg-[#13111C]/40 backdrop-blur-md px-4 md:px-6 flex flex-col lg:flex-row gap-5 lg:gap-6 items-center justify-between text-[10px] md:text-xs">
+      <footer className="relative z-20 w-full py-6 md:py-8 border-t border-[var(--color-border-default)] backdrop-blur-md px-4 md:px-6 flex flex-col lg:flex-row gap-5 lg:gap-6 items-center justify-between text-[10px] md:text-xs" style={{ background: "color-mix(in srgb, var(--color-surface) 40%, transparent)" }}>
         <div className="text-[var(--color-body-subtle)] font-mono text-center lg:text-left w-full lg:w-auto">
           Powered by <br className="md:hidden" /> <span className="text-[var(--color-heading)] font-semibold">AMD Instinct™ MI300X</span> &amp; <span className="text-[var(--color-heading)] font-semibold">Base L2</span>
         </div>
 
         {/* Tech StackBadges */}
         <div className="flex flex-wrap justify-center lg:justify-end items-center gap-2 md:gap-3 w-full lg:w-auto">
-          <span className="px-2 md:px-2.5 py-1 rounded bg-[#2D2A38]/50 border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]">AIM (AMD Inference Microservice)</span>
-          <span className="px-2 md:px-2.5 py-1 rounded bg-[#2D2A38]/50 border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]">ROCm 6.x</span>
-          <span className="px-2 md:px-2.5 py-1 rounded bg-[#2D2A38]/50 border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]">SGLang Server</span>
-          <span className="px-2 md:px-2.5 py-1 rounded bg-[#2D2A38]/50 border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]">LangGraph Python</span>
-          <span className="px-2 md:px-2.5 py-1 rounded bg-[#2D2A38]/50 border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]">ChromaDB</span>
+          <span className="px-2 md:px-2.5 py-1 rounded border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]" style={{ background: "color-mix(in srgb, var(--color-neutral-secondary-strong) 50%, transparent)" }}>AIM (AMD Inference Microservice)</span>
+          <span className="px-2 md:px-2.5 py-1 rounded border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]" style={{ background: "color-mix(in srgb, var(--color-neutral-secondary-strong) 50%, transparent)" }}>ROCm 6.x</span>
+          <span className="px-2 md:px-2.5 py-1 rounded border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]" style={{ background: "color-mix(in srgb, var(--color-neutral-secondary-strong) 50%, transparent)" }}>SGLang Server</span>
+          <span className="px-2 md:px-2.5 py-1 rounded border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]" style={{ background: "color-mix(in srgb, var(--color-neutral-secondary-strong) 50%, transparent)" }}>LangGraph Python</span>
+          <span className="px-2 md:px-2.5 py-1 rounded border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]" style={{ background: "color-mix(in srgb, var(--color-neutral-secondary-strong) 50%, transparent)" }}>ChromaDB</span>
         </div>
       </footer>
 
@@ -283,7 +288,8 @@ export default function LandingPage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.6 }}
-            className="absolute inset-0 z-50 bg-[#13111C]/60 backdrop-blur-sm pointer-events-none"
+            className="absolute inset-0 z-50 backdrop-blur-sm pointer-events-none"
+            style={{ background: "color-mix(in srgb, var(--color-surface) 60%, transparent)" }}
           />
         )}
       </AnimatePresence>
