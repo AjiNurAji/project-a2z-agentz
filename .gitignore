@@ -59,6 +59,7 @@ wandb/
 test.html
 test_cache/
 .cookies.txt
+test_*-passed/
 
 # Misc
 *.tmp

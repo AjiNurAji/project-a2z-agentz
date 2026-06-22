@@ -1053,3 +1053,60 @@ Memperbaiki anomali WebSocket yang tidak mengirim log di mode simulasi (use_mock
 **Status: ✅ BUG MOCK DATA & ZONA WAKTU DASHBOARD TERATASI — SEMUA PANEL MENYALA DENGAN BENAR.**
 
 ---
+
+## Sesi 24 — 2026-06-22 | Telegram & X scraper Agent A via Apify + config LIMIT via .env
+
+### 📌 Ringkasan
+Membangun modul scraper Telegram dan X untuk Agent A pakai Apify (`apify-client==3.0.3`), lalu gabung ke pipeline `agent_a.py` sebagai data source beneran (ganti mock yang tadinya ada di script). Akhir sesi: mock hilang total, konstanta `LIMIT` pindah dari hardcode ke `.env` lewat `AGENT_A_SCRAPER_LIMIT` (fallback default `2`). Pipeline Agent A sekarang full real-data: DexScreener (free) → Web3 EIP-55 checksum → X via Apify → Telegram via Apify → kalau WARNING keyword match, blacklist tanpa LLM; kalau OPPORTUNITY match, emit JSON Line ke stdout.
+
+### ✅ Hal yang Berhasil Dikerjakan
+
+| Item | Detail |
+|------|--------|
+| `requirements.txt` | Tambah `apify-client==3.0.3` (match versi yang ter-install di `venv/`; versi 1.6.4 yang coba duluan deprecated, API-nya beda total) |
+| `agent_a.py` | Merge `test/agent_a_scraper.py` (legacy) + `test/test_agent_a_scout.py` (v4 spec) jadi 1 file di root. 280 baris, 8248 bytes. Isinya: `OPPORTUNITY_KEYWORDS` (21 item Base ecosystem), `WARNING_KEYWORDS` (10 item rug/scam/honeypot), Web3 EIP-55 checksum, WARNING shortcut blacklist, JSON Lines emit ke stdout |
+| Mock removal | Hapus total dari `agent_a.py`: `_MOCK_TOKENS`, `_MOCK_MENTIONS`, 4 function `_mock_fetch_*`, `_apply_mocks()`, CLI flag `--mock` |
+| LIMIT hardcode | Drop `--limit` CLI flag + argparse + sys import. Ganti dengan konstanta `LIMIT = 2` di module level |
+| Config LIMIT via `.env` | Section `##limit agent a scraper` (lowercase, double-hash sesuai request) + var `AGENT_A_SCRAPER_LIMIT=2`. `agent_a.py` diupdate: `from dotenv import load_dotenv`, `load_dotenv()` call, helper `_resolve_agent_a_limit()` dengan fallback 2 + validasi `< 1` → warn ke stdout |
+| Debug `apify-client` 3.x | 3x patch buat handle API yang beda dari 1.x: `list = None` → `list \| None = None`, `ApifyClientAsync` butuh `# type: ignore[misc]`, `Run.default_dataset_id` (snake_case Pydantic), `.dataset(id).list_items().items` (DatasetItemsPage dataclass) bukan `.iterate_items()` |
+| Fix Telegram actor schema | Field `mode` required (default `channel` → 0 results kalau `channels: []`). `maxResultsPerKeyword` min=10 max=100. Set `"mode": "keyword"` eksplisit biar scraper pakai keyword search across all public channels |
+| Drop Farcaster | `webdatalabs/farcaster-hub-scraper` ternyata scrape by FIDs (bukan keywords). Nggak ada Farcaster scraper gratis lain di Apify store. Credit tipis → drop total, fokus ke X + Telegram |
+| Real call Telegram | 1 hit ke `lofomachines/telegram-keyword-search-scraper` SUCCEEDED, dapet 2 messages dari MetricBase token |
+
+### ✏️ File yang DIUBAH / DITAMBAHKAN
+
+| File | Lokasi | Detail Perubahan |
+|------|--------|------------------|
+| `requirements.txt` | `/` | Tambah `apify-client==3.0.3` di section pin |
+| `agent_a.py` | `/` | **Baru** — main pipeline hasil konsolidasi (280 baris, 8248 bytes) |
+| `.env` | `/` | Tambah section `##limit agent a scraper` + `AGENT_A_SCRAPER_LIMIT=2` (di bawah section OSINT) |
+| `test/agent_a_scraper.py` | `/test/` | Dihapus via git (konten sudah digabung ke `agent_a.py`) |
+| `test/test_agent_a_scout.py` | `/` | Pindah ke `test_agent-a-passed/test_agent_a_scout.py` |
+
+### 🏗️ Keputusan Desain
+
+| Aspek | Keputusan |
+|-------|-----------|
+| Apify client | `apify-client==3.0.3` sync `ApifyClient` (bukan async, lebih simpel untuk per-call use case) |
+| Actor Telegram | `lofomachines/telegram-keyword-search-scraper`, mode `keyword`, channels `[]`, maxItems `10` |
+| Actor X | `apify/twitter-scraper`, searchTerms + maxItems |
+| LIMIT resolution | `os.getenv("AGENT_A_SCRAPER_LIMIT")` → fallback 2. Shell env MENANG dari `.env` (`load_dotenv(override=False)`) |
+
+### 🧪 Verifikasi
+
+```bash
+python -m py_compile agent_a.py      # OK
+```
+
+LIMIT resolution (4 skenario):
+
+| Input | Hasil |
+|-------|-------|
+| (default) | `2` |
+| `5` | `5` |
+| `abc` | warn + `2` |
+| `0` | warn + `2` |
+
+Telegram real call: 1 hit, 2 messages, SUCCEEDED.
+
+**Status: ✅ AGENT A SCRAPER APIFY READY, LIMIT CONFIG VIA .ENV, MOCK PURGED.**
