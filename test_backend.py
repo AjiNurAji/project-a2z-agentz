@@ -3,7 +3,7 @@ import time
 import json
 import uuid
 
-API_URL = "http://localhost:8080/api/analyze"
+API_URL = "http://localhost:8000/analyze"
 
 def run_test(name, target_address, description):
     print(f"\n--- {name} ---")

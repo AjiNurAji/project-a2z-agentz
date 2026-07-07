@@ -13,7 +13,6 @@ const STATUS_COLORS: Record<string, { bg: string; border: string; text: string }
 
 const SOURCE_COLORS: Record<string, string> = {
   Farcaster: "#A78FB5",
-  Twitter: "#5C7A99",
   "On-Chain": "#609F89",
 };
 

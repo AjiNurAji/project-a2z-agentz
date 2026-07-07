@@ -74,3 +74,4 @@ chroma_db/
 .agents/
 .skill-archive/
 .worktrees/
+_archive_stale/

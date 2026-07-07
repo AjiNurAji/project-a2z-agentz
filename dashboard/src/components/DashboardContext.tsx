@@ -48,7 +48,7 @@ export interface VectorMemoryItem {
   contractAddress: string;
   similarityScore: number;
   embeddingStatus: "indexed" | "processing" | "blacklisted";
-  source: "Farcaster" | "Twitter" | "On-Chain";
+  source: "Farcaster" | "On-Chain";
   tvl: number;
   indexedAt: Date;
 }
@@ -188,7 +188,7 @@ function genAddress() {
 // (Dummy generators removed)
 
 const DEFAULT_CONFIG: DashboardConfig = {
-  agentA: { cronSchedule: "0 * * * *", sentimentWeight: 70, tvlWeight: 30, scoreThreshold: 85, sources: ["Farcaster", "Twitter", "On-Chain"] },
+  agentA: { cronSchedule: "0 * * * *", sentimentWeight: 70, tvlWeight: 30, scoreThreshold: 85, sources: ["Farcaster", "On-Chain"] },
   agentB: { kmsRegion: "us-east-1", primaryRpc: "https://base-mainnet.g.alchemy.com/v2/YOUR_KEY", fallbackRpc: "https://mainnet.base.org", autonomousCap: 2.0, gasBuffer: 15 },
 };
 
