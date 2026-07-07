@@ -2,40 +2,40 @@
 A2Z Agentz - Agent A (The Scout): ChromaDB Semantic Dedup Stage
 ===============================================================
 
-Pipeline position (per PRD):
-    [agent_a_scraper] -> JSON Lines -> [agent_a_chroma (THIS)] -> JSON Lines -> [SGLang/AIM inference]
+Pipeline position:
+ [current source data] -> JSON Lines -> [agent_a_chroma (THIS)] -> JSON Lines
+ -> [downstream AIM / SGLang inference] -> publication to DB
 
 Responsibilities:
-  1. Lazy-init a PersistentClient rooted at ``CHROMA_PATH`` so embeddings
-     survive Cron Job restarts.
-  2. Expose ``check_semantic_similarity(description, threshold)`` — the
-     PRD's "Vector DB Cache: similarity check sebelum inference".
-  3. Expose ``insert_project_embedding(project_id, description, metadata)``
-     — called by the downstream AIM scoring stage after a project passes
-     the full scoring gauntlet (PRD §3.1 — 85+ threshold).
-  4. CLI reads JSON Lines from stdin (or ``--file``) and emits one
-     decision JSON per record on stdout, log lines on stderr.
+ 1. Lazy-init a PersistentClient rooted at `CHROMA_PATH` so embeddings
+    survive service restarts.
+ 2. Expose `check_semantic_similarity(description, threshold)` - the
+    module that stops the same kind of opportunity from being processed twice.
+ 3. Expose `insert_project_embedding(project_id, description, metadata)` -
+    used for records that clear the pipeline.
+ 4. CLI reads JSON Lines from stdin (or `--file`) and emits one
+    decision JSON per record on stdout, log lines on stderr.
 
 Distance semantics:
-    The collection is created with ``hnsw:space=cosine``. With cosine
-    distance, two normalized vectors produce:
-        distance   = 1 - cosine_similarity
-        similarity = 1 - distance        (range: [-1, 1])
-    So ``threshold=0.85`` blocks records whose similarity EXCEEDS 0.85,
-    i.e. cosine_distance < 0.15 — the natural reading of the spec.
+ The collection is created with `hnsw:space=cosine`. With cosine
+ distance, two normalized vectors produce:
+ distance = 1 - cosine_similarity
+ similarity = 1 - distance (range: [-1, 1])
+ So `threshold=0.85` blocks records whose similarity EXCEEDS 0.85,
+ i.e. cosine_distance < 0.15 - the natural reading of the spec.
 
 Error policy:
-    ChromaDB / I/O failures during lookup are treated as FAIL-OPEN (the
-    record is allowed through) because semantic dedup is opportunistic:
-    it guards against accidental re-processing, not against loss of funds.
-    Compare with ``database.is_blacklisted`` which fail-CLOSES — blacklist
-    is safety-critical, dedup is not. Errors are still logged at ERROR.
+ ChromaDB / I/O failures during lookup are treated as FAIL-OPEN (the
+ record is allowed through) because semantic dedup is opportunistic:
+ it guards against accidental re-processing, not against loss of funds.
+ Compare with `database.is_blacklisted` which fail-CLOSES - blacklist
+ is safety-critical, dedup is not. Errors are still logged at ERROR.
 
 Dependencies (added to requirements.txt):
-    chromadb         — PersistentClient + collection API
-    onnxruntime      — required by ChromaDB's default embedding function
-    tokenizers       — required by ChromaDB's default embedding function
-    (huggingface-hub, numpy, etc. come in transitively)
+ chromadb - PersistentClient + collection API
+ onnxruntime - required by ChromaDB's default embedding function
+ tokenizers - required by ChromaDB's default embedding function
+ (huggingface-hub, numpy, etc. come in transitively)
 """
 
 from __future__ import annotations
@@ -67,14 +67,18 @@ except ImportError:
 # ----------------------------------------------------------------------------
 # Constants
 # ----------------------------------------------------------------------------
-CHROMA_PATH: str = "/home/ubuntu/project-a2z-agentz/chroma_db"
+CHROMA_PATH: str = os.getenv("CHROMA_PATH", ".chroma_db") or ".chroma_db"
+if os.path.isabs(CHROMA_PATH):
+    CHROMA_DIR = CHROMA_PATH
+else:
+    CHROMA_DIR = os.path.join(os.getcwd(), CHROMA_PATH)
 COLLECTION_NAME: str = "project_embeddings"
-DEFAULT_THRESHOLD: float = 0.85  # similarity threshold (1 - cosine_distance)
+DEFAULT_THRESHOLD: float = 0.85 # similarity threshold (1 - cosine_distance)
 
 
 # ----------------------------------------------------------------------------
-# Logger (same a2z.* namespace family as database.py / web3_client.py /
-# agent_a_scraper.py — stderr only, so stdout stays pipe-clean)
+# Logger (same `a2z.*` namespace family as database.py / web3_client.py /
+# agent_a_producer.py - stderr only, so stdout stays pipe-clean)
 # ----------------------------------------------------------------------------
 logger = logging.getLogger("a2z.agent_a.chroma")
 if not logger.handlers:
@@ -85,7 +89,7 @@ logger.setLevel(logging.INFO)
 
 
 # ----------------------------------------------------------------------------
-# Lazy singletons — ChromaDB init + model download is expensive (~80 MB
+# Lazy singletons - ChromaDB init + model download is expensive (~80 MB
 # on first run for the default MiniLM model), so we only do it when the
 # first semantic lookup actually happens.
 # ----------------------------------------------------------------------------
@@ -94,11 +98,12 @@ _collection: Optional[Collection] = None
 
 
 def _ensure_storage_dir() -> None:
-    """Create the persistent storage dir, or raise a clear OSError."""
+    """Create a writable ChromaDB storage dir, or raise a clear OSError."""
     try:
         Path(CHROMA_PATH).mkdir(parents=True, exist_ok=True)
     except OSError as exc:
         logger.error("Cannot create ChromaDB directory %s: %s", CHROMA_PATH, exc)
+
 _client_singleton = None
 _client_lock = threading.Lock()
 
@@ -117,7 +122,7 @@ def get_chroma_client():
 
 
 def get_collection() -> Optional[Collection]:
-    """Return the singleton ``project_embeddings`` collection (cosine space)."""
+    """Return the singleton `project_embeddings` collection (cosine space)."""
     if not HAS_CHROMA:
         logger.warning("chromadb not installed, returning mock persistent client")
         return None
@@ -127,7 +132,7 @@ def get_collection() -> Optional[Collection]:
     return client.get_or_create_collection(
         name=COLLECTION_NAME,
         embedding_function=ef,
-        metadata={"hnsw:space": "cosine", "description": "A2Z Agentz — Base project embeddings"},
+        metadata={"hnsw:space": "cosine", "description": "A2Z Agentz - Base project embeddings"},
     )
 
 
@@ -139,15 +144,15 @@ def check_semantic_similarity(
     threshold: float = DEFAULT_THRESHOLD,
 ) -> Tuple[bool, float, Optional[dict]]:
     """
-    Look up the closest existing embedding to ``description``.
+    Look up the closest existing embedding to `description`.
 
     Returns:
         (is_too_similar, similarity_score, matched_metadata_or_none)
-            - is_too_similar  : True iff similarity_score > threshold
-            - similarity_score: float in [-1, 1] (1 - cosine_distance)
-            - matched_metadata: dict from the closest row, or None if the
-                               collection is empty / query failed / match
-                               not returned metadata.
+        - is_too_similar : True iff similarity_score > threshold
+        - similarity_score: float in [-1, 1] (1 - cosine_distance)
+        - matched_metadata: dict from the closest row, or None if the
+                            collection is empty / query failed / match
+                            not returned metadata.
 
     Fail-OPEN on ChromaDB errors: returns (False, 0.0, None) so a transient
     vector-DB outage does not block ingestion of new opportunities.
@@ -169,7 +174,7 @@ def check_semantic_similarity(
             include=["distances", "metadatas"],
         )
     except Exception as exc:
-        logger.error("ChromaDB query failed — fail-OPEN: %s", exc)
+        logger.error("ChromaDB query failed - fail-OPEN: %s", exc)
         return False, 0.0, None
 
     distances = (results.get("distances") or [[]])[0]
@@ -179,7 +184,7 @@ def check_semantic_similarity(
         return False, 0.0, None
 
     distance = float(distances[0])
-    similarity = 1.0 - distance  # cosine distance → similarity in [-1, 1]
+    similarity = 1.0 - distance # cosine distance -> similarity in [-1, 1]
     matched_metadata = metadatas[0] if metadatas else None
 
     return similarity > threshold, similarity, matched_metadata
@@ -190,9 +195,7 @@ def insert_project_embedding(
     description: str,
     metadata: Optional[dict] = None,
 ) -> str:
-    """
-    Persist a project embedding so future runs can dedup against it.
-    """
+    """Persist a project embedding so future runs can dedup against it."""
     if not HAS_CHROMA:
         return project_id
 
@@ -230,7 +233,7 @@ def insert_project_embedding(
 def derive_project_id(record: dict) -> str:
     """
     Pick a stable, canonical project_id from a scraper record.
-    Preference: target_address (unique on-chain) → sha256(description) fallback.
+    Preference: target_address (unique on-chain) -> sha256(description) fallback.
     """
     addr = (record.get("target_address") or "").strip()
     if addr:
@@ -247,7 +250,7 @@ def _now_iso() -> str:
 
 
 # ----------------------------------------------------------------------------
-# Pipeline glue (CLI: stdin JSON Lines → decision JSON Lines)
+# Pipeline glue (CLI: stdin JSON Lines -> decision JSON Lines)
 # ----------------------------------------------------------------------------
 def _process_record(record: dict, threshold: float) -> dict:
     """Apply semantic dedup to one scraper-emitted record."""
@@ -272,7 +275,7 @@ def _process_record(record: dict, threshold: float) -> dict:
 
 def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description="Agent A — ChromaDB semantic-dedup stage.",
+        description="Agent A - ChromaDB semantic-dedup stage.",
     )
     p.add_argument("--threshold", type=float, default=DEFAULT_THRESHOLD,
                    help=f"Similarity threshold in [0, 1]. Default: {DEFAULT_THRESHOLD}")
@@ -280,7 +283,7 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
                    help="Read JSONL from path (default: stdin, '-' = stdin)")
     p.add_argument("--insert-passed", action="store_true",
                    help="Also call insert_project_embedding() for records that pass dedup. "
-                        "Off by default — production should let the downstream AIM stage "
+                        "Off by default - production should let the downstream AIM stage "
                         "decide which survivors are 'approved' and worth remembering.")
     return p.parse_args(argv)
 
@@ -301,14 +304,14 @@ def main(argv: Optional[list[str]] = None) -> int:
             try:
                 record = json.loads(line)
             except json.JSONDecodeError as exc:
-                logger.error("Line %d: invalid JSON (%s) — skipping", line_no, exc)
+                logger.error("Line %d: invalid JSON (%s) - skipping", line_no, exc)
                 errors += 1
                 continue
 
             try:
                 decision = _process_record(record, args.threshold)
             except Exception as exc:
-                logger.exception("Line %d: processing crashed — skipping", line_no)
+                logger.exception("Line %d: processing crashed - skipping", line_no)
                 errors += 1
                 continue
 
@@ -326,24 +329,25 @@ def main(argv: Optional[list[str]] = None) -> int:
                     "Semantic OK | project=%s score=%.4f <= %.2f",
                     decision["project_name"], decision["similarity_score"], args.threshold,
                 )
-                if args.insert_passed:
-                    try:
-                        insert_project_embedding(
-                            project_id=decision["project_id"],
-                            description=decision["description"],
-                            metadata={
-                                "project_name": decision["project_name"],
-                                "target_address": decision["target_address"],
-                                "source": decision["source"],
-                                "similarity_score": decision["similarity_score"],
-                            },
-                        )
-                    except Exception as exc:
-                        logger.error("Insert failed for %s: %s", decision["project_id"], exc)
-                        errors += 1
-                        continue
 
-            # Emit one decision JSON per line → pipe-clean stdout.
+            if args.insert_passed:
+                try:
+                    insert_project_embedding(
+                        project_id=decision["project_id"],
+                        description=decision["description"],
+                        metadata={
+                            "project_name": decision["project_name"],
+                            "target_address": decision["target_address"],
+                            "source": decision["source"],
+                            "similarity_score": decision["similarity_score"],
+                        },
+                    )
+                except Exception as exc:
+                    logger.error("Insert failed for %s: %s", decision["project_id"], exc)
+                    errors += 1
+                    continue
+
+            # Emit one decision JSON per line -> pipe-clean stdout.
             print(json.dumps(decision, ensure_ascii=False, separators=(",", ":")), flush=True)
     finally:
         if in_stream is not sys.stdin:
