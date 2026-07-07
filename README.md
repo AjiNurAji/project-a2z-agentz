@@ -1,25 +1,27 @@
 # 🤖 A2Z Agentz — Autonomous A2A Payment Agent on AMD
 
-Selamat datang di repositori **A2Z Agentz**, proyek **AMD Developer Hackathon: ACT II** dengan tema *Agent-to-Agent Payments*.
+Welcome to **A2Z Agentz**, an **AMD Developer Hackathon: ACT II** project themed *Agent-to-Agent Payments*.
 
-Sistem *multi-agent* otonom yang berjalan 100% di atas infrastruktur **AMD** — dari *fine-tuning* model LLM di **AMD AI Workbench**, *deployment* via **AMD Inference Microservice (AIM)**, hingga *inference* di-**serve** oleh **SGLang** di atas GPU **AMD Instinct™ MI300X** dengan **ROCm** runtime, semuanya di **AMD Developer Cloud**.
+An autonomous multi-agent system built entirely on **AMD** infrastructure — from **LLM fine-tuning** in **AMD AI Workbench**, deployment through **AMD Inference Microservice (AIM)**, to inference served by **SGLang** on **AMD Instinct™ MI300X** with **ROCm** runtime, all running on **AMD Developer Cloud**.
 
-Agen ini mencari peluang Web3 (DeFi/Airdrop) berkualitas, mengeksekusi pembayaran *gas fee* atau modal awal, dan meng-*settle* transaksi on-chain di jaringan **Base** — sepenuhnya otonom antar-agen (*Agent-to-Agent Payment*).
+The agents identify high-quality Web3 opportunities (DeFi / Airdrop), execute gas-fee or seed-capital payments, and settle transactions on-chain on the **Base** network — fully autonomous, agent-to-agent (*Agent-to-Agent Payment*).
 
-## 🌟 Konsep Utama
+## 🌟 Core Concepts
 
-Sistem ini terdiri dari dua agen utama yang bekerja secara asinkron menggunakan *framework* **LangGraph**:
+The system is composed of two primary agents operating asynchronously via **LangGraph**:
 
-1. **Agent A (The Scout)** — Otak intelijen. Model **AIM-tuned LLM** (fine-tuned via **AMD AI Workbench** dari base Llama 3 8B untuk domain Web3 sentiment), di-serve via **SGLang** di **AMD Instinct MI300X**. Memindai Farcaster, Twitter/X, dan data on-chain setiap 1 jam.
-2. **Agent B (The Vault)** — Eksekutor *smart contract* yang mengelola *wallet* (EOA) dengan sistem keamanan *Multi-RPC*, KMS, dan *Circuit Breaker*. Menerima instruksi terenkripsi dari Agent A untuk melakukan pembayaran.
+1. **Agent A (The Scout)** — The designed-for-AMD cloud intel engine for scrape→sentiment→score. It uses the **AMD AI Workbench / AIM workflow** and is built to run on **SGLang (AMD Instinct MI300X / ROCm)**; for demo/runtime stability it can execute against a remote inference runtime when the live AMD cluster is unreachable. Scans **Farcaster** and **on-chain** signals.
 
-## 🛠️ AMD-Native Tech Stack (Kewajiban Hackathon)
+> **Runtime note**: The system is architected to run on AMD AIM / MI300X, but the **current live demo and production inference executes on DeepSeek v4 via Fireworks AI** for hackathon stability.
+2. **Agent B (The Vault)** — A smart-contract executor that manages an EOA wallet with **Multi-RPC** failover, KMS-backed key security, and a **Circuit Breaker**. Receives signed instructions from Agent A to authorize payments.
 
-| Layer | Teknologi AMD |
+## 🛠️ AMD-Native Tech Stack (Hackathon Requirement)
+
+| Layer | AMD Technology |
 |---|---|
 | **Cloud Platform** | AMD Developer Cloud ($100 credits) |
 | **GPU** | AMD Instinct™ MI300X (192GB HBM3) |
-| **Runtime GPU** | AMD ROCm 6.x |
+| **GPU Runtime** | AMD ROCm 6.x |
 | **Fine-Tuning** | **AMD AI Workbench** (no-code GUI) |
 | **Model Deployment** | **AMD Inference Microservice (AIM)** |
 | **Inference Server** | **SGLang** (AMD-recommended) |
@@ -31,30 +33,30 @@ Sistem ini terdiri dari dua agen utama yang bekerja secara asinkron menggunakan 
 | **PWA** | Service Worker, Web App Manifest (offline-capable) |
 | **Wallet UX** | EIP-1193 provider detection (MetaMask, Coinbase Wallet, Rabby, Injected) + frontend-only demo session |
 
-## 📚 Dokumentasi
+## 📚 Documentation
 
-Baca secara berurutan untuk pemahaman maksimal:
+Read sequentially for maximum understanding:
 
-- [01. Arsitektur Sistem](docs/01-architecture.md) — Diagram Mermaid end-to-end + integrasi AMD stack
-- [02. Agent A (The Scout)](docs/02-agent-a-scout.md) — Pipeline AMD AI Workbench fine-tune + AIM + SGLang inference
-- [03. Agent B (The Vault)](docs/03-agent-b-vault.md) — Keamanan on-chain, Gas Oracle, Idempotensi
-- [04. Protokol Komunikasi](docs/04-communication-protocol.md) — Payload JSON, Signature, LangGraph
-- [05. Setup Guide](docs/05-setup-guide.md) — Panduan end-to-end install di AMD Developer Cloud
-- [06. AMD Stack Alignment](docs/06-amd-stack.md) — Pemetaan detail ke tema & tooling wajib ACT II
+- [01. System Architecture](docs/01-architecture.md) — End-to-end Mermaid diagram + AMD stack integration
+- [02. Agent A (The Scout)](docs/02-agent-a-scout.md) — AMD AI Workbench fine-tune pipeline + AIM + SGLang inference
+- [03. Agent B (The Vault)](docs/03-agent-b-vault.md) — On-chain security, Gas Oracle, Idempotency
+- [04. Communication Protocol](docs/04-communication-protocol.md) — JSON Payload, Signature, LangGraph
+- [05. Setup Guide](docs/05-setup-guide.md) — End-to-end install guide for AMD Developer Cloud
+- [06. AMD Stack Alignment](docs/06-amd-stack.md) — Detailed mapping to ACT II theme and required tooling
 
-## 🚀 Fitur Unggulan (Hackathon Highlights)
+## 🚀 Key Features (Hackathon Highlights)
 
-- **AMD-Native Pipeline**: Fine-tune LLM di AMD AI Workbench → deploy sebagai AMD Inference Microservice (AIM) → serve via SGLang di MI300X. Sepenuhnya di AMD Developer Cloud.
-- **Ultra-Low Latency**: Scraping → AIM inference (SGLang-served) → on-chain Tx selesai dalam < 30 detik di MI300X.
-- **Bulletproof Security**: Verifikasi tanda tangan kriptografi, deteksi *double-spending* via PostgreSQL, dan *Emergency Pause* (Circuit Breaker).
+- **AMD-Native Pipeline**: Fine-tune LLM in AMD AI Workbench → deploy as AMD Inference Microservice (AIM) → serve via SGLang on MI300X. Fully on AMD Developer Cloud.
+- **Ultra-Low Latency**: Scraping → AIM inference (SGLang-served) → on-chain Tx completed in < 30 seconds on MI300X.
+- **Bulletproof Security**: Cryptographic signature verification, double-spending detection via PostgreSQL, and Emergency Pause (Circuit Breaker).
 
-### 🎨 Dashboard UI/UX (16 Fitur Production-Grade)
+### 🎨 Dashboard UI/UX (16 Production-Grade Features)
 
-| # | Fitur | Deskripsi |
-|---|-------|-----------|
+| # | Feature | Description |
+|---|---------|-------------|
 | 1 | **Loading Skeletons** | Per-route skeleton states (card, list, chart) |
 | 2 | **Toast Notifications** | Success/error/info toast (auto-dismiss, ARIA live) |
-| 3 | **Error Boundaries** | Crash recovery dengan fallback UI |
+| 3 | **Error Boundaries** | Crash recovery with fallback UI |
 | 4 | **Empty States** | Icon + message + CTA button |
 | 5 | **Command Palette** | ⌘+K keyboard-driven command palette |
 | 6 | **Command Center** | Grouped action overlay |
@@ -69,7 +71,7 @@ Baca secara berurutan untuk pemahaman maksimal:
 | 15 | **Export Utilities** | CSV/JSON data export |
 | 16 | **Reduced Motion** | Respects `prefers-reduced-motion` |
 
-**Aksesibilitas**: WCAG AA, focus rings, ARIA semantics, 44×44px touch targets, `aria-live` regions, skip-to-content, reduced-motion support.
+**Accessibility**: WCAG AA, focus rings, ARIA semantics, 44×44px touch targets, `aria-live` regions, skip-to-content, reduced-motion support.
 
 ---
 
@@ -77,50 +79,50 @@ Baca secara berurutan untuk pemahaman maksimal:
 
 ### Backend
 
-1. Set environment variables di `backend/.env`:
+1. Set environment variables in `backend/.env`:
    ```
    JWT_SECRET=your-random-string-of-at-least-32-chars
    FRONTEND_ORIGIN=http://localhost:3000
    ```
 
-2. Jalankan migrasi tabel users:
+2. Run user table migrations:
    ```bash
    psql $POSTGRES_URI -f backend/database_schema_patch_users.sql
    ```
 
-3. Install dependency baru:
+3. Install dependencies:
    ```bash
    cd backend && pip install -r requirements.txt
    ```
 
 ### Frontend
 
-Set URL backend di `dashboard/.env.local`:
+Set the backend URL in `dashboard/.env.local`:
 ```
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
-### Alur Autentikasi
+### Authentication Flow
 
-1. Landing page → klik "Launch App" / "Log In" → redirect ke `/login`
-2. User daftar di `/register` (email + password + optional wallet) → auto-login → redirect ke `/dashboard`
-3. User login di `/login` → JWT cookie httpOnly diset → redirect ke `/dashboard`
-4. Middleware protect semua route `/dashboard/*` → redirect ke `/login` jika belum auth
-5. Navbar tampilkan email user + tombol Logout
-6. Logout → clear cookie → redirect ke landing page
+1. Landing page → click "Launch App" / "Log In" → redirect to `/login`
+2. User registers at `/register` (email + password + optional wallet) → auto-login → redirect to `/dashboard`
+3. User logs in at `/login` → JWT httpOnly cookie is set → redirect to `/dashboard`
+4. Middleware protects all `/dashboard/*` routes → redirect to `/login` if not authenticated
+5. Navbar displays user email + Logout button
+6. Logout → clear cookie → redirect to landing page
 
 ### Wallet Connect Demo Mode
 
-Frontend juga menyediakan tombol **Connect Wallet** di `/login` dan `/register`:
+The frontend also provides a **Connect Wallet** button on `/login` and `/register`:
 
-- Mendeteksi provider EIP-1193: **MetaMask**, **Coinbase Wallet**, **Rabby**, dan generic injected wallet.
-- Jika wallet extension tersedia, frontend meminta `eth_requestAccounts` dan membaca `eth_chainId`.
-- Jika wallet extension tidak tersedia, frontend memakai **demo fallback session** agar flow hackathon/demo tetap bisa dilanjutkan.
-- Session wallet disimpan secara lokal sebagai `a2z-wallet-session` dan cookie non-httpOnly untuk membuka akses demo ke dashboard.
-- Dashboard menampilkan **Identity Handshake Status**: wallet session, backend auth readiness, dan A2A WebSocket status.
+- Detects EIP-1193 providers: **MetaMask**, **Coinbase Wallet**, **Rabby**, and generic injected wallets.
+- If a wallet extension is available, the frontend requests `eth_requestAccounts` and reads `eth_chainId`.
+- If no wallet extension is available, the frontend falls back to a **demo session** so the hackathon/demo flow can continue without interruption.
+- Wallet session is stored locally as `a2z-wallet-session` and a non-httpOnly cookie to unlock demo access to the dashboard.
+- The dashboard displays **Identity Handshake Status**: wallet session, backend auth readiness, and A2A WebSocket status.
 
-> Catatan keamanan: wallet login saat ini **frontend-only**. Backend production masih perlu endpoint SIWE (`challenge` + `verify`) untuk menerbitkan cookie JWT `a2z-token` yang setara dengan email/password login.
+> **Security note**: Wallet login is currently **frontend-only**. Production backend still needs SIWE endpoints (`challenge` + `verify`) to issue an `a2z-token` JWT cookie equivalent to email/password login.
 
 ---
 
-*Dibangun untuk AMD Developer Hackathon: ACT II — menggunakan 100% AMD stack (AI Workbench → AIM → SGLang → MI300X → ROCm).*
+*Built for AMD Developer Hackathon: ACT II — using a 100% AMD stack (AI Workbench → AIM → SGLang → MI300X → ROCm).*

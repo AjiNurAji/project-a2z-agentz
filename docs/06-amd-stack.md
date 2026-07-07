@@ -19,7 +19,7 @@ A2Z Agentz bukan sekadar "pakai GPU AMD" — kami mengadopsi **end-to-end AMD-na
 | Tema / Persyaratan | Implementasi A2Z |
 |---|---|
 | **"Build AI agents on AMD GPUs in the cloud"** | ✅ Agent A (Scout) berjalan 100% di AMD Instinct MI300X via AMD Developer Cloud. |
-| **AMD AI Workbench** | ✅ Digunakan untuk fine-tune Llama 3 8B → AIM-tuned LLM khusus Web3 sentiment. GUI no-code, no custom training loop. |
+|| **AMD AI Workbench** | ✅ Digunakan untuk fine-tune base LLM → AIM-tuned Qwen 2.5 72B khusus Web3 sentiment. GUI no-code, no custom training loop. |
 | **AMD Inference Microservice (AIM)** | ✅ Hasil fine-tune di-wrap sebagai AIM, di-serve via SGLang OpenAI-compatible endpoint. |
 | **SGLang di ROCm** | ✅ Serving engine untuk AIM, rekomendasi AMD untuk high-throughput inference. |
 | **Akash Systems (co-sponsor)** | 🟡 Opsional: Agent A inference bisa di-bid ke Akash decentralized compute via X402 payment (post-hackathon). |
@@ -31,7 +31,7 @@ A2Z Agentz bukan sekadar "pakai GPU AMD" — kami mengadopsi **end-to-end AMD-na
 Submission lain biasanya pakai OpenAI API atau HuggingFace Inference. A2Z melatih & men-deploy model **sendiri** di infrastruktur AMD — dari Workbench (training) → AIM (packaging) → SGLang (serving). Ini menunjukkan penguasaan penuh toolchain AMD.
 
 ### 2. Fine-tuning sebagai pembeda utama
-Mayoritas submission ACT II akan pakai model *out-of-the-box* tanpa fine-tuning. A2Z **fine-tune Llama 3 8B untuk Web3 sentiment** via AMD AI Workbench. Ini:
+Mayoritas submission ACT II akan pakai model *out-of-the-box* tanpa fine-tuning. A2Z **fine-tune base LLM to AIM-tuned Qwen 2.5 72B untuk Web3 sentiment** via AMD AI Workbench. Ini:
 - Menggunakan tooling AMD yang belum banyak dieksplorasi peserta lain.
 - Meningkatkan akurasi inference untuk domain spesifik (Web3/DeFi).
 - Mudah direproduksi juri: dataset, hyperparameter, dan workflow training semua di Workbench GUI.

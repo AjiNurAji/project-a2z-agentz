@@ -4,19 +4,19 @@
 
 ## ✅ Submission Form (lablab.ai)
 
-| Field | Status | Catatan |
+| Field | Status | Notes |
 |---|---|---|
 | Project Title | ⬜ | "A2Z Agentz — Autonomous A2A Payment Agent on AMD" |
-| Short Description | ⬜ | 1-2 kalimat, mention AMD stack + Agent-to-Agent |
-| Long Description | ⬜ | 3-5 paragraf, link ke PRD.md |
-| Technology Tags | ⬜ | `AMD Instinct MI300X`, `ROCm`, `AMD AI Workbench`, `AMD Inference Microservice`, `SGLang`, `LangGraph`, `Base Network`, `ECDSA`, `Next.js`, `Web3` |
+| Short Description | ⬜ | 1–2 sentences mentioning the AMD stack and Agent-to-Agent theme |
+| Long Description | ⬜ | 3–5 paragraphs with a link to `PRD.md` |
+| Technology Tags | ⬜ | `DeepSeek v4`, `Fireworks AI`, `AMD Instinct MI300X`, `ROCm`, `AMD AI Workbench`, `AMD Inference Microservice`, `SGLang`, `LangGraph`, `Base Network`, `ECDSA`, `Next.js`, `Web3` |
 | Category Tags | ⬜ | `AI Agents`, `Web3`, `FinTech` |
-| Cover Image | ⬜ | 1200x630px, dark theme + AMD branding + Mermaid arch |
-| Video Presentation | ⬜ | 3 menit, demo end-to-end live |
-| Slide Presentation | ⬜ | 10-12 slide, pitch narrative |
+| Cover Image | ⬜ | 1200×630px, dark theme + AMD branding + Mermaid architecture |
+| Video Presentation | ⬜ | 3 minutes, end-to-end live demo |
+| Slide Presentation | ⬜ | 10–12 slides, pitch narrative |
 | Public GitHub Repo | ✅ | https://github.com/axzss/project-a2z-agentz |
-| Demo Application URL | ⬜ | Hosted di AMD Developer Cloud (atau Vercel) |
-| Submission Deadline | ⚠️ | TBD — monitor lablab.ai ACT II page |
+| Demo Application URL | ⬜ | Hosted on AMD Developer Cloud (or Vercel) |
+| Submission Deadline | ⚠️ | TBD — monitor the lablab.ai ACT II page regularly |
 
 ## 📦 Submission Package (Deliverables)
 
@@ -26,10 +26,10 @@
 - [ ] `src/agent_b/` — Vault (KMS, RPC, signer, dry-run)
 - [ ] `contracts/A2ZVault.sol` — Pausable + Ownable Solidity contract
 - [ ] `docker-compose.yml` — PostgreSQL + ChromaDB
-- [ ] `dashboard/` — Next.js (sudah ada, tinggal connect ke backend)
-- [ ] `tests/` — Unit + integration test (idempotency, signature, dry-run)
-- [ ] `.env.example` — Template secrets (no real keys)
-- [ ] `Dockerfile` untuk Agent A & B (ROCm-ready)
+- [ ] `dashboard/` — Next.js (ready, pending backend connection)
+- [ ] `tests/` — Unit + integration tests (idempotency, signature, dry-run)
+- [ ] `.env.example` — Secrets template (no real keys)
+- [ ] `Dockerfile` for Agent A & B (ROCm-ready)
 
 ### Documentation
 - [x] `README.md` — Overview + AMD stack
@@ -39,36 +39,36 @@
 - [x] `docs/03-agent-b-vault.md` — Vault spec
 - [x] `docs/04-communication-protocol.md` — ECDSA + SGLang
 - [x] `docs/05-setup-guide.md` — End-to-end install
-- [x] `docs/06-amd-stack.md` — Alignment untuk juri
+- [x] `docs/06-amd-stack.md` — Judge-facing alignment doc
 - [x] `memory.md` — Changelog
 - [x] `LICENSE` — MIT
 
 ### Submission Artifacts
 - [ ] **Cover image** (PNG/JPG, 1200×630)
 - [ ] **Video** (YouTube unlisted / Loom, 3 min)
-- [ ] **Slide deck** (PDF/PPTX, 10-12 slides)
-- [ ] **Live demo URL** (public, https)
+- [ ] **Slide deck** (PDF/PPTX, 10–12 slides)
+- [ ] **Live demo URL** (public, HTTPS)
 
-## 🎯 Demo Flow untuk Video (3 menit)
+## 🎯 Video Demo Flow (3 minutes)
 
-1. **[0:00-0:30]** Hook: "What if AI agents could pay each other autonomously on-chain?"
-2. **[0:30-1:00]** Problem: Web3 opportunities lost + manual capital bootstrapping pain
-3. **[1:00-1:30]** Solution: A2Z Agentz + AMD stack (show AMD AI Workbench workspace)
-4. **[1:30-2:30]** **LIVE DEMO**:
+1. **[0:00–0:30]** Hook: "What if AI agents could pay each other autonomously on-chain?"
+2. **[0:30–1:00]** Problem: missed Web3 opportunities + manual capital bootstrapping pain
+3. **[1:00–1:30]** Solution: A2Z Agentz + AMD stack (show AMD AI Workbench workspace)
+4. **[1:30–2:30]** **LIVE DEMO**:
    - Trigger Agent A → AIM inference
    - Hybrid scoring (70% sentiment + 30% TVL)
    - Agent B signing payload
    - Tx broadcast → show on Basescan
    - Dashboard live log streaming
-5. **[2:30-2:50]** Safety: Circuit Breaker kill switch demo
-6. **[2:50-3:00]** Closing: tech stack summary + team AnTS Groups + github link
+5. **[2:30–2:50]** Safety: Circuit Breaker kill switch demo
+6. **[2:50–3:00]** Closing: tech stack recap + team AnTS Groups + GitHub link
 
 ## 🚨 Risk Watch
 
-- **Submission deadline TBD** — monitor lablab.ai ACT II page every 2-3 days
-- **AMD Cloud credits** — apply ASAP if not yet claimed
-- **Base mainnet ETH** — need small amount for tx fees (~$5)
-- **Demo data** — jangan pakai data real user, selalu mode dev/sandbox saat pitching
+- **Submission deadline TBD** — monitor the lablab.ai ACT II page every 2–3 days
+- **AMD Cloud credits** — apply immediately if not yet claimed
+- **Base mainnet ETH** — small amount required for tx fees (~$5)
+- **Demo data** — never use real user data; always use dev / sandbox mode during the pitch
 
 ## 📞 Submission Channels
 

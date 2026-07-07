@@ -7,9 +7,8 @@ Dokumen ini menjelaskan arsitektur *high-level* dari sistem **A2Z Agentz** (Auto
 ```mermaid
 graph TD
     subgraph Data Sources
-        F[Farcaster / Neynar API]
-        T[Twitter / X]
-        O[On-Chain Block Explorer]
+    F[Farcaster / Neynar API]
+    O[On-Chain Block Explorer]
     end
 
     subgraph AMD Developer Cloud — Agent A (The Scout)
@@ -70,7 +69,7 @@ graph TD
 ## Komponen Utama
 
 1. **Hardware AMD Instinct™ MI300X** (192GB HBM3) — Inti komputasi AI, tersedia di **AMD Developer Cloud**. Semua inferensi LLM berjalan di GPU ini via **SGLang** dengan backend **ROCm**.
-2. **AMD AI Workbench** — GUI no-code yang digunakan untuk *fine-tune* base LLM (Llama 3 8B Instruct) menjadi **AIM-tuned LLM** yang ter-specialisasi untuk analisis sentimen Web3 (Farcaster, Twitter, on-chain narrative).
+2. **AMD AI Workbench** — GUI no-code yang digunakan untuk *fine-tune* base LLM (Qwen 2.5 72B Instruct) menjadi **AIM-tuned LLM** yang ter-specialisasi untuk analisis sentimen Web3 (Farcaster and on-chain narrative).
 3. **AMD Inference Microservice (AIM)** — Format deployment standar AMD untuk hasil fine-tune. LLM terungkus sebagai *microservice* yang bisa di-panggil via HTTP/gRPC oleh Agent A.
 4. **SGLang (AMD-recommended)** — *Serving framework* LLM *high-throughput* yang berjalan di atas ROCm. Bertugas menerima *request* inference dari Agent A dan mengembalikan *response* terstruktur.
 5. **LangGraph Framework** — Mengorkestrasi state graf antar-agen, menangani *retry mechanism* dan *backpressure*.
@@ -84,7 +83,7 @@ graph TD
 ## Alur AMD Pipeline (Inti)
 
 ```
-Base Llama 3 8B (HuggingFace)
+Base Qwen 2.5 72B Instruct (HuggingFace)
         │
         ▼
 [AMD AI Workbench — fine-tune pada dataset Web3 sentiment]

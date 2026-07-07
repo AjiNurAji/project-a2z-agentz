@@ -348,7 +348,7 @@ AMD-sponsored hackathons (termasuk ACT II saat ini) provide:
 ```
 [Dataset Web3 sentiment]
         ↓
-[AMD AI Workbench GUI] → Fine-tune Llama 3 8B
+[AMD AI Workbench GUI] → Fine-tune Qwen 2.5 72B → AIM-tuned Web3 scorer
         ↓
 [AIM-tuned weights (.safetensors)]
         ↓
@@ -375,7 +375,7 @@ AMD-sponsored hackathons (termasuk ACT II saat ini) provide:
 | Training | AMD AI Workbench | [academy.amd.com](https://academy.amd.com) |
 | Deployment | AMD Inference Microservice (AIM) | [AIM blog](https://rocm.blogs.amd.com/) |
 | Serving | SGLang | [SGLang on AMD](https://rocm.blogs.amd.com/software-tools-optimization/disaggregation/README.html) |
-| Base model | Llama 3 8B Instruct | HuggingFace |
+| Base model | Qwen 2.5 72B Instruct | HuggingFace |
 | Fine-tune dataset | Custom Web3 sentiment | Internal |
 
 ### Total Cost Estimate (4 minggu hackathon)

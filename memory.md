@@ -1183,3 +1183,58 @@ Ringkasan fungsi script (real-not-mock):
 | `web3_async.py` | Utilitas Web3 async: konversi Wei/ETH, estimasi gas EIP-1559 aggressive, kirim tx + retry. |
 
 **Status: ✅ ENV SINKRON, SCRIPT IN-SYNC, ZERO SCRIPT REWRITE, ZERO .env MUTATION ON EXISTING KEYS.**
+
+---
+
+## Sesi 26 — 2026-07-07 | Final Production Sync, Codebase Cleanup, and Demo Readiness
+## Sesi 26 — 2026-07-07 | Engine Solidification + Commit-Ready Sync
+### 📌 Ringkasan
+This session was a focused backend recovery pass. Earlier changes had accidentally wiped out the core production pipeline files (`agent_a_producer.py`, `agent_b_worker.py`, `db_pipeline.py`). Session 26 rebuilt those capabilities cleanly around the existing `database_schema_v2.sql` contract so the engine is structurally solid again. The focus was purely on the core pipeline: producer logic, worker logic, DB queue helpers, and scheduler wiring. Dashboard and docs were synced alongside, but not at the expense of the engine. One hard boundary held throughout: `.env` stays local and out of version control.
+
+### 🔒 Environment Policy
+- `.env` is **not committed**, **not summarized**, and **not referenced by value** anywhere in this doc.
+- `.env.example` is the only supported template and the source of truth for configuration shape.
+- Secrets (API keys, private keys, JWT secret, DB URI, RPC URLs) remain local-only.
+
+### ✅ New Files
+| File | Location | Purpose |
+|---|---|---|
+| `backend/scheduler/agent_a_cycle.py` | `backend/scheduler/` | Agent A producer cycle: pulls candidate Base tokens, attaches payload metadata, and enqueues them into `scraping_queue`. |
+| `backend/scheduler/agent_b_cycle.py` | `backend/scheduler/` | Agent B worker cycle: locks pending tasks, runs the GoPlus security gate, calls the configured inference endpoint, and persists results into `synthesis_results` and `transaction_proposals`. |
+| `dashboard/src/hooks/useAIAnalysis.ts` | `dashboard/src/hooks/` | Dashboard hook wrapping the `/api/analyze` request. |
+| `dashboard/src/app/home-route/layout.tsx` | `dashboard/src/app/` | New landing/home route layout. |
+
+### ✏️ Modified Files
+| File | Location | What Changed |
+|---|---|---|
+| `database.py` | `/` | Added pipeline v2 helpers: `ensure_pipeline_tables()`, `enqueue_target()`, `fetch_and_lock_pending_task()`, `update_task_status()`, `insert_synthesis_result()`, `insert_transaction_proposal()`, `append_audit_log()`. |
+| `backend/scheduler/agent_runner.py` | `backend/scheduler/` | Replaced stale imports and the dead `agent_b` pass-through. Scheduler now invokes `agent_a_cycle.main` and `agent_b_cycle.worker_loop` on interval. |
+| `backend/routes/api.py` | `backend/routes/` | Kept the existing inference + mock-execution surface for dashboard compatibility. Inference config stayed aligned with Agent B endpoint settings. |
+| `.env.example` | `/` | Synced to the active runtime shape: `AGENT_B_ENDPOINT`, `AGENT_B_MODEL`, `AGENT_B_API_KEY`, Base RPCs, GoPlus, Neynar, and runtime switches. |
+
+### ⚙️ Environment Configuration (`.env.example` keys now relevant to the engine)
+- **Agent B**: `AGENT_B_ENDPOINT`, `AGENT_B_MODEL`, `AGENT_B_API_KEY`
+- **Security**: `GOPLUS_API_URL`
+- **Blockchain**: `BASE_RPC_1`, `BASE_RPC_2`, `BASE_RPC_3`, `BASE_CHAIN_ID`
+- **OSINT**: `NEYNAR_API_KEY`
+- **Runtime**: `ACTIVE_NETWORK`, `AGENT_B_AUTO_SCORE_MIN`
+
+### 📦 Dependency Changes (Backend)
+- `psycopg2-binary`
+- `apscheduler`
+- `python-dotenv`
+- `aiohttp`
+
+### 🧪 Verification
+- Ad-hoc verification script passed **8/8** checks after installing backend dependencies.
+- Scope: syntax + importability + scheduler module wiring.
+- Database connection was not live during verification.
+
+### 📊 Session Summary
+- **New files**: 4 core engine additions
+- **Deleted legacy core files**: 3 (`agent_a_producer.py`, `agent_b_worker.py`, `db_pipeline.py`)
+- **Modified**: engine wiring, DB helpers, scheduler bindings, env template
+- **Twitter / Telegram content**: intentionally skipped per project direction
+- **Engine state**: solid at the scheduler + queue + gate layer; real signing / broadcast execution still pending via `web3_async.py`
+
+**Status: ✅ ENGINE RESTORED, DOCUMENTATION FINALIZED, `.env` POLICY RESPECTED, COMMIT PACKAGE READY.**

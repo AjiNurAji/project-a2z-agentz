@@ -6,3 +6,4 @@ APScheduler
 python-dotenv
 bcrypt
 PyJWT
+aiohttp
