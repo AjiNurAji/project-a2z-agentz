@@ -19,8 +19,8 @@ def run_agent_a() -> None:
     logger.info("Triggering Agent A (The Scout)...")
     try:
         from backend.scheduler.agent_a_cycle import main as agent_a_cycle_main
-
-        agent_a_cycle_main()
+        import asyncio
+        asyncio.run(agent_a_cycle_main())
     except SystemExit:
         return
     except Exception as exc:  # noqa: BLE001
@@ -31,8 +31,8 @@ def run_agent_b() -> None:
     logger.info("Triggering Agent B (Vault)...")
     try:
         from backend.scheduler.agent_b_cycle import worker_loop as agent_b_cycle_main
-
-        agent_b_cycle_main()
+        import asyncio
+        asyncio.run(agent_b_cycle_main(poll_interval=0.1))
     except SystemExit:
         return
     except Exception as exc:  # noqa: BLE001
@@ -54,6 +54,7 @@ def start_scheduler() -> None:
     scheduler.add_job(
         run_agent_b,
         trigger=IntervalTrigger(minutes=1),
+        next_run_time=datetime.now(),
         id="agent_b_job",
         name="Agent B Worker Cycle",
         replace_existing=True,

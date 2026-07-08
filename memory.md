@@ -1238,3 +1238,15 @@ This session was a focused backend recovery pass. Earlier changes had accidental
 - **Engine state**: solid at the scheduler + queue + gate layer; real signing / broadcast execution still pending via `web3_async.py`
 
 **Status: ✅ ENGINE RESTORED, DOCUMENTATION FINALIZED, `.env` POLICY RESPECTED, COMMIT PACKAGE READY.**
+
+## Bug Fixes & Refactors (July 2026)
+- **Agent Runner Sync**: Fixed APScheduler jobs by correctly executing background coroutines with `asyncio.run()`.
+- **WebSocket Broadcasting**: Enabled `manager.broadcast()` within `agent_a_cycle.py` and `agent_b_cycle.py` so that the frontend's Agent Communication panel receives real-time agent logs.
+- **TVL Endpoint Fixed**: Dashboard now fetches real-time Base TVL directly from DefiLlama (`/v2/chains`) via backend instead of simulating it.
+- **Neynar Farcaster API Free-Tier Migration**: Swapped the premium Farcaster endpoint (`/v2/farcaster/cast/search`) to the free-tier endpoint (`/v2/farcaster/feed/channels`) to bypass 402 Payment Required errors. Agent A now fetches the feed once per cycle and locally filters casts matching target token names.
+- **Circuit Breaker Hooked**: Added check to `get_system_config('circuit_breaker')` directly into Agent A and Agent B's cycle. Agents now properly halt execution if paused.
+- **Database Refactor**:
+  - Addressed `scraping_queue` missing `UNIQUE(target_address)` constraint, breaking the Agent A enqueue deduplication logic.
+  - Scaled `target_address` length from 42 to 255 to support longer addresses natively.
+  - Added failed task retrying capability to `fetch_and_lock_pending_task` for tasks below the 3 retry limit.
+- **GoPlus API Fix**: Fixed the double `/api/v1/` URL construction bug which was causing Agent B to constantly get 404s when querying honeypot status.

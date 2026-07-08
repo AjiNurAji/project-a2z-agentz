@@ -5,6 +5,12 @@ import { createAgentSocket, type WsStatus, type RawTransaction, type AgentLogPay
 
 const MAX_LOGS = 50;
 
+export interface WsCallbacks {
+  onAgentLog?: (log: AgentLogPayload) => void;
+  onSystemLog?: (log: SystemLogPayload) => void;
+  onTransactions?: (txs: RawTransaction[]) => void;
+}
+
 export interface UseAgentWebSocketResult {
   status: WsStatus;
   transactions: RawTransaction[];
@@ -13,7 +19,7 @@ export interface UseAgentWebSocketResult {
   lastMessageAt: number | null;
 }
 
-export function useAgentWebSocket(): UseAgentWebSocketResult {
+export function useAgentWebSocket(callbacks?: WsCallbacks): UseAgentWebSocketResult {
   const [status, setStatus] = useState<WsStatus>("disconnected");
   const [transactions, setTransactions] = useState<RawTransaction[]>([]);
   const [agentLogs, setAgentLogs] = useState<AgentLogPayload[]>([]);
@@ -27,14 +33,17 @@ export function useAgentWebSocket(): UseAgentWebSocketResult {
       onTransactions: (txs) => {
         setTransactions(txs);
         setLastMessageAt(Date.now());
+        callbacks?.onTransactions?.(txs);
       },
       onAgentLog: (log) => {
         setAgentLogs((prev) => [...prev, log].slice(-MAX_LOGS));
         setLastMessageAt(Date.now());
+        callbacks?.onAgentLog?.(log);
       },
       onSystemLog: (log) => {
         setSystemLogs((prev) => [...prev, log].slice(-MAX_LOGS));
         setLastMessageAt(Date.now());
+        callbacks?.onSystemLog?.(log);
       },
     });
 

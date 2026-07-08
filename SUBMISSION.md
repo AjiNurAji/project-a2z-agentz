@@ -9,7 +9,7 @@
 | Project Title | ⬜ | "A2Z Agentz — Autonomous A2A Payment Agent on AMD" |
 | Short Description | ⬜ | 1–2 sentences mentioning the AMD stack and Agent-to-Agent theme |
 | Long Description | ⬜ | 3–5 paragraphs with a link to `PRD.md` |
-| Technology Tags | ⬜ | `DeepSeek v4`, `Fireworks AI`, `AMD Instinct MI300X`, `ROCm`, `AMD AI Workbench`, `AMD Inference Microservice`, `SGLang`, `LangGraph`, `Base Network`, `ECDSA`, `Next.js`, `Web3` |
+| Technology Tags | ⬜ | `DeepSeek v4`, `Fireworks AI`, `AMD Instinct MI300X`, `ROCm`, `AMD AI Workbench`, `AMD Inference Microservice`, `vLLM`, `LangGraph`, `Base Network`, `ECDSA`, `Next.js`, `Web3` |
 | Category Tags | ⬜ | `AI Agents`, `Web3`, `FinTech` |
 | Cover Image | ⬜ | 1200×630px, dark theme + AMD branding + Mermaid architecture |
 | Video Presentation | ⬜ | 3 minutes, end-to-end live demo |
@@ -37,7 +37,7 @@
 - [x] `docs/01-architecture.md` — Mermaid diagram
 - [x] `docs/02-agent-a-scout.md` — Scout spec + AMD AI Workbench
 - [x] `docs/03-agent-b-vault.md` — Vault spec
-- [x] `docs/04-communication-protocol.md` — ECDSA + SGLang
+- [x] `docs/04-communication-protocol.md` — ECDSA + vLLM
 - [x] `docs/05-setup-guide.md` — End-to-end install
 - [x] `docs/06-amd-stack.md` — Judge-facing alignment doc
 - [x] `memory.md` — Changelog

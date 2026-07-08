@@ -2,7 +2,7 @@
 
 Welcome to **A2Z Agentz**, an **AMD Developer Hackathon: ACT II** project themed *Agent-to-Agent Payments*.
 
-An autonomous multi-agent system built entirely on **AMD** infrastructure — from **LLM fine-tuning** in **AMD AI Workbench**, deployment through **AMD Inference Microservice (AIM)**, to inference served by **SGLang** on **AMD Instinct™ MI300X** with **ROCm** runtime, all running on **AMD Developer Cloud**.
+An autonomous multi-agent system built entirely on **AMD** infrastructure — from **LLM fine-tuning** in **AMD AI Workbench**, deployment through **AMD Inference Microservice (AIM)**, to inference served by **vLLM** on **AMD Instinct™ MI300X** with **ROCm** runtime, all running on **AMD Developer Cloud**.
 
 The agents identify high-quality Web3 opportunities (DeFi / Airdrop), execute gas-fee or seed-capital payments, and settle transactions on-chain on the **Base** network — fully autonomous, agent-to-agent (*Agent-to-Agent Payment*).
 
@@ -10,7 +10,7 @@ The agents identify high-quality Web3 opportunities (DeFi / Airdrop), execute ga
 
 The system is composed of two primary agents operating asynchronously via **LangGraph**:
 
-1. **Agent A (The Scout)** — The designed-for-AMD cloud intel engine for scrape→sentiment→score. It uses the **AMD AI Workbench / AIM workflow** and is built to run on **SGLang (AMD Instinct MI300X / ROCm)**; for demo/runtime stability it can execute against a remote inference runtime when the live AMD cluster is unreachable. Scans **Farcaster** and **on-chain** signals.
+1. **Agent A (The Scout)** — The designed-for-AMD cloud intel engine for scrape→sentiment→score. It uses the **AMD AI Workbench / AIM workflow** and is built to run on **vLLM (AMD Instinct MI300X / ROCm)**; for demo/runtime stability it can execute against a remote inference runtime when the live AMD cluster is unreachable. Scans **Farcaster** and **on-chain** signals.
 
 > **Runtime note**: The system is architected to run on AMD AIM / MI300X, but the **current live demo and production inference executes on DeepSeek v4 via Fireworks AI** for hackathon stability.
 2. **Agent B (The Vault)** — A smart-contract executor that manages an EOA wallet with **Multi-RPC** failover, KMS-backed key security, and a **Circuit Breaker**. Receives signed instructions from Agent A to authorize payments.
@@ -24,7 +24,7 @@ The system is composed of two primary agents operating asynchronously via **Lang
 | **GPU Runtime** | AMD ROCm 6.x |
 | **Fine-Tuning** | **AMD AI Workbench** (no-code GUI) |
 | **Model Deployment** | **AMD Inference Microservice (AIM)** |
-| **Inference Server** | **SGLang** (AMD-recommended) |
+| **Inference Server** | **vLLM** (AMD-recommended) |
 | **Compute Marketplace** | Akash Systems (co-sponsor) |
 | **Frontend** | Next.js 16, React 19, Tailwind CSS v4, TypeScript |
 | **Charts** | Recharts |
@@ -38,7 +38,7 @@ The system is composed of two primary agents operating asynchronously via **Lang
 Read sequentially for maximum understanding:
 
 - [01. System Architecture](docs/01-architecture.md) — End-to-end Mermaid diagram + AMD stack integration
-- [02. Agent A (The Scout)](docs/02-agent-a-scout.md) — AMD AI Workbench fine-tune pipeline + AIM + SGLang inference
+- [02. Agent A (The Scout)](docs/02-agent-a-scout.md) — AMD AI Workbench fine-tune pipeline + AIM + vLLM inference
 - [03. Agent B (The Vault)](docs/03-agent-b-vault.md) — On-chain security, Gas Oracle, Idempotency
 - [04. Communication Protocol](docs/04-communication-protocol.md) — JSON Payload, Signature, LangGraph
 - [05. Setup Guide](docs/05-setup-guide.md) — End-to-end install guide for AMD Developer Cloud
@@ -46,8 +46,8 @@ Read sequentially for maximum understanding:
 
 ## 🚀 Key Features (Hackathon Highlights)
 
-- **AMD-Native Pipeline**: Fine-tune LLM in AMD AI Workbench → deploy as AMD Inference Microservice (AIM) → serve via SGLang on MI300X. Fully on AMD Developer Cloud.
-- **Ultra-Low Latency**: Scraping → AIM inference (SGLang-served) → on-chain Tx completed in < 30 seconds on MI300X.
+- **AMD-Native Pipeline**: Fine-tune LLM in AMD AI Workbench → deploy as AMD Inference Microservice (AIM) → serve via vLLM on MI300X. Fully on AMD Developer Cloud.
+- **Ultra-Low Latency**: Scraping → AIM inference (vLLM-served) → on-chain Tx completed in < 30 seconds on MI300X.
 - **Bulletproof Security**: Cryptographic signature verification, double-spending detection via PostgreSQL, and Emergency Pause (Circuit Breaker).
 
 ### 🎨 Dashboard UI/UX (16 Production-Grade Features)
@@ -125,4 +125,4 @@ The frontend also provides a **Connect Wallet** button on `/login` and `/registe
 
 ---
 
-*Built for AMD Developer Hackathon: ACT II — using a 100% AMD stack (AI Workbench → AIM → SGLang → MI300X → ROCm).*
+*Built for AMD Developer Hackathon: ACT II — using a 100% AMD stack (AI Workbench → AIM → vLLM → MI300X → ROCm).*

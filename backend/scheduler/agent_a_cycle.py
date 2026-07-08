@@ -14,6 +14,7 @@ import aiohttp
 from dotenv import load_dotenv
 
 from database import ensure_pipeline_tables, enqueue_target, append_audit_log
+from routes.websockets import manager
 
 load_dotenv()
 
@@ -60,18 +61,23 @@ async def fetch_dexscreener(session: aiohttp.ClientSession) -> list[dict[str, An
     return tokens
 
 
-async def fetch_social_signals(session: aiohttp.ClientSession, token_name: str) -> list[str]:
+async def fetch_recent_channel_casts(session: aiohttp.ClientSession, channel_id: str = "base", limit: int = 50) -> list[str]:
     if not NEYNAR_API_KEY:
         return []
-    data = await _get(
-        session,
-        "https://api.neynar.com/v2/farcaster/cast/search",
-        {"q": token_name, "limit": NEYNAR_CAST_LIMIT},
-        timeout=10,
-    )
-    if not data:
-        return []
-    return [cast.get("text", "") for cast in data.get("casts", [])]
+    headers = {"api_key": NEYNAR_API_KEY, "accept": "application/json"}
+    try:
+        async with session.get(
+            f"https://api.neynar.com/v2/farcaster/feed/channels?channel_ids={channel_id}&limit={limit}",
+            headers=headers,
+            timeout=10
+        ) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                return [cast.get("text", "") for cast in data.get("casts", [])]
+            logger.warning("Agent A Neynar channels fetch failed -> %s", resp.status)
+    except Exception as exc:
+        logger.warning("Agent A Neynar channels fetch error: %s", exc)
+    return []
 
 
 def _is_opportunity(signals: list[str]) -> bool:
@@ -90,18 +96,32 @@ def _is_opportunity(signals: list[str]) -> bool:
 
 
 async def run_cycle() -> None:
+    from database import get_system_config
+    if get_system_config("circuit_breaker", "active") == "paused":
+        logger.info("Circuit breaker is paused. Agent A skipping cycle.")
+        return
+
     ensure_pipeline_tables()
     async with aiohttp.ClientSession() as session:
         tokens = await fetch_dexscreener(session)
         if not tokens:
             logger.info("Agent A: no tokens fetched")
             return
+        
+        # Fetch Farcaster feed ONCE per cycle using the free endpoint
+        recent_casts = await fetch_recent_channel_casts(session, channel_id="base", limit=50)
+
         queued = 0
         for token in tokens:
             address = token.get("contract_address", "")
             if not address:
                 continue
-            signals = await fetch_social_signals(session, token.get("token_name", ""))
+            
+            token_name = (token.get("token_name") or "").lower()
+            # Filter the cached casts for mentions of this token
+            signals = []
+            if token_name:
+                signals = [cast for cast in recent_casts if token_name in cast.lower()]
             payload = {
                 "source": "agent_a_scout",
                 "token_name": token.get("token_name"),
@@ -124,6 +144,19 @@ async def run_cycle() -> None:
             if queue_id is not None:
                 queued += 1
                 append_audit_log("agent_a.enqueued", f"Enqueued {address}", {"queue_id": queue_id})
+                try:
+                    await manager.broadcast(
+                        json.dumps({
+                            "type": "AGENT_LOG",
+                            "data": {
+                                "sender": "agent_a",
+                                "content": f"Found new target: {token.get('token_name')} ({address}) via DexScreener. Queued for Agent B analysis.",
+                                "metadata": {"projectName": token.get("token_name")}
+                            }
+                        })
+                    )
+                except Exception:
+                    pass
             else:
                 logger.info("Agent A: duplicate skipped %s", address)
         logger.info("Agent A cycle done: queued=%s scanned=%s", queued, len(tokens))

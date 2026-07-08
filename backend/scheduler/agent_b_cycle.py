@@ -22,6 +22,7 @@ from database import (
     insert_transaction_proposal,
     update_task_status,
 )
+from routes.websockets import manager
 from web3_async import MultiRpcProvider
 
 load_dotenv()
@@ -31,7 +32,7 @@ logger = logging.getLogger("a2z.agent_b")
 AGENT_B_ENDPOINT = os.getenv("AGENT_B_ENDPOINT", "")
 AGENT_B_MODEL = os.getenv("AGENT_B_MODEL", "")
 AGENT_B_API_KEY = os.getenv("AGENT_B_API_KEY", "")
-GOPLUS_API_URL = os.getenv("GOPLUS_API_URL", "https://api.gopluslabs.io/api/v1/token_security/8453")
+GOPLUS_API_URL = os.getenv("GOPLUS_API_URL", "")
 BASE_RPC_1 = os.getenv("BASE_RPC_1", "")
 BASE_RPC_2 = os.getenv("BASE_RPC_2", "")
 BASE_RPC_3 = os.getenv("BASE_RPC_3", "")
@@ -71,10 +72,12 @@ def _rpc_health_ok(provider: MultiRpcProvider | None) -> bool:
 
 async def _check_goplus(session: aiohttp.ClientSession, token_address: str) -> dict[str, Any]:
     # v2 schema uses token_security/8453 address path; keep robust to both shapes.
-    urls = [
-        f"{GOPLUS_API_URL.rstrip('/')}/{token_address}",
-        f"{GOPLUS_API_URL.rstrip('/').replace('/token_security/8453', '')}/api/v1/token_security/8453/{token_address}",
-    ]
+    base_url = GOPLUS_API_URL.rstrip('/')
+    if "/token_security/" in base_url:
+        urls = [f"{base_url}/{token_address}"]
+    else:
+        urls = [f"{base_url}/api/v1/token_security/8453/{token_address}"]
+        
     for url in urls:
         data = await _get(session, url)
         if data is not None:
@@ -163,12 +166,27 @@ async def process_task(task: dict[str, Any]) -> None:
 
     inference = await _run_agent_b_inference(token_name, contract_address, goplus_summary)
     score = int(inference.get("score", 0) or 0)
-    synthesis_id = insert_synthesis_result(queue_id, score, inference.get("reason") or "")
+    reason = inference.get("reason") or ""
+    synthesis_id = insert_synthesis_result(queue_id, score, reason)
     append_audit_log(
         "agent_b.synthesized",
         f"Synthesized score={score} for queue_id={queue_id}",
         {"queue_id": queue_id, "score": score, "address": contract_address},
     )
+
+    try:
+        await manager.broadcast(
+            json.dumps({
+                "type": "AGENT_LOG",
+                "data": {
+                    "sender": "agent_b",
+                    "content": f"Analyzed {token_name} ({contract_address}). Score: {score}/100. Reason: {reason}",
+                    "metadata": {"score": score, "projectName": token_name}
+                }
+            })
+        )
+    except Exception:
+        pass
 
     if score >= MAX_SCORE_FOR_AUTO and _rpc_health_ok(_build_rpc_provider()):
         amount_usd = min(float(inference.get("amount_usd", 0) or 0), 2.0)
@@ -178,6 +196,19 @@ async def process_task(task: dict[str, Any]) -> None:
             f"Auto proposal amount_usd={amount_usd}",
             {"synthesis_id": synthesis_id, "proposal_id": proposal_id, "address": contract_address},
         )
+        try:
+            await manager.broadcast(
+                json.dumps({
+                    "type": "AGENT_LOG",
+                    "data": {
+                        "sender": "agent_b",
+                        "content": f"Score {score} >= {MAX_SCORE_FOR_AUTO}. Auto-executing proposal for {token_name}. Amount: ${amount_usd}",
+                        "metadata": {"amountUsd": amount_usd, "projectName": token_name}
+                    }
+                })
+            )
+        except Exception:
+            pass
         update_task_status(queue_id, "COMPLETED", retry=False)
         return
 
@@ -185,13 +216,17 @@ async def process_task(task: dict[str, Any]) -> None:
 
 
 async def worker_loop(poll_interval: float = 2.0) -> None:
+    from database import get_system_config
+    if get_system_config("circuit_breaker", "active") == "paused":
+        logger.info("Circuit breaker is paused. Agent B skipping cycle.")
+        return
+
     ensure_pipeline_tables()
-    logger.info("Agent B worker starting")
+    logger.info("Agent B worker starting cycle")
     while True:
         task = fetch_and_lock_pending_task(limit=1)
         if task is None:
-            await asyncio.sleep(poll_interval)
-            continue
+            break # Exit the cycle when no more tasks
         try:
             await process_task(task)
         except Exception as exc:

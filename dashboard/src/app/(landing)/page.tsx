@@ -144,7 +144,7 @@ function LandingContent() {
                 </div>
                 <h3 className="text-sm font-semibold text-[var(--color-heading)]">OSINT Sentiment Parser</h3>
                 <p className="text-[11px] text-[var(--color-body-subtle)] leading-relaxed">
-                  Scrapes Neynar, Farcaster, and Base explorers. Runs AIM-tuned Qwen 2.5 72B on SGLang to analyze sentiment score. Trigger at score {'>'} 85.
+                  Scrapes Neynar, Farcaster, and Base explorers. Runs AIM-tuned Qwen 2.5 72B on vLLM to analyze sentiment score. Trigger at score {'>'} 85.
                 </p>
               </div>
 

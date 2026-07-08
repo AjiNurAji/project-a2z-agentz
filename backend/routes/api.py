@@ -3,6 +3,7 @@ import os
 import json
 import time
 import hashlib
+import httpx
 
 from starlette.routing import Route
 from starlette.responses import JSONResponse
@@ -78,8 +79,23 @@ async def get_stats(request: Request):
             cur.execute("SELECT COUNT(*) as scanned FROM target_addresses")
             projects_scanned = cur.fetchone()["scanned"] or 0
 
-            # Simulated TVL Analyzed (For demo, assume average project has $1.2M TVL)
-            total_tvl = projects_scanned * 1200000
+            tvl_endpoint = os.getenv("TVL_ENDPOINT", "https://api.llama.fi/v2/chains")
+            total_tvl = 0.0
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(tvl_endpoint, timeout=5.0)
+                    if response.status_code == 200:
+                        data = response.json()
+                        for chain in data:
+                            if chain.get("name") == "Base":
+                                total_tvl = float(chain.get("tvl", 0.0))
+                                break
+                    else:
+                        print(f"Error fetching TVL from {tvl_endpoint}: {response.status_code}")
+            except Exception as e:
+                print(f"Error fetching TVL from {tvl_endpoint}: {e}")
+                # Fallback to simulated data if API fails
+                total_tvl = projects_scanned * 1200000
 
             success_rate = (success_tx / total_tx * 100) if total_tx > 0 else 0
 

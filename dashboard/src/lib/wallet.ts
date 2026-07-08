@@ -105,6 +105,7 @@ export function saveWalletSession(session: WalletSession) {
   if (!isBrowser()) return;
   window.localStorage.setItem(WALLET_SESSION_KEY, JSON.stringify(session));
   document.cookie = `${WALLET_SESSION_COOKIE}=1; path=/; SameSite=Lax; Max-Age=2592000`;
+  document.cookie = `a2z-token=guest; path=/; SameSite=Lax; Max-Age=2592000`;
 }
 
 export function getWalletSession(): WalletSession | null {
@@ -124,4 +125,5 @@ export function clearWalletSession() {
   if (!isBrowser()) return;
   window.localStorage.removeItem(WALLET_SESSION_KEY);
   document.cookie = `${WALLET_SESSION_COOKIE}=; path=/; Max-Age=0; SameSite=Lax`;
+  document.cookie = `a2z-token=; path=/; Max-Age=0; SameSite=Lax`;
 }

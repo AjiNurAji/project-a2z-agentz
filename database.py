@@ -424,14 +424,13 @@ def ensure_pipeline_tables() -> None:
     user_id INTEGER NOT NULL,
     source VARCHAR(64) NOT NULL,
     project_name VARCHAR(255) NOT NULL,
-    target_address VARCHAR(42),
+    target_address VARCHAR(255) UNIQUE,
     data_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
     processing_status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
     retry_count INTEGER NOT NULL DEFAULT 0 CHECK (retry_count >= 0),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT scraping_queue_status_chk CHECK (processing_status IN ('PENDING','PROCESSING','COMPLETED','FAILED')),
-    CONSTRAINT scraping_queue_addr_chk CHECK (target_address IS NULL OR target_address ~ '^0x[a-fA-F0-9]{40}$')
+    CONSTRAINT scraping_queue_status_chk CHECK (processing_status IN ('PENDING','PROCESSING','COMPLETED','FAILED'))
     );
     CREATE TABLE IF NOT EXISTS synthesis_results (
     id SERIAL PRIMARY KEY,
@@ -462,8 +461,11 @@ def ensure_pipeline_tables() -> None:
         with _get_cursor() as cur:
             cur.execute(query)
     except psycopg2.Error as exc:
-        logger.error('ensure_pipeline_tables failed: %s', exc)
-        raise
+        if "duplicate key value violates unique constraint" in str(exc):
+            logger.info('ensure_pipeline_tables race condition caught (tables already created)')
+        else:
+            logger.error('ensure_pipeline_tables failed: %s', exc)
+            raise
 
 
 def enqueue_target(user_id: int, source: str, project_name: str, target_address: str | None, data_payload: dict) -> int | None:
@@ -489,7 +491,7 @@ def enqueue_target(user_id: int, source: str, project_name: str, target_address:
 def fetch_and_lock_pending_task(limit: int = 1):
     query = """
     SELECT * FROM scraping_queue
-    WHERE processing_status = 'PENDING'
+    WHERE processing_status = 'PENDING' OR (processing_status = 'FAILED' AND retry_count < 3)
     ORDER BY id
     FOR UPDATE SKIP LOCKED
     LIMIT %s;
