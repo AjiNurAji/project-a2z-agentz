@@ -1,54 +1,54 @@
 # 02. Agent A (The Scout)
 
-**Agent A** adalah otak intelijen A2Z Agentz. Tugasnya: mencari, mengklasifikasi, dan menyaring proyek Web3 (DeFi/Airdrop) yang kekurangan modal (*gas fee*) dan layak didanai.
+**Agent A** is the intelligence brain of A2Z Agentz. Its job is to discover, classify, and filter Web3 opportunities (DeFi / Airdrop) that are capital-constrained (gas-fee poor) but still fundable.
 
-## 1. Pipeline Pemrosesan Data
+## 1. Data Processing Pipeline
 
-Agent A berjalan via *Cron Job* setiap 1 jam untuk mengumpulkan *batch* data, namun mampu menyelesaikan eksekusi *End-to-End* di bawah 30 detik (latency target: < 30s di AMD Instinct MI300X).
+Agent A runs on a **1-hour Cron Job** to process batches, yet it completes an end-to-end pass in under **30 seconds** (target latency: < 30s on AMD Instinct MI300X).
 
-- **Sumber Data**: Farcaster (via Neynar API) dan On-chain explorer.
-- **Anti-Bot Strategy**: Puppeteer/Selenium dengan mode *Stealth Plugin* (untuk data airdrop yang punya anti-bot ringan).
+- **Data Sources**: Farcaster (via Neynar API) + on-chain block explorers.
+- **Anti-Bot Strategy**: Puppeteer / Selenium with a Stealth Plugin profile for lighter anti-bot airdrop pages.
 
 ## 2. AMD-Native AI Implementation
 
-Inferensi Agent A **100% berjalan di atas AMD stack** — bukan Qwen 2.5 72B generik, tapi versi yang sudah di-*fine-tune* khusus untuk domain Web3.
+Agent A inference runs **100% on the AMD stack** — not a generic Qwen 2.5 72B, but a Web3-domain fine-tuned variant.
 
-| Layer | Tools |
+| Layer | Tooling |
 |---|---|
-| **Fine-Tuning Platform** | **AMD AI Workbench** (GUI no-code, berbasis ROCm) |
+| **Fine-tuning Platform** | **AMD AI Workbench** (no-code GUI, ROCm-backed) |
 | **Base Model** | Qwen 2.5 72B Instruct (pre-trained) |
-| **Fine-Tune Method** | LoRA / QLoRA adapter pada dataset Web3 sentiment |
+| **Fine-tune Method** | LoRA / QLoRA adapter on a Web3 sentiment dataset |
 | **Deployment Format** | **AMD Inference Microservice (vLLM)** — containerized |
-| **Serving Engine** | **vLLM** di AMD Instinct MI300X (ROCm backend) |
+| **Serving Engine** | **vLLM** on AMD Instinct MI300X (ROCm backend) |
 | **Vector Cache** | ChromaDB (embedding-based de-duplication) |
 
-### Alur Fine-Tune
+### Fine-Tune Flow
 
-1. **Dataset Curation**: Kumpulkan ~5.000–10.000 contoh (Farcaster casts, on-chain announcement) yang sudah dilabeli sentimen (positive/neutral/negative) + label legit/scam.
-2. **AMD AI Workbench**: Import dataset → pilih base Qwen 2.5 72B → atur hyperparameter (LoRA rank, learning rate) → jalankan training job di AMD Instinct MI300X (dialokasikan via AMD Developer Cloud credits).
-3. **Export Weights**: Hasil training diekspor sebagai adapter LoRA atau full weights (format `.safetensors`).
-4. **Wrap ke vLLM**: Buat **AMD Inference Microservice** baru yang memuat weights + tokenizer + konfigurasi. vLLM ini yang nanti di-serve.
+1. **Dataset Curation**: Collect ~5,000–10,000 examples (Farcaster casts, on-chain announcements) labeled with sentiment (positive / neutral / negative) plus legit / scam labels.
+2. **AMD AI Workbench**: Import dataset → select Qwen 2.5 72B base → set hyperparameters (LoRA rank, learning rate) → launch the training job on AMD Instinct MI300X (allocated through AMD Developer Cloud credits).
+3. **Export Weights**: Export the training result as a LoRA adapter or full weights (`.safetensors` format).
+4. **Wrap for vLLM**: Build a new **AMD Inference Microservice** that loads the weights, tokenizer, and config. This vLLM service is what gets served.
 
-### Alur Inference (per cron tick)
+### Inference Flow (per cron tick)
 
-1. Agent A trigger scraper → kumpulkan raw text dari Farcaster dan on-chain.
-2. Cek ChromaDB: hitung *similarity score* dengan proyek yang sudah pernah dianalisis. Jika sangat mirip dengan proyek yang sudah dibayar/ditolak, lewati (hemat GPU compute).
-3. **Request inference** ke endpoint vLLM (yang me-load vLLM-tuned LLM) di MI300X.
-4. vLLM-tuned LLM mengembalikan: sentiment score (0-100), key entities, risk flags, summary.
-5. Hybrid Scoring Engine gabungkan 70% sentiment + 30% on-chain TVL.
-6. Jika total > 85 → tandatangani JSON payload dengan *Private Key* Agent A → kirim ke Agent B.
+1. Agent A triggers the scraper -> collect raw text from Farcaster and on-chain sources.
+2. ChromaDB check: compute a *similarity score* against previously analyzed projects. If it closely matches a project already paid or rejected, skip it (saves GPU compute).
+3. **Inference request** to the vLLM endpoint (loading the vLLM-tuned LLM) on MI300X.
+4. The vLLM-tuned LLM returns: sentiment score (0-100), key entities, risk flags, and summary.
+5. Hybrid Scoring Engine combines 70% sentiment + 30% on-chain TVL.
+6. If the total is > 85 -> sign the JSON payload with Agent A's *Private Key* -> forward it to Agent B.
 
 ## 3. Hybrid Scoring Engine
 
-Untuk menghindari halusinasi LLM, Agent A tidak mengambil keputusan 100% secara generatif:
+To keep the LLM from hallucinating, Agent A never decides 100% generatively:
 
-- **70% LLM Sentiment** — vLLM-tuned LLM menganalisis konteks bahasa, pendukung (KOL/Wallet besar), dan narasi proyek.
-- **30% On-chain Metrics** — Verifikasi bahwa *Smart Contract* project sudah di-deploy, terverifikasi di Basescan, dan memiliki TVL minimum (misal: > $500,000).
-- **Threshold** — Jika Total Score > 85, Agent A menyusun *JSON Payload* dan menandatanganinya dengan *Private Key* untuk dikirim ke Agent B.
+- **70% LLM Sentiment** — the vLLM-tuned LLM analyzes language context, backers (KOLs / whale wallets), and project narrative.
+- **30% On-chain Metrics** — verify the project's Smart Contract is deployed, verified on Basescan, and meets a minimum TVL (e.g., > $500,000).
+- **Threshold** — when the Total Score > 85, Agent A assembles a *JSON Payload* and signs it with its *Private Key* before sending it to Agent B.
 
 ## 4. AMD Performance Advantage
 
-Dibandingkan menjalankan Qwen 2.5 72B generik di CPU atau GPU non-ROCm:
-- **Throughput**: vLLM di MI300X delivers > 2000 tokens/s untuk batch inference — cukup untuk memproses 50+ proyek paralel per cron tick.
-- **Latency TTFT**: < 100ms time-to-first-token pada single request (kritikal untuk UX real-time di Dashboard).
-- **Cost**: $100 AMD Developer Cloud credits ≈ ~50 jam inference MI300X — cukup untuk 6 minggu operasional (lebih dari durasi hackathon 4 minggu).
+Compared with running a generic Qwen 2.5 72B on CPU or non-ROCm GPU hardware:
+- **Throughput**: vLLM on MI300X delivers > 2,000 tokens/s for batch inference — enough to process 50+ projects in parallel per cron tick.
+- **Latency (TTFT)**: < 100ms time-to-first-token on a single request (critical for real-time UX in the Dashboard).
+- **Cost**: $100 in AMD Developer Cloud credits equals roughly 50 hours of MI300X inference — enough for about 6 weeks of operation (longer than the 4-week hackathon window).

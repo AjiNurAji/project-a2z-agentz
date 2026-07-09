@@ -1,8 +1,8 @@
-# 01. Arsitektur Sistem Terintegrasi
+# 01. Integrated System Architecture
 
-Dokumen ini menjelaskan arsitektur *high-level* dari sistem **A2Z Agentz** (Autonomous A2A Payment Agent), dibangun **100% di atas AMD stack** untuk AMD Developer Hackathon: ACT II.
+This document explains the high-level architecture of **A2Z Agentz** (Autonomous A2A Payment Agent), built **100% on the AMD stack** for the AMD Developer Hackathon: ACT II.
 
-## Diagram Arsitektur (End-to-End)
+## End-to-End Architecture Diagram
 
 ```mermaid
 graph TD
@@ -66,42 +66,42 @@ graph TD
  VaultCore -->|Live Logs| UI
 ```
 
-## Komponen Utama
+## Core Components
 
-1. **Hardware AMD Instinct™ MI300X** (192GB HBM3) — Inti komputasi AI, tersedia di **AMD Developer Cloud**. Semua inferensi LLM berjalan di GPU ini via **vLLM** dengan backend **ROCm**.
-2. **AMD AI Workbench** — GUI no-code yang digunakan untuk *fine-tune* base LLM (Qwen 2.5 72B Instruct) menjadi **vLLM-served LLM** yang ter-specialisasi untuk analisis sentimen Web3 (Farcaster and on-chain narrative).
-3. **vLLM model server** — Format deployment standar AMD untuk hasil fine-tune. LLM terungkus sebagai *microservice* yang bisa di-panggil via HTTP/gRPC oleh Agent A.
-4. **vLLM (AMD-recommended)** — *Serving framework* LLM *high-throughput* yang berjalan di atas ROCm. Bertugas menerima *request* inference dari Agent A dan mengembalikan *response* terstruktur.
-5. **LangGraph Framework** — Mengorkestrasi state graf antar-agen, menangani *retry mechanism* dan *backpressure*.
-6. **Database Relasional & Vector**:
- - **ChromaDB** — Long-term memory Agent A agar tidak menganalisis proyek yang sama berulang kali.
- - **PostgreSQL** — Log transaksi Agent B untuk memastikan status *idempotency* (mencegah *double-spending*).
-7. **Hybrid Approval Mode** — Semua transaksi < $2 berjalan otonom. Jika > $2, proses tertahan di *Dashboard Next.js* dan butuh klik "Approve" dari manusia.
-8. **Auth System** — Autentikasi email/password dengan JWT httpOnly cookie (7 hari). Backend Starlette: `POST /api/auth/register`, `/login`, `GET /me`, `POST /logout`. Tabel `users` di PostgreSQL (bcrypt hash). Frontend: `AuthProvider` React Context + Next.js middleware route protection. Optional wallet address saat register.
-9. **Route Protection** — Next.js middleware memeriksa keberadaan cookie `a2z-token`. Unauthenticated → redirect `/login`. Authenticated di halaman auth → redirect `/dashboard`.
+1. **AMD Instinct™ MI300X hardware** (192GB HBM3) — the AI compute core, available through **AMD Developer Cloud**. All LLM inference runs on this GPU through **vLLM** with a **ROCm** backend.
+2. **AMD AI Workbench** — the no-code GUI used to fine-tune the base LLM (Qwen 2.5 72B Instruct) into a **vLLM-served LLM** specialized for Web3 sentiment analysis (Farcaster and on-chain narrative).
+3. **vLLM model server** — the standard AMD deployment format for fine-tune outputs. The LLM is wrapped as a *microservice* callable over HTTP/gRPC by Agent A.
+4. **vLLM (AMD-recommended)** — a *high-throughput* LLM *serving framework* running on ROCm. It receives inference *requests* from Agent A and returns structured *responses*.
+5. **LangGraph Framework** — orchestrates inter-agent state graphs, handling *retry mechanisms* and *backpressure*.
+6. **Relational & Vector Database**:
+   - **ChromaDB** — Agent A's long-term memory so it does not re-analyze the same projects repeatedly.
+   - **PostgreSQL** — Agent B transaction log to ensure *idempotency* status (preventing *double-spending*).
+7. **Hybrid Approval Mode** — all transactions under $2 run autonomously. If above $2, the process is held on the *Next.js Dashboard* and requires a human "Approve" click.
+8. **Auth System** — email/password auth with a JWT httpOnly cookie (7 days). Backend Starlette targets: `POST /api/auth/register`, `/login`, `GET /me`, `POST /logout`. `users` table in PostgreSQL (bcrypt hash). Frontend: `AuthProvider` React Context + Next.js middleware route protection. Optional wallet address at registration time.
+9. **Route Protection** — Next.js middleware checks for the `a2z-token` cookie. Unauthenticated -> redirect `/login`. Authenticated on an auth page -> redirect `/dashboard`.
 
-## Alur AMD Pipeline (Inti)
+## AMD Pipeline Flow (Core)
 
 ```
 Base Qwen 2.5 72B Instruct (HuggingFace)
  │
  ▼
-[AMD AI Workbench — fine-tune pada dataset Web3 sentiment]
+[AMD AI Workbench — fine-tune on Web3 sentiment dataset]
  │
  ▼
 vLLM-served weights (.safetensors)
  │
  ▼
-[vLLM model server — wrap sebagai container]
+[vLLM model server — wrap as container]
  │
  ▼
-[vLLM server — load vLLM on ROCm backend pada MI300X]
+[vLLM server — load vLLM on ROCm backend on MI300X]
  │
  ▼
-Agent A Scout → call vLLM via OpenAI-compatible API
+Agent A Scout -> call vLLM via OpenAI-compatible API
 ```
 
-Seluruh pipeline berjalan di **AMD Developer Cloud**, tanpa ketergantungan pada provider cloud eksternal untuk workload AI-nya.
+The entire pipeline runs inside **AMD Developer Cloud**, with no dependency on an external cloud provider for its AI workload.
 
 ---
 
@@ -109,34 +109,35 @@ Seluruh pipeline berjalan di **AMD Developer Cloud**, tanpa ketergantungan pada 
 
 ### TypeUI Design System
 
-Dashboard menggunakan sistem desain internal bernama **TypeUI** dengan token-token berikut (didefinisikan di `globals.css` via CSS `:root` variables):
+The Dashboard uses an internal design system named **TypeUI** with the following tokens (defined in `globals.css` via CSS `:root` variables):
 
-| Token | Kegunaan |
-|-------|----------|
-| `--color-brand` | Warna utama (purple gradient) |
-| `--color-brand-medium` | Variasi brand medium |
+| Token | Purpose |
+|-------|---------|
+| `--color-brand` | Primary color (purple gradient) |
+| `--color-brand-medium` | Medium brand variation |
 | `--color-brand-soft` | Brand glow / shadow |
-| `--color-heading` | Warna teks heading |
-| `--color-body` | Warna teks body |
-| `--color-body-subtle` | Teks sekunder / muted |
-| `--color-border-default` | Border standar |
-| `--color-neutral-secondary-medium` | Background netral |
-| `--font-heading` (Outfit) | Font heading |
-| `--font-body` (Inter) | Font body / data |
-| `--font-mono` (Geist Mono) | Font log / code |
+| `--color-heading` | Heading text color |
+| `--color-body` | Body text color |
+| `--color-body-subtle` | Secondary / muted text |
+| `--color-border-default` | Standard border |
+| `--color-neutral-secondary-medium` | Neutral background |
+| `--font-heading` (Outfit) | Heading font |
+| `--font-body` (Inter) | Body / data font |
+| `--font-mono` (Geist Mono) | Log / code font |
 
-Glassmorphism: `.glass` dan `.glass-card` utility classes untuk efek blur transparan.
+Glassmorphism: `.glass` and `.glass-card` utility classes for a transparent blur effect.
 
 ### Route & Layout Architecture
 
-Next.js App Router dikelompokkan ke dalam dua grup rute utama untuk memisahkan layout visual landing page dan dashboard:
+Next.js App Router is grouped into two main route groups to separate the visual landing page from the dashboard layout:
+
 1. **`(landing)` Group** (`dashboard/src/app/(landing)/`):
- - **Rute**: `/` (Landing Page)
- - **Visual**: Background 2D `<canvas>` Particle Network interaktif (`AgentScene.tsx`) yang beradaptasi dengan perubahan tema, didukung efek mouse parallax, HSL breathing grid, dan scanlines cybernetic.
- - **Main Component**: Mockup Terminal retro dengan GIF animasi multi-agent `A2Z-animation.gif` otonom (Agent A & Agent B).
+   - **Routes**: `/` (Landing Page)
+   - **Visual**: Interactive HTML5 2D `<canvas>` Particle Network background (`AgentScene.tsx`) that adapts to theme changes, with mouse parallax, HSL breathing grid, and cybernetic scanlines.
+   - **Main Component**: Retro mockup terminal with an animated multi-agent `A2Z-animation.gif` (Agent A & Agent B).
 2. **`(dashboard)` Group** (`dashboard/src/app/(dashboard)/`):
- - **Rute**: `/dashboard` (Dashboard Utama) beserta halaman pendukung (`/agents`, `/analytics`, `/memory`, `/settings`, `/history`).
- - **Layout**: Sidebar & Navbar permanen, state management tersinkronisasi (`DashboardContext.tsx`), serta global keybindings wrapper.
+   - **Routes**: `/dashboard` (Main Dashboard) plus supporting pages (`/agents`, `/analytics`, `/memory`, `/settings`, `/history`).
+   - **Layout**: Persistent Sidebar & Navbar, synchronized state management (`DashboardContext.tsx`), and global keybindings wrapper.
 
 ### Component Hierarchy
 
@@ -145,7 +146,7 @@ Root Layout (dashboard/src/app/layout.tsx)
 ├── PWARegister ← Service worker registration
 ├── ToastProvider & Toast ← Global toast notification system
 ├── RouteProgress ← Top transition loading bar
-└── Rute Grup
+└── Route Group
  ├── (landing) Layout
  │ └── Landing Page (page.tsx)
  │ ├── AgentScene ← Interactive HTML5 2D Canvas Background
@@ -169,31 +170,31 @@ Root Layout (dashboard/src/app/layout.tsx)
 
 ### Loading & Streaming Patterns
 
-Setiap rute di bawah grup `(dashboard)` memiliki `loading.tsx` yang menampilkan **Skeleton** komponen saat data sedang dimuat secara asinkron (Streaming SSR):
+Every route under the `(dashboard)` group has a `loading.tsx` file that shows **Skeleton** components while data is being loaded asynchronously (Streaming SSR):
 
-- `dashboard/src/app/(dashboard)/loading.tsx` — Root dashboard skeleton (6 KPI cards + 3-column grid)
-- `dashboard/src/app/(dashboard)/analytics/loading.tsx` — Chart skeletons (area, line, bar)
-- `dashboard/src/app/(dashboard)/memory/loading.tsx` — Vector memory explorer skeleton
-- `dashboard/src/app/(dashboard)/settings/loading.tsx` — Settings form skeleton
-- `dashboard/src/app/(dashboard)/history/loading.tsx` — Audit trail table skeleton
+- `dashboard/src/app/(dashboard)/loading.tsx` — root dashboard skeleton (6 KPI cards + 3-column grid)
+- `dashboard/src/app/(dashboard)/analytics/loading.tsx` — chart skeletons (area, line, bar)
+- `dashboard/src/app/(dashboard)/memory/loading.tsx` — vector memory explorer skeleton
+- `dashboard/src/app/(dashboard)/settings/loading.tsx` — settings form skeleton
+- `dashboard/src/app/(dashboard)/history/loading.tsx` — audit trail table skeleton
 
-Pattern: **Streaming SSR** via Next.js App Router — data simulasi real-time dialirkan secara asinkron dari server ke komponen client, menggunakan `loading.tsx` sebagai Suspense boundary.
+Pattern: **Streaming SSR** via the Next.js App Router — simulated real-time data streams asynchronously from the server to client components, with `loading.tsx` acting as the Suspense boundary.
 
 ### Error Handling
 
-- `ErrorBoundary.tsx` — Setiap section utama dibungkus error boundary dengan fallback UI untuk pemulihan crash seketika.
-- `not-found.tsx` — Custom 404 page (animated, branded).
-- `Toast.tsx` — Notifikasi error/info/success global (ARIA live regions).
+- `ErrorBoundary.tsx` — each main section is wrapped in an error boundary with fallback UI for instant crash recovery.
+- `not-found.tsx` — custom animated branded 404 page.
+- `Toast.tsx` — global error/info/success notifications (ARIA live regions).
 
 ### Accessibility Stack
 
 - `SkipToContent.tsx` — WCAG 2.1 skip navigation link.
-- `useReducedMotion.ts` — Mendeteksi media query `prefers-reduced-motion`.
-- `KeyboardNavWrapper.tsx` — Navigasi keyboard penuh (1-5 rute, ⌘+K, Esc).
-- `aria-live="polite"` pada semua area yang update real-time (LiveLog, Toast).
-- `role="log"`, `role="alert"`, `aria-label` pada semua interactive elements.
-- Focus-visible rings pada semua target interaktif.
-- Area sentuh (touch targets) minimum 44×44px.
+- `useReducedMotion.ts` — detects the `prefers-reduced-motion` media query.
+- `KeyboardNavWrapper.tsx` — full keyboard navigation (routes 1-5, ⌘+K, Esc).
+- `aria-live="polite"` on all real-time updating areas (LiveLog, Toast).
+- `role="log"`, `role="alert"`, `aria-label` on all interactive elements.
+- Focus-visible rings on all interactive targets.
+- Touch targets minimum 44×44px.
 
 ## Active Lane Separation
 

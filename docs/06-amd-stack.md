@@ -1,66 +1,70 @@
-# 06. AMD Stack Alignment (untuk Penilai Hackathon)
+# 06. AMD Stack Alignment (for Hackathon Reviewers)
 
-Dokumen ini menjelaskan **mengapa A2Z Agentz adalah submission yang 100%契合 (cocok) dengan tema & tooling wajib AMD Developer Hackathon: ACT II**, dan bagaimana setiap komponen proyek dipetakan ke ekosistem AMD.
+This document explains **why A2Z Agentz is a perfect fit for the AMD Developer Hackathon: ACT II theme and required tooling**, and how every project component maps to the AMD ecosystem.
 
-## Ringkasan Posisi
+## Position Summary
 
-A2Z Agentz bukan sekadar "pakai GPU AMD" — kami mengadopsi **end-to-end AMD-native pipeline** dari training hingga deployment:
+A2Z Agentz goes beyond "using an AMD GPU." It adopts an **end-to-end AMD-native pipeline** from training to deployment:
 
 ```
-[Data Web3] → [AMD AI Workbench: fine-tune] → [vLLM: model]
-                                                       ↓
-[Dashboard] ← [vLLM inference MI300X] ← [vLLM-served LLM]
-        ↓
-[Agent B: on-chain Base] ← [vLLM-served output]
+[Data Web3] -> [AMD AI Workbench: fine-tune] -> [vLLM: model]
+ |
+[Dashboard] <- [vLLM inference MI300X] <- [vLLM-served LLM]
+ |
+[Agent B: Base on-chain] <- [vLLM-served output]
 ```
 
-## Pemetaan ke Tema ACT II
+## Mapping to ACT II Themes
 
-| Tema / Persyaratan | Implementasi A2Z |
+| Theme / Requirement | A2Z Implementation |
 |---|---|
-| **"Build AI agents on AMD GPUs in the cloud"** | ✅ Agent A (Scout) berjalan 100% di AMD Instinct MI300X via AMD Developer Cloud. |
-|| **AMD AI Workbench** | ✅ Digunakan untuk fine-tune base LLM → vLLM-served Qwen 2.5 72B khusus Web3 sentiment. GUI no-code, no custom training loop. |
-| **vLLM model server** | ✅ Hasil fine-tune di-wrap sebagai AIM, di-serve via vLLM OpenAI-compatible endpoint. |
-| **vLLM on ROCm** | ✅ Serving engine for vLLM, rekomendasi AMD untuk high-throughput inference. |
-| **Akash Systems (co-sponsor)** | 🟡 Opsional: Agent A inference bisa di-bid ke Akash decentralized compute via X402 payment (post-hackathon). |
-| **$100 AMD Cloud Credits** | ✅ Digunakan untuk: 1) training job AI Workbench (~30 credits), 2) hosting vLLM server 4 minggu (~50 credits), 3) buffer. |
+| **"Build AI agents on AMD GPUs in the cloud"** | ✅ Agent A (Scout) runs 100% on AMD Instinct MI300X via AMD Developer Cloud. |
+| **AMD AI Workbench** | ✅ Used to fine-tune base LLM -> vLLM-served Qwen 2.5 72B specialized for Web3 sentiment. GUI no-code, no custom training loop. |
+| **vLLM model server** | ✅ Fine-tune result is wrapped as an AIM, served via a vLLM OpenAI-compatible endpoint. |
+| **vLLM on ROCm** | ✅ Serving engine for vLLM, AMD's recommendation for high-throughput inference. |
+| **Akash Systems (co-sponsor)** | 🟡 Optional: Agent A inference can later be bid out to Akash decentralized compute via X402 payment (post-hackathon). |
+| **$100 AMD Cloud Credits** | ✅ Used for: 1) training job AI Workbench (~30 credits), 2) hosting vLLM server for 4 weeks (~50 credits), 3) buffer. |
 
-## Mengapa Pendekatan Ini Kuat untuk ACT II
+## Why This Approach Is Strong for ACT II
 
-### 1. Showcase end-to-end AMD stack
-Submission lain biasanya pakai OpenAI API atau HuggingFace Inference. A2Z melatih & men-deploy model **sendiri** di infrastruktur AMD — dari Workbench (training) → vLLM model (packaging) → vLLM serving. Ini menunjukkan penguasaan penuh toolchain AMD.
+### 1. End-to-end AMD stack showcase
 
-### 2. Fine-tuning sebagai pembeda utama
-Mayoritas submission ACT II akan pakai model *out-of-the-box* tanpa fine-tuning. A2Z **fine-tune base LLM to vLLM-served Qwen 2.5 72B untuk Web3 sentiment** via AMD AI Workbench. Ini:
-- Menggunakan tooling AMD yang belum banyak dieksplorasi peserta lain.
-- Meningkatkan akurasi inference untuk domain spesifik (Web3/DeFi).
-- Mudah direproduksi juri: dataset, hyperparameter, dan workflow training semua di Workbench GUI.
+Most submissions use OpenAI API or HuggingFace Inference. A2Z trains and deploys its own model on AMD hardware -- from Workbench (training) -> vLLM model (packaging) -> vLLM serving. This shows full command of the AMD toolchain.
+
+### 2. Fine-tuning as the main differentiator
+
+Most ACT II submissions will use an out-of-the-box model without fine-tuning. A2Z fine-tunes a base LLM into a Web3-sentiment vLLM-served Qwen 2.5 72B via AMD AI Workbench. This:
+- Uses AMD tooling that most other participants have not explored yet.
+- Improves inference accuracy for the target domain (Web3 / DeFi).
+- Is easy for judges to reproduce: dataset, hyperparameters, and training workflow are all visible in the Workbench GUI.
 
 ### 3. Production-grade safety layer
-A2Z tidak hanya demo happy path. Ada:
-- KMS key management (bukan hardcoded private key)
-- ECDSA signature verification antar-agen
+
+A2Z is not just a happy-path demo. It includes:
+- KMS key management (not a hardcoded private key)
+- ECDSA signature verification between agents
 - PostgreSQL idempotency check
 - Circuit Breaker + Manual Approval
-- Foundry Anvil dry-run untuk honeypot detection
+- Foundry Anvil dry-run for honeypot detection
 
-Ini menjawab juri yang concern tentang agent yang "bermain" dengan uang sungguhan.
+This addresses judge concerns about agents interacting with real funds.
 
 ### 4. Real on-chain execution
-Bukan simulasi. Agent B execute transaksi **real on Base mainnet** (dengan hard-cap $1-2 untuk keamanan selama hackathon). Juri bisa verify Tx Hash di Basescan.
 
-## Demo Flow untuk Juri (Saran Urutan Pitch)
+Not a simulation. Agent B executes real transactions on Base mainnet (with a hard cap of $1-2 for safety during the hackathon). Judges can verify the Tx Hash on Basescan.
 
-1. **Show AMD Developer Cloud console** — workspace running di MI300X.
-2. **Buka AMD AI Workbench** — tunjukkan fine-tune job history + resulting vLLM model.
-3. **Buka vLLM endpoint** — `curl /v1/models` → tunjukkan vLLM-served LLM loaded.
-4. **Trigger Agent A manual run** — call vLLM dengan sample Farcaster post → dapat sentiment + reason.
-5. **Hybrid Scoring** — kombinasikan dengan TVL check on-chain → score > 85.
-6. **Agent B signing + execute** — tunjukkan signature payload → tx hash di Base.
-7. **Buka Dashboard** — live log semua step di atas, Tx Hash link ke Basescan.
-8. **Trigger Circuit Breaker** — tunjukkan pause global kill switch.
+## Demo Flow for Judges (Suggested Pitch Order)
 
-## Referensi Eksternal
+1. **Show AMD Developer Cloud console** -- workspace running on MI300X.
+2. **Open AMD AI Workbench** -- show fine-tune job history + resulting vLLM model.
+3. **Open vLLM endpoint** -- `curl /v1/models` -> show vLLM-served LLM loaded.
+4. **Trigger Agent A manual run** -- call vLLM with sample Farcaster post -> get sentiment + reason.
+5. **Hybrid Scoring** -- combine with on-chain TVL check -> score > 85.
+6. **Agent B signing + execution** -- show the signed payload -> tx hash on Base.
+7. **Open Dashboard** -- live log of every step above, Tx Hash link to Basescan.
+8. **Trigger Circuit Breaker** -- show the global kill switch pause.
+
+## External References
 
 - AMD Blog: [Adapting vLLM models For Specific Use Cases Through Fine-Tuning in AMD AI Workbench](https://rocm.blogs.amd.com/software-tools-optimization/aiwb-fine-tuning/README.html)
 - AMD Blog: [Unleashing AMD Instinct MI300X GPUs for LLM Serving with vLLM](https://rocm.blogs.amd.com/software-tools-optimization/disaggregation/README.html)

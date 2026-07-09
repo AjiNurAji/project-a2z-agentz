@@ -1,20 +1,20 @@
 # A2Z Agentz — Web Dashboard
 
-Frontend dashboard untuk **A2Z Agentz** (Autonomous A2A Payment Agent) — submission untuk **AMD Developer Hackathon: ACT II**.
+Frontend dashboard for **A2Z Agentz** (Autonomous A2A Payment Agent) — submission for **AMD Developer Hackathon: ACT II**.
 
-Dibangun dengan **Next.js 16** + **React 19** + **Tailwind CSS v4** + **TypeScript**.
+Built with **Next.js 16** + **React 19** + **Tailwind CSS v4** + **TypeScript**.
 
-> 🛠️ **Powered by AMD Instinct / Radeon Pro™ MI300X** — backend Agent A berjalan di GPU AMD via **vLLM** dengan **AMD Inference Microservice (vLLM)** hasil fine-tune **AMD AI Workbench**.
+> **Powered by AMD Instinct / Radeon Pro™ MI300X** — Agent A backend runs on AMD GPU via **vLLM** with a **vLLM** inference service, fine-tuned using **AMD AI Workbench**.
 
 ## Getting Started (Local Dev)
 
-Dashboard ini consume API dari Agent A & Agent B yang berjalan di AMD Developer Cloud. Untuk development lokal:
+This dashboard consumes APIs from Agent A & Agent B running on AMD Developer Cloud. For local development:
 
 ```bash
 # 1. Install dependencies
 npm install
 
-# 2. (Opsional) Setup env untuk point ke AMD Cloud endpoint
+# 2. (Optional) Configure env to point at AMD Cloud endpoints
 echo "NEXT_PUBLIC_AGENT_A_API=https://your-amd-cloud/a2z-agent-a" > .env.local
 echo "NEXT_PUBLIC_AGENT_B_API=https://your-amd-cloud/a2z-agent-b" >> .env.local
 
@@ -22,7 +22,7 @@ echo "NEXT_PUBLIC_AGENT_B_API=https://your-amd-cloud/a2z-agent-b" >> .env.local
 npm run dev
 ```
 
-Buka [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000).
 
 ## Build
 
@@ -45,46 +45,46 @@ npm start
 | Real-time | Agent A/B WebSocket + polling fallback |
 | Wallet UX | EIP-1193 provider detection + frontend-only demo session |
 
-## Halaman
+## Pages
 
-- `/` — Landing page cinematic + A2A positioning
+- `/` — Cinematic landing page + A2A positioning
 - `/login` — Email/password login + Connect Wallet modal
 - `/register` — Register form + wallet connect autofill
-- `/dashboard` — Dashboard utama: KPI, Identity Handshake Status, Circuit Breaker, Live Log, Approval Queue, Transaction List
-- `/analytics` — Chart TVL, gas, success rate (Recharts)
+- `/dashboard` — Main dashboard: KPI, Identity Handshake Status, Circuit Breaker, Live Log, Approval Queue, Transaction List
+- `/analytics` — TVL, gas, success rate charts (Recharts)
 - `/memory` — ChromaDB vector memory explorer
 - `/settings` — Config Agent A (cron, weights) + Agent B (RPC, KMS, cap)
-- `/history` — Audit trail paginated
+- `/history` — Paginated audit trail
 
 ## Wallet Connect & Demo Auth
 
-Komponen wallet berada di:
+Wallet components are located at:
 
 - `src/lib/wallet.ts` — provider detection, session persistence, address formatting
 - `src/hooks/useWalletConnect.ts` — connect flow + demo fallback when no wallet extension exists
 - `src/components/WalletConnectModal.tsx` — modal selector with continue-to-dashboard action
 - `src/components/A2AIdentityReadiness.tsx` — dashboard readiness card for wallet/backend/WebSocket state
 
-Behavior saat ini:
+Current behavior:
 
-1. Klik **Connect Wallet** di login/register.
-2. Pilih MetaMask/Coinbase/Rabby/Browser Wallet.
-3. Jika provider asli ada, browser memanggil `eth_requestAccounts`.
-4. Jika provider tidak ada, app membuat **mock demo wallet session** agar demo tetap bisa lanjut.
-5. Setelah session aktif, tombol **Continue to dashboard** muncul.
-6. Middleware menerima cookie `a2z-wallet-session=1` sebagai akses demo frontend-only.
+1. Click **Connect Wallet** on login/register.
+2. Select MetaMask/Coinbase/Rabby/Browser Wallet.
+3. If a real provider exists, the browser calls `eth_requestAccounts`.
+4. If no provider exists, the app creates a **mock demo wallet session** so the demo can continue.
+5. Once the session is active, the **Continue to dashboard** button appears.
+6. Middleware accepts the `a2z-wallet-session=1` cookie as frontend-only demo access.
 
-> Production note: wallet auth belum menggantikan backend JWT. Tambahkan SIWE challenge/verify endpoint untuk menerbitkan `a2z-token` httpOnly sebelum digunakan production.
+> Production note: wallet auth does not replace backend JWT yet. Add a SIWE challenge/verify endpoint to issue an `a2z-token` httpOnly cookie before using this in production.
 
-## Aksesibilitas (a11y)
+## Accessibility (a11y)
 
 - WCAG AA compliance
 - Focus rings, `aria-label`, semantic roles
-- Touch target minimum 44×44px
-- `aria-live="polite"` di LiveLog
+- Minimum 44×44px touch targets
+- `aria-live="polite"` on LiveLog
 - **Skip to Content** — `SkipToContent.tsx` (WCAG 2.1 skip link)
 - **Reduced Motion** — `useReducedMotion.ts` (respects `prefers-reduced-motion`)
-- **Error Boundaries** — `ErrorBoundary.tsx` (crash recovery w/ fallback UI)
+- **Error Boundaries** — `ErrorBoundary.tsx` (crash recovery with fallback UI)
 - **Empty States** — `EmptyState.tsx` (icon + message + CTA)
 - **Tooltips** — `Tooltip.tsx` (accessible hover/focus)
 
@@ -109,18 +109,18 @@ Behavior saat ini:
 - **OG Image** — `opengraph-image.tsx` (1200×630 branded social preview)
 - **SEO** — `robots.ts` + `sitemap.ts` (dynamic generation)
 
-## 🎨 UI/UX Features (22 Fitur)
+## 🎨 UI/UX Features (22 Features)
 
 1. **Loading Skeletons** — `Skeleton.tsx` + 5× `loading.tsx` per-route
 2. **Toast Notifications** — `Toast.tsx` (success/error/info, auto-dismiss)
 3. **Error Boundaries** — `ErrorBoundary.tsx` (crash recovery)
-4. **Empty States** — `EmptyState.tsx` (icon + message + CTA) — 🟢 actively used in VectorMemoryExplorer + AuditTrail
-5. **Command Palette** — `CommandPalette.tsx` (⌘+K) — 🟢 wired with real navigation & actions
-6. **Command Center** — `CommandCenter.tsx` (grouped actions) — 🟢 data attributes fixed
+4. **Empty States** — `EmptyState.tsx` (icon + message + CTA) — actively used in VectorMemoryExplorer + AuditTrail
+5. **Command Palette** — `CommandPalette.tsx` (⌘+K) — wired with real navigation & actions
+6. **Command Center** — `CommandCenter.tsx` (grouped actions) — data attributes fixed
 7. **Keyboard Navigation** — `KeyboardNavWrapper.tsx` + `useKeyboardNav.ts`
-8. **Animated Counters** — `AnimatedCounter.tsx` (tween morph) — 🟢 actively used in KpiCard
-9. **Tooltips** — `Tooltip.tsx` (accessible) — 🟢 actively used on KpiCards & status badges
-10. **Breadcrumbs** — `Breadcrumbs.tsx` (route-aware) — 🟢 import fixed (motion/react)
+8. **Animated Counters** — `AnimatedCounter.tsx` (tween morph) — actively used in KpiCard
+9. **Tooltips** — `Tooltip.tsx` (accessible) — actively used on KpiCards & status badges
+10. **Breadcrumbs** — `Breadcrumbs.tsx` (route-aware) — import fixed (motion/react)
 11. **Route Progress** — `RouteProgress.tsx` (top loading bar)
 12. **Scroll to Top** — `ScrollToTop.tsx` (floating button)
 13. **Skip to Content** — `SkipToContent.tsx` (a11y)
@@ -134,9 +134,9 @@ Behavior saat ini:
 21. **Design Tokens (LiveLog)** — All hardcoded hex replaced with CSS variables
 22. **Design Tokens (AnalyticsCharts)** — Chart colors use CSS variables
 23. **Wallet Connect Modal** — MetaMask/Coinbase/Rabby/Injected detection + demo fallback
-24. **A2A Identity Readiness** — dashboard card for wallet session, backend auth, and WebSocket status
+24. **A2A Identity Readiness** — Dashboard card for wallet session, backend auth, and WebSocket status
 
-## 📦 Komponen Inventori (30+)
+## 📦 Component Inventory (30+)
 
 ### Core Components
 - `DashboardContext.tsx` — Global state + real-time data simulator
@@ -150,8 +150,8 @@ Behavior saat ini:
 
 ### Data Components
 - `KpiCard.tsx` — Reusable metric card (5 color variants)
-- `DashboardKpis.tsx` — 6 KPI cards (TVL, success rate, total tx, dll)
-- `AnalyticsCharts.tsx` — 3 Recharts (TVL area, gas line, success/fail bar)
+- `DashboardKpis.tsx` — 6 KPI cards (TVL, success rate, total tx, etc.)
+- `AnalyticsCharts.tsx` — 3 Recharts charts (TVL area, gas line, success/fail bar)
 - `TransactionList.tsx` — Tx table + expandable rows + Basescan links
 - `AuditTrail.tsx` — Paginated audit log (10/page) + search + filter
 
@@ -180,7 +180,7 @@ Behavior saat ini:
 - `exportUtils.ts` — CSV/JSON export utilities
 - `useKeyboardNav.ts` — Keyboard navigation hook
 
-> **🟢 Actively Used:** `AnimatedCounter` (in KpiCard), `Tooltip` (KpiCard + status badges), `Skeleton` (SSR hydration loading), `EmptyState` (VectorMemoryExplorer + AuditTrail), `CommandPalette` (wired with real actions), `KeyboardNavWrapper` (with visible hints)
+> **Actively Used:** `AnimatedCounter` (in KpiCard), `Tooltip` (KpiCard + status badges), `Skeleton` (SSR hydration loading), `EmptyState` (VectorMemoryExplorer + AuditTrail), `CommandPalette` (wired with real actions), `KeyboardNavWrapper` (with visible hints)
 
 ### Hooks
 - `useReducedMotion.ts` — `prefers-reduced-motion` detection
@@ -201,18 +201,18 @@ Behavior saat ini:
 
 ## Deployment
 
-Untuk production, deploy ke Vercel atau platform Next.js-compatible lain. Set environment variables untuk point ke AMD Cloud Agent A & Agent B endpoints.
+For production, deploy to Vercel or another Next.js-compatible platform. Set environment variables to point to AMD Cloud Agent A & Agent B endpoints.
 
 ```bash
-# Deploy ke Vercel
+# Deploy to Vercel
 vercel deploy --prod
 
-# Atau build static export
+# Or build static export
 npm run build
 ```
 
-Lihat dokumentasi lengkap di [`/docs/`](https://github.com/axzss/project-a2z-agentz/tree/develop/docs).
+See full documentation in [`/docs/`](https://github.com/axzss/project-a2z-agentz/tree/develop/docs).
 
 ---
 
-*Dibangun untuk AMD Developer Hackathon: ACT II.*
+*Built for AMD Developer Hackathon: ACT II.*
