@@ -4,7 +4,7 @@ Frontend dashboard untuk **A2Z Agentz** (Autonomous A2A Payment Agent) — submi
 
 Dibangun dengan **Next.js 16** + **React 19** + **Tailwind CSS v4** + **TypeScript**.
 
-> 🛠️ **Powered by AMD Instinct™ MI300X** — backend Agent A berjalan di GPU AMD via **SGLang** dengan **AMD Inference Microservice (AIM)** hasil fine-tune **AMD AI Workbench**.
+> 🛠️ **Powered by AMD Instinct / Radeon Pro™ MI300X** — backend Agent A berjalan di GPU AMD via **vLLM** dengan **AMD Inference Microservice (vLLM)** hasil fine-tune **AMD AI Workbench**.
 
 ## Getting Started (Local Dev)
 

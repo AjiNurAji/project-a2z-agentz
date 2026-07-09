@@ -1,77 +1,53 @@
-# Submission Checklist — AMD Developer Hackathon: ACT II
+# Submission Checklist — AMD Developer Hackathon: Track 3 — Unicorn (Open Innovation)
 
-> Reference: [lablab.ai/ai-hackathons/amd-developer-hackathon-act-ii](https://lablab.ai/ai-hackathons/amd-developer-hackathon-act-ii)
+> Reference: AMD Developer Hackathon submission guidance for Track 3.
+> Pre-screening inspects GitHub repo, Slide Deck (PDF), and Live Demo / hosted URL.
 
-## ✅ Submission Form (lablab.ai)
+## ✅ Submission Fields
 
-| Field | Status | Notes |
-|---|---|---|
-| Project Title | ⬜ | "A2Z Agentz — Autonomous A2A Payment Agent on AMD" |
-| Short Description | ⬜ | 1–2 sentences mentioning the AMD stack and Agent-to-Agent theme |
-| Long Description | ⬜ | 3–5 paragraphs with a link to `PRD.md` |
-| Technology Tags | ⬜ | `DeepSeek v4`, `Fireworks AI`, `AMD Instinct MI300X`, `ROCm`, `AMD AI Workbench`, `AMD Inference Microservice`, `vLLM`, `LangGraph`, `Base Network`, `ECDSA`, `Next.js`, `Web3` |
-| Category Tags | ⬜ | `AI Agents`, `Web3`, `FinTech` |
-| Cover Image | ⬜ | 1200×630px, dark theme + AMD branding + Mermaid architecture |
-| Video Presentation | ⬜ | 3 minutes, end-to-end live demo |
-| Slide Presentation | ⬜ | 10–12 slides, pitch narrative |
-| Public GitHub Repo | ✅ | https://github.com/axzss/project-a2z-agentz |
-| Demo Application URL | ⬜ | Hosted on AMD Developer Cloud (or Vercel) |
-| Submission Deadline | ⚠️ | TBD — monitor the lablab.ai ACT II page regularly |
+| Field | Placeholder / Status |
+|---|---|
+| **Project Title** | A2Z Agentz — Autonomous A2A Payment Agent on AMD |
+| **Short Description** | An autonomous multi-agent system that scores Web3 opportunities and settles payments on Base, with all LLM inference running on an AMD GPU via vLLM on ROCm. |
+| **Long Description** | TBD — link to `PRD.md` |
+| **Technology Tags** | `vLLM`, `ROCm`, `AMD Instinct`, `AMD GPU`, `Cloudflare Tunnel`, `OpenAI-compatible API`, `Starlette`, `PostgreSQL`, `Base Network`, `Web3`, `Next.js`, `Python` |
+| **Category Tags** | `AI Agents`, `Web3`, `Open Innovation` |
+| **GitHub Repository** | https://github.com/<YOUR-ORG>/project-a2z-agentz |
+| **Slide Deck URL** | https://docsend.com/view/<YOUR-SLIDE-DECK> |
+| **Demo Video URL** | https://youtu.be/<YOUR-VIDEO> |
+| **Live Demo / Hosted URL** | https://<YOUR-DOMAIN> |
 
-## 📦 Submission Package (Deliverables)
+## 🎯 Why AMD? (Executive Summary for Pre-Screening)
 
-### Code
-- [ ] `src/orchestrator/main_graph.py` — LangGraph entry point
-- [ ] `src/agent_a/` — Scout (scraper, AIM client, scoring)
-- [ ] `src/agent_b/` — Vault (KMS, RPC, signer, dry-run)
-- [ ] `contracts/A2ZVault.sol` — Pausable + Ownable Solidity contract
-- [ ] `docker-compose.yml` — PostgreSQL + ChromaDB
-- [ ] `dashboard/` — Next.js (ready, pending backend connection)
-- [ ] `tests/` — Unit + integration tests (idempotency, signature, dry-run)
-- [ ] `.env.example` — Secrets template (no real keys)
-- [ ] `Dockerfile` for Agent A & B (ROCm-ready)
+A2Z Agentz is architected to **prove AMD compute usage beyond doubt**:
 
-### Documentation
-- [x] `README.md` — Overview + AMD stack
-- [x] `PRD.md` — Full product spec
-- [x] `docs/01-architecture.md` — Mermaid diagram
-- [x] `docs/02-agent-a-scout.md` — Scout spec + AMD AI Workbench
-- [x] `docs/03-agent-b-vault.md` — Vault spec
-- [x] `docs/04-communication-protocol.md` — ECDSA + vLLM
-- [x] `docs/05-setup-guide.md` — End-to-end install
-- [x] `docs/06-amd-stack.md` — Judge-facing alignment doc
-- [x] `memory.md` — Changelog
-- [x] `LICENSE` — MIT
+1. **Inference runs on AMD silicon only.** 
+ The AI Brain is a dedicated AMD GPU server (AMD AI Developer Program instance) running **vLLM on ROCm** with Qwen/Qwen2.5-72B-Instruct.
 
-### Submission Artifacts
-- [ ] **Cover image** (PNG/JPG, 1200×630)
-- [ ] **Video** (YouTube unlisted / Loom, 3 min)
-- [ ] **Slide deck** (PDF/PPTX, 10–12 slides)
-- [ ] **Live demo URL** (public, HTTPS)
+2. **Serving stack is AMD-native.** 
+ No OpenAI API key is used for production inference. The model is served from a local AMD GPU process and exposed via an OpenAI-compatible API.
 
-## 🎯 Video Demo Flow (3 minutes)
+3. **Tunnel provenance is verifiable.** 
+ The tunnel is initiated from the AMD instance terminal itself (Cloudflare Quick Tunnel), so the public endpoint traces back to AMD hardware.
 
-1. **[0:00–0:30]** Hook: "What if AI agents could pay each other autonomously on-chain?"
-2. **[0:30–1:00]** Problem: missed Web3 opportunities + manual capital bootstrapping pain
-3. **[1:00–1:30]** Solution: A2Z Agentz + AMD stack (show AMD AI Workbench workspace)
-4. **[1:30–2:30]** **LIVE DEMO**:
-   - Trigger Agent A → AIM inference
-   - Hybrid scoring (70% sentiment + 30% TVL)
-   - Agent B signing payload
-   - Tx broadcast → show on Basescan
-   - Dashboard live log streaming
-5. **[2:30–2:50]** Safety: Circuit Breaker kill switch demo
-6. **[2:50–3:00]** Closing: tech stack recap + team AnTS Groups + GitHub link
+4. **Performance + cost are AMD-specific claims.** 
+ Throughput, VRAM utilization, and latency figures are all gathered from an AMD GPU running ROCm.
 
-## 🚨 Risk Watch
+## 📋 Deliverables
 
-- **Submission deadline TBD** — monitor the lablab.ai ACT II page every 2–3 days
-- **AMD Cloud credits** — apply immediately if not yet claimed
-- **Base mainnet ETH** — small amount required for tx fees (~$5)
-- **Demo data** — never use real user data; always use dev / sandbox mode during the pitch
+- [ ] **README.md** — includes the AMD Compute Layer section, tunnel pattern, and log placeholder.
+- [ ] **Slide Deck (PDF)** — 10–12 slides, one dedicated "Why AMD?" slide with `rocm-smi` output.
+- [ ] **Demo Video (YouTube unlisted)** — 3 minutes showing the tunnel, AMD terminal, and dashboard round-trip.
+- [ ] **Live Demo URL** — dashboard with system status proving AI Brain connectivity.
 
-## 📞 Submission Channels
+## 🎬 Demo Video Must-Haves
 
-- Lab: https://lablab.ai/ai-hackathons/amd-developer-hackathon-act-ii
-- Discord: https://discord.gg/lablabai
-- AMD Community: via AMD AI Developer Program
+1. AMD Jupyter terminal showing the vLLM launch command and `rocm-smi` output.
+2. Cloudflare tunnel URL resolving to the AMD instance.
+3. Backend log showing `AI endpoint OK | model=Qwen/Qwen2.5-72B-Instruct latency=XXXms`.
+4. Dashboard view with live logs + transaction result.
+
+## 🚨 Disqualification Guardrails
+
+- Ensure the Slide Deck or README contains **both words** "ROCm" and "AMD" in context of inference serving.
+- Active Security Gatekeeper (Agent B) is documented separately from the inference engine in `docs/01-architecture.md`.

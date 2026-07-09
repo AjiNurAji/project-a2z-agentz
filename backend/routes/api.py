@@ -21,11 +21,18 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from auth import verify_access_token
 from routes.websockets import manager
 
-API_KEY = os.getenv("API_KEY", "your_secret_api_key_for_agents")
+_raw_api_key = os.getenv("API_KEY")
+if not _raw_api_key:
+    raise RuntimeError("API_KEY environment variable is not set. Refusing to start.")
+API_KEY = _raw_api_key
 
 AGENT_B_ENDPOINT = os.getenv("AGENT_B_ENDPOINT", "")
 AGENT_B_MODEL = os.getenv("AGENT_B_MODEL", "")
 AGENT_B_API_KEY = os.getenv("AGENT_B_API_KEY", "")
+FIREWORKS_API_KEY = AGENT_B_API_KEY
+
+# Read-only judge bypass token (hackathon judges); GET-only, never mutations.
+JUDGE_TOKEN = os.getenv("JUDGE_TOKEN")
 
 
 def check_auth(request: Request) -> bool:
@@ -35,8 +42,16 @@ def check_auth(request: Request) -> bool:
 
     token = request.cookies.get("a2z-token")
     if token == "guest":
-        return True
+        return False
     if token and verify_access_token(token):
+        return True
+
+    # Allow read-only judge access: valid judge token + safe HTTP method only.
+    if (
+        request.method in ("GET", "HEAD", "OPTIONS")
+        and JUDGE_TOKEN
+        and token == JUDGE_TOKEN
+    ):
         return True
 
     return False
@@ -185,7 +200,7 @@ async def get_system_status(request: Request):
         {
             "database": "healthy",
             "rpc_node": "healthy",
-            "aim_model": "healthy",
+            "ai_model": "healthy",
             "circuit_breaker": cb_status,
         }
     )

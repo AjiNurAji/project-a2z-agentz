@@ -3,7 +3,10 @@ import bcrypt
 import jwt
 from datetime import datetime, timedelta, timezone
 
-JWT_SECRET = os.getenv("JWT_SECRET", "super-secret-key-for-local-dev-only")
+_raw_jwt_secret = os.getenv("JWT_SECRET")
+if not _raw_jwt_secret:
+    raise RuntimeError("JWT_SECRET environment variable is not set. Refusing to start.")
+JWT_SECRET = _raw_jwt_secret
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 7
 

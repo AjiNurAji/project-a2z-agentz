@@ -126,7 +126,7 @@ Ekspansi dashboard single-page → multi-halaman. 9 komponen baru, 5 halaman bar
 
 - **AMD AI Workbench** (no-code fine-tune LLM, fitur unggulan AMD)
 - **AMD Inference Microservice (AIM)** (format deployment hasil fine-tune)
-- **SGLang** (serving framework AMD-recommended di ROCm, pengganti vLLM)
+- **vLLM** (inference server on ROCm)
 - **AMD Instinct MI300X** + **ROCm** di **AMD Developer Cloud**
 
 Penyelarasan ini menjadikan A2Z Agentz **100%契合 (cocok) dengan tema wajib ACT II** dan memberi kami keunggulan vs submission lain yang masih pakai OpenAI API atau stack generik.
@@ -135,13 +135,13 @@ Penyelarasan ini menjadikan A2Z Agentz **100%契合 (cocok) dengan tema wajib AC
 
 | File | Perubahan |
 |------|-----------|
-| `README.md` | Tambah section "AMD-Native Tech Stack" (tabel pemetaan). Swap vLLM → SGLang, tambah AMD AI Workbench + AIM. Tagline update: "100% AMD stack" |
-| `PRD.md` | Full rewrite. Section 2.2 ganti tech stack. Section 3.1 swap "Llama 3 8B via vLLM" → "AIM-tuned LLM via AMD AI Workbench → SGLang → MI300X". Tambah section 6.4 "AMD Stack Compliance". Update Fase 2-4 roadmap dengan milestone AMD |
-| `docs/01-architecture.md` | Mermaid diagram update: tambah subgraph AMD Developer Cloud (AI Workbench → AIM → SGLang). Tambah section "Alur AMD Pipeline" |
-| `docs/02-agent-a-scout.md` | Section 2 full rewrite: AMD AI Workbench fine-tune workflow + AIM packaging + SGLang serving. Tambah section "AMD Performance Advantage" (throughput, latency, cost) |
+| `README.md` | Tambah section "AMD-Native Tech Stack" (tabel pemetaan). Use vLLM consistently across all docs, tambah AMD AI Workbench + AIM. Tagline update: "100% AMD stack" |
+| `PRD.md` | Full rewrite. Section 2.2 ganti tech stack. Section 3.1 update all inference references to vLLM on ROCm via AMD GPU Server. Tambah section 6.4 "AMD Stack Compliance". Update Fase 2-4 roadmap dengan milestone AMD |
+| `docs/01-architecture.md` | Mermaid diagram update: tambah subgraph AMD Developer Cloud (AI Workbench → vLLM model). Tambah section "Alur AMD Pipeline" |
+| `docs/02-agent-a-scout.md` | Section 2 full rewrite: AMD AI Workbench fine-tune workflow + vLLM packaging + serving. Tambah section "AMD Performance Advantage" (throughput, latency, cost) |
 | `docs/03-agent-b-vault.md` | Minor: tambah catatan "Agent B tidak menjalankan LLM" + context deployment di AMD Cloud |
-| `docs/04-communication-protocol.md` | Tambah section "Inference Endpoint Reference" — request format ke SGLang/AIM OpenAI-compatible |
-| `docs/05-setup-guide.md` | Full rewrite Langkah 1-3: AMD AI Workbench workspace → fine-tune Llama 3 8B → export AIM → serve via SGLang ROCm di MI300X |
+| `docs/04-communication-protocol.md` | Tambah section "Inference Endpoint Reference" — request format to vLLM OpenAI-compatible |
+| `docs/05-setup-guide.md` | Full rewrite Langkah 1-3: AMD AI Workbench workspace → fine-tune Llama 3 8B → export vLLM model → serve via vLLM ROCm di MI300X |
 | `dashboard/README.md` | Minor: tambah badge AMD MI300X + ROCm |
 
 ### ✅ File yang DITAMBAHKAN (Baru)

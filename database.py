@@ -214,12 +214,12 @@ def insert_execution_log(
 
     if inserted:
         logger.info(
-            "execution_log inserted tx_hash_id=%s… address=%s… amount=%s status=%s",
+            "execution_log inserted tx_hash_id=%s... address=%s... amount=%s status=%s",
             safe_hash[:10], addr[:10], amount, status_norm,
         )
     else:
         logger.info(
-            "execution_log skipped (duplicate) tx_hash_id=%s… address=%s…",
+            "execution_log skipped (duplicate) tx_hash_id=%s... address=%s...",
             safe_hash[:10], addr[:10],
         )
     return safe_hash
@@ -273,7 +273,7 @@ def is_blacklisted(address: str) -> bool:
             row = cur.fetchone()
         return row is not None
     except psycopg2.Error as exc:
-        logger.error("is_blacklisted lookup failed for %s…: %s", addr[:10], exc)
+        logger.error("is_blacklisted lookup failed for %s...: %s", addr[:10], exc)
         # Fail closed: assume blacklisted on DB error to avoid risky trades.
         return True
 
@@ -420,42 +420,44 @@ def set_system_config(key: str, value: str) -> None:
 def ensure_pipeline_tables() -> None:
     query = """
     CREATE TABLE IF NOT EXISTS scraping_queue (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL,
-    source VARCHAR(64) NOT NULL,
-    project_name VARCHAR(255) NOT NULL,
-    target_address VARCHAR(255) UNIQUE,
-    data_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
-    processing_status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
-    retry_count INTEGER NOT NULL DEFAULT 0 CHECK (retry_count >= 0),
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT scraping_queue_status_chk CHECK (processing_status IN ('PENDING','PROCESSING','COMPLETED','FAILED'))
-    );
-    CREATE TABLE IF NOT EXISTS synthesis_results (
-    id SERIAL PRIMARY KEY,
-    queue_id INTEGER NOT NULL UNIQUE,
-    score INTEGER CHECK (score BETWEEN 0 AND 100),
-    risk_flags TEXT,
-    synthesized_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE TABLE IF NOT EXISTS transaction_proposals (
-    id SERIAL PRIMARY KEY,
-    synthesis_id INTEGER NOT NULL UNIQUE,
-    gnosis_safe_tx_hash VARCHAR(66) UNIQUE,
-    amount_usd NUMERIC(20, 6) NOT NULL CHECK (amount_usd >= 0),
-    status VARCHAR(32) NOT NULL DEFAULT 'PENDING'
-    );
-    CREATE TABLE IF NOT EXISTS audit_log (
-    id BIGSERIAL PRIMARY KEY,
-    event_type VARCHAR(64) NOT NULL,
-    description TEXT NOT NULL,
-    metadata JSONB DEFAULT '{}'::jsonb,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE INDEX IF NOT EXISTS scraping_queue_status_idx ON scraping_queue (processing_status);
-    CREATE INDEX IF NOT EXISTS transaction_proposals_status_idx ON transaction_proposals (status);
-    CREATE INDEX IF NOT EXISTS audit_log_created_at_idx ON audit_log (created_at DESC);
+     id SERIAL PRIMARY KEY,
+     user_id INTEGER NOT NULL,
+     source VARCHAR(64) NOT NULL,
+     project_name VARCHAR(255) NOT NULL,
+     target_address VARCHAR(42),
+     data_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+     processing_status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+     retry_count INTEGER NOT NULL DEFAULT 0 CHECK (retry_count >= 0),
+     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     CONSTRAINT scraping_queue_status_chk CHECK (processing_status IN ('PENDING','PROCESSING','COMPLETED','FAILED')),
+     CONSTRAINT scraping_queue_addr_chk CHECK (target_address IS NULL OR target_address ~ '^0x[a-fA-F0-9]{40}$')
+     );
+     CREATE TABLE IF NOT EXISTS synthesis_results (
+     id SERIAL PRIMARY KEY,
+     queue_id INTEGER NOT NULL UNIQUE,
+     score INTEGER CHECK (score BETWEEN 0 AND 100),
+     risk_flags TEXT,
+     synthesized_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+     );
+     CREATE TABLE IF NOT EXISTS transaction_proposals (
+     id SERIAL PRIMARY KEY,
+     synthesis_id INTEGER NOT NULL UNIQUE,
+     gnosis_safe_tx_hash VARCHAR(66) UNIQUE,
+     amount_usd NUMERIC(20, 6) NOT NULL CHECK (amount_usd >= 0),
+     status VARCHAR(32) NOT NULL DEFAULT 'PENDING'
+ CHECK (status IN ('PENDING','AWAITING_SIGNATURES','EXECUTED','FAILED','REJECTED'))
+     );
+     CREATE TABLE IF NOT EXISTS audit_log (
+     id BIGSERIAL PRIMARY KEY,
+     event_type VARCHAR(64) NOT NULL,
+     description TEXT NOT NULL,
+     metadata JSONB DEFAULT '{}'::jsonb,
+     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+     );
+     CREATE INDEX IF NOT EXISTS scraping_queue_status_idx ON scraping_queue (processing_status);
+     CREATE INDEX IF NOT EXISTS transaction_proposals_status_idx ON transaction_proposals (status);
+     CREATE INDEX IF NOT EXISTS audit_log_created_at_idx ON audit_log (created_at DESC);
     """
     try:
         with _get_cursor() as cur:
@@ -533,21 +535,33 @@ def update_task_status(task_id: int, status: str, retry: bool = False) -> bool:
 
 
 def insert_synthesis_result(queue_id: int, score: int, risk_flags: str) -> int | None:
-    query = """
-    INSERT INTO synthesis_results (queue_id, score, risk_flags)
-    VALUES (%s, %s, %s)
-    RETURNING id;
-    """
-    try:
-        with _get_cursor() as cur:
-            cur.execute(query, (queue_id, score, risk_flags))
-            row = cur.fetchone()
-            if row:
-                return row[0] if isinstance(row, (tuple, list)) else row.get('id')
-            return None
-    except psycopg2.Error as exc:
-        logger.error('insert_synthesis_result failed: %s', exc)
-        return None
+ """
+ Insert or update a synthesis result for a queue item.
+
+ Uses ``ON CONFLICT (queue_id) DO UPDATE`` so that retries / replays
+ do not violate the unique constraint on ``synthesis_results.queue_id``.
+ The winning row always wins; if a newer synthesis overwrites an older
+ one the returned id still points to the same row.
+ """
+ query = """
+ INSERT INTO synthesis_results (queue_id, score, risk_flags)
+ VALUES (%s, %s, %s)
+ ON CONFLICT (queue_id) DO UPDATE
+ SET score = EXCLUDED.score,
+ risk_flags = EXCLUDED.risk_flags,
+ synthesized_at = CURRENT_TIMESTAMP
+ RETURNING id;
+ """
+ try:
+  with _get_cursor() as cur:
+   cur.execute(query, (queue_id, score, risk_flags))
+   row = cur.fetchone()
+   if row:
+    return row[0] if isinstance(row, (tuple, list)) else row.get('id')
+   return None
+ except psycopg2.Error as exc:
+  logger.error('insert_synthesis_result failed: %s', exc)
+  return None
 
 
 def insert_transaction_proposal(synthesis_id: int, amount_usd: float, gnosis_safe_tx_hash: str | None = None) -> int | None:

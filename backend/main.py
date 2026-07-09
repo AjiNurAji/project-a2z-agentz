@@ -11,6 +11,8 @@ from dotenv import load_dotenv
 ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT / ".env", override=False)
 
+FIREWORKS_API_KEY = os.getenv("AGENT_B_API_KEY", "")
+
 from routes.api import routes as api_routes
 from routes.auth import routes as auth_routes
 from routes.websockets import routes as ws_routes
@@ -190,8 +192,10 @@ middleware = [
     Middleware(CORSMiddleware, allow_origins=[frontend_origin], allow_methods=["*"], allow_headers=["*"], allow_credentials=True)
 ]
 
+debug = os.getenv("DEBUG", "false").lower() == "true"
+
 app = Starlette(
-    debug=True,
+    debug=debug,
     routes=[
         Route("/", read_root, methods=["GET"]),
         Route("/docs", get_docs, methods=["GET"]),

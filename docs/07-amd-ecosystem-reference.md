@@ -84,7 +84,7 @@ print(response.choices[0].message.content)
 ### Rekomendasi untuk A2Z Agentz
 
 - ✅ **Gunakan AMD Developer Cloud sebagai host** Agent A (Scout) + Agent B (Vault)
-- ✅ **Quickstart image `vLLM` → swap ke SGLang** untuk serve AIM-tuned LLM
+- ✅ **Use vLLM as the inference endpoint** untuk serve vLLM-served LLM
 - ✅ **Monitor credit usage** — $100 harus cukup untuk 4 minggu, jangan biarkan Droplet idle
 - ✅ **Stop Droplet saat tidak dipakai** (auto-suspend via dashboard)
 
@@ -173,7 +173,7 @@ Untuk kustomisasi penuh, pakai PyTorch upstream Dockerfile.
 
 ### Rekomendasi untuk A2Z Agentz
 
-- ✅ **Base image** untuk Agent A container: `rocm/sglang:latest`
+- ✅ **Base image** untuk Agent A container: `rocm/vllm:latest`
 - ✅ **JANGAN install ROCm manual** di host — pakai Docker image
 - ✅ **PyTorch image `rocm/pytorch:7.2.4_*`** untuk fine-tune job di AI Workbench
 - ✅ **Monitor release notes** di [rocm.docs.amd.com/en/latest/release/versions.html](https://rocm.docs.amd.com/en/latest/release/versions.html)
@@ -215,7 +215,7 @@ Benefit eksklusif AMD AI Developer Program: **1 bulan gratis DeepLearning.AI Pro
 | Aspek | Detail |
 |---|---|
 | **Konten** | Short courses, specializations, certificates |
-| **Relevan untuk A2Z** | "A2A: The Agent2Agent Protocol", "Agent Memory: Building Memory-Aware Agents", "Efficient Inference with SGLang", "Multimodal Llama 3.2", "Practical Multi-AI Agents with CrewAI" |
+| **Relevan untuk A2Z** | "A2A: The Agent2Agent Protocol", "Agent Memory: Building Memory-Aware Agents", "Efficient Inference with vLLM", "Multimodal Llama 3.2", "Practical Multi-AI Agents with CrewAI" |
 | **Cara klaim** | Buat akun di deeplearning.ai, masukkan promo code dari AMD AI Developer Program member site |
 | **URL courses** | [deeplearning.ai/courses](https://www.deeplearning.ai/courses) |
 
@@ -235,7 +235,7 @@ Benefit eksklusif AMD AI Developer Program: **1 bulan gratis DeepLearning.AI Pro
 **Rekomendasi Course Path untuk A2Z Agentz (urutan belajar):**
 1. AI Foundations → run first model on AMD
 2. Fine-tuning course → pakai Unsloth + GRPO workflow
-3. SGLang short course di DeepLearning.AI
+3. vLLM short course di DeepLearning.AI
 4. AMD AI Workbench tutorial (fine-tune GUI)
 5. LangGraph / multi-agent course
 
@@ -250,7 +250,7 @@ AMD-sponsored hackathons (termasuk ACT II saat ini) provide:
 - Office hours bulanan
 
 **Rekomendasi untuk A2Z Agentz:**
-- ✅ **Klaim DeepLearning.AI Pro** via AMD AI Developer Program (1 bulan free) — habiskan untuk course SGLang, A2A Protocol, Agent Memory
+- ✅ **Klaim DeepLearning.AI Pro** via AMD AI Developer Program (1 bulan free) — habiskan untuk course vLLM, A2A Protocol, Agent Memory
 - ✅ **Selesaikan course fine-tuning Unsloth di AMD AI Academy** sebelum mulai custom training
 - ✅ **Join AMD Discord** untuk tanya ke AMD experts langsung
 
@@ -335,7 +335,7 @@ AMD-sponsored hackathons (termasuk ACT II saat ini) provide:
 
 ### Use Case untuk A2Z Agentz
 
-- **AIM-tuned LLM inference** (8B → 70B+ model) — single GPU cukup
+- **vLLM-served LLM inference** (8B → 70B+ model) — single GPU cukup
 - **Vector search** (ChromaDB embeddings) — bandwidth 5.3 TB/s
 - **Concurrent inference** — bisa serve 50+ request paralel per cron tick
 
@@ -348,17 +348,17 @@ AMD-sponsored hackathons (termasuk ACT II saat ini) provide:
 ```
 [Dataset Web3 sentiment]
         ↓
-[AMD AI Workbench GUI] → Fine-tune Qwen 2.5 72B → AIM-tuned Web3 scorer
+[AMD AI Workbench GUI] → Fine-tune Qwen 2.5 72B → vLLM-served Web3 scorer
         ↓
-[AIM-tuned weights (.safetensors)]
+[vLLM-served weights (.safetensors)]
         ↓
 [AMD Inference Microservice (AIM) — wrap as container]
         ↓
-[SGLang server — load AIM di ROCm backend]
+[vLLM server — load model on ROCm backend]
         ↓
 [AMD Instinct MI300X di AMD Developer Cloud]
         ↓
-[Agent A panggil AIM via OpenAI-compatible API]
+[Agent A calls vLLM via OpenAI-compatible API]
         ↓
 [Hybrid Scoring: 70% sentiment + 30% on-chain TVL]
         ↓
@@ -371,10 +371,10 @@ AMD-sponsored hackathons (termasuk ACT II saat ini) provide:
 |---|---|---|
 | Host VM | AMD Developer Cloud Droplet | $100 credits |
 | GPU | MI300X (192GB HBM3) | $1.99/jam |
-| Runtime | ROCm 7.x | Docker `rocm/sglang` |
+| Runtime | ROCm 7.x | Docker `rocm/vllm` |
 | Training | AMD AI Workbench | [academy.amd.com](https://academy.amd.com) |
 | Deployment | AMD Inference Microservice (AIM) | [AIM blog](https://rocm.blogs.amd.com/) |
-| Serving | SGLang | [SGLang on AMD](https://rocm.blogs.amd.com/software-tools-optimization/disaggregation/README.html) |
+| Serving | vLLM | [vLLM on AMD](https://rocm.blogs.amd.com/software-tools-optimization/disaggregation/README.html) |
 | Base model | Qwen 2.5 72B Instruct | HuggingFace |
 | Fine-tune dataset | Custom Web3 sentiment | Internal |
 
@@ -383,14 +383,14 @@ AMD-sponsored hackathons (termasuk ACT II saat ini) provide:
 | Item | Hours | Cost |
 |---|---|---|
 | Fine-tune (one-time) | 5 hours | ~$10 |
-| SGLang serving (always-on) | 24×7 × 28 days = 672 hours | ~$1,338 |
+| vLLM serving (always-on) | 24×7 × 28 days = 672 hours | ~$1,338 |
 | Buffer + iterations | - | $50-100 |
 | **Total** | - | **~$1,400-1,500** |
 
 ⚠️ **Cost Alert:** $100 credits CUKUP untuk fine-tune + serving ringan. Untuk serving 24/7 selama 4 minggu, perlu pay-as-you-go tambahan ~$1,300. **Atau** auto-suspend Droplet saat idle untuk hemat.
 
 **Rekomendasi hemat:**
-- ✅ **SGLang serving hanya saat Agent A cron tick** (1×/jam × 5 menit = 80 menit/hari)
+- ✅ **vLLM serving hanya saat Agent A cron tick** (1×/jam × 5 menit = 80 menit/hari)
 - ✅ 80 menit/hari × $1.99/jam × 28 hari = **~$75** — MASUK di $100 credits!
 - ✅ **Agent B (non-LLM) di instance kecil** (bukan MI300X) — bisa pakai shared CPU atau AMD Radeon
 
@@ -416,8 +416,8 @@ AMD-sponsored hackathons (termasuk ACT II saat ini) provide:
 - [TheRock — New Build Platform](https://github.com/ROCm/TheRock)
 - [ROCm Blogs](https://rocm.blogs.amd.com/)
 - [PyTorch Docker Hub](https://hub.docker.com/r/rocm/pytorch)
-- [SGLang on MI300X Blog](https://rocm.blogs.amd.com/software-tools-optimization/disaggregation/README.html)
-- [Adapting AIM LLMs Fine-Tuning](https://rocm.blogs.amd.com/software-tools-optimization/aiwb-fine-tuning/README.html)
+- [vLLM on MI300X Blog](https://rocm.blogs.amd.com/software-tools-optimization/disaggregation/README.html)
+- [Adapting vLLM-served models Fine-Tuning](https://rocm.blogs.amd.com/software-tools-optimization/aiwb-fine-tuning/README.html)
 
 ### Learning
 - [DeepLearning.AI Courses](https://www.deeplearning.ai/courses)
@@ -438,4 +438,4 @@ AMD-sponsored hackathons (termasuk ACT II saat ini) provide:
 
 ---
 
-*Dokumen ini di-scrape Juni 2026 dari sumber resmi AMD & lablab.ai. Selalu cek update dari URL referensi karena AMD ecosystem berkembang cepat (ROCm 7.x → 8.x, AIM updates, dll.).*
+*Dokumen ini di-scrape Juni 2026 dari sumber resmi AMD & lablab.ai. Selalu cek update dari URL referensi karena AMD ecosystem berkembang cepat (ROCm 7.x → 8.x, vLLM updates, dll.).*

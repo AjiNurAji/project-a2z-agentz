@@ -3,7 +3,7 @@
 
 This Product Requirement Document (PRD) describes the complete specification, architecture, and functionality of the **A2Z Agentz** system, an autonomous multi-agent platform developed for the **AMD Developer Hackathon: ACT II** with the theme **Agent-to-Agent Payments**.
 
-**Core differentiation:** A2Z Agentz uses a **100% AMD-native AI stack** — fine-tuning via **AMD AI Workbench**, deployment as an **AMD Inference Microservice (AIM)**, serving via **vLLM** on **AMD Instinct™ MI300X** (ROCm), entirely on **AMD Developer Cloud**.
+**Core differentiation:** A2Z Agentz uses a **100% AMD-native AI stack** — fine-tuning via **AMD AI Workbench**, deployment as an **vLLM model server**, serving via **vLLM** on **AMD Instinct™ MI300X** (ROCm), entirely on **AMD Developer Cloud**.
 
 ---
 
@@ -15,13 +15,13 @@ In the Web3 ecosystem, opportunities such as airdrops and new DeFi protocol laun
 
 **A2Z Agentz** automates the full pipeline of discovery (*scraping*), sentiment analysis (AI), filtering, and on-chain payment execution — fully autonomous, agent-to-agent (*Agent-to-Agent Payment*) on the **Base** network.
 
-> **Runtime note**: The system is architected for AMD AIM / MI300X; **current live production and demo inference runs on DeepSeek v4 via Fireworks AI**.
+> **Runtime note**: The system is architected for AMD vLLM / MI300X; **current live production and demo inference runs on Qwen/Qwen2.5-72B-Instruct via AMD vLLM**.
 
 ### 1.2 Core Concepts
 
 The system uses an asynchronous **Multi-Agent** architecture orchestrated via **LangGraph**:
 
-1. **Agent A (The Scout) — Intel Engine (AMD MI300X / vLLM translation layer)** — The intent-collection and scoring layer. It is **architected for AMD Instinct MI300X / vLLM via AIM**, and designed to scrape Farcaster through the Neynar API plus on-chain signals, run sentiment/scoring logic, and forward high-confidence opportunities downstream. For current demo/runtime stability, the same Agent A flow can execute against a remote inference runtime when the live AMD cluster is not attached. Scans **Farcaster** and **on-chain** signals.
+1. **Agent A (The Scout) — Intel Engine (AMD MI300X / vLLM translation layer)** — The intent-collection and scoring layer. It is **architected for AMD Instinct MI300X / vLLM via vLLM**, and designed to scrape Farcaster through the Neynar API plus on-chain signals, run sentiment/scoring logic, and forward high-confidence opportunities downstream. For current demo/runtime stability, the same Agent A flow can execute against a remote inference runtime when the live AMD cluster is not attached. Scans **Farcaster** and **on-chain** signals.
 2. **Agent B (The Vault / Executor)** — A transaction execution vault that manages an EOA wallet with high-grade security (KMS, Multi-RPC, idempotency). Receives encrypted instructions from Agent A to transfer seed capital.
 
 ---
@@ -39,15 +39,15 @@ graph TD
  O[On-Chain Block Explorer]
  end
     subgraph AMD Developer Cloud (Agent A - The Scout)
-        AW[AMD AI Workbench<br/>DeepSeek v4 Inference]
-        AIM[AMD Inference Microservice<br/>A2Z-tuned model]
+        AW[AMD AI Workbench<br/>Qwen/Qwen2.5-72B-Instruct Inference]
+        VLL[vLLM model server<br/>A2Z-tuned model]
         SGL[vLLM Server<br/>ROCm / MI300X]
         VDB[(ChromaDB - Memory)]
         Sc[Scraper]
         Scoring[Hybrid Scoring Engine]
 
-        AW -->|fine-tuned weights| AIM
-        AIM --> SGL
+        AW -->|fine-tuned weights| VLL
+        VLL --> API
         Data Sources --> Sc
         Sc -->|Raw Text| VDB
         VDB -->|Context| SGL
@@ -94,9 +94,9 @@ graph TD
   - **AMD Instinct™ MI300X** — 192GB HBM3 GPU for training and inference.
   - **ROCm 6.x** — AMD GPU runtime.
   - **AMD AI Workbench** — No-code GUI for LLM fine-tuning.
-  - **AMD Inference Microservice (AIM)** — Standard deployment format for AMD fine-tuned models.
+  - **vLLM model server** — Standard deployment format for AMD fine-tuned models.
   - **vLLM** — AMD-recommended LLM serving framework (ROCm-native).
-- **AI Model**: DeepSeek v4 (via Fireworks AI) → **fine-tuned via AMD AI Workbench** on a Web3 sentiment dataset (output: "AIM-tuned LLM" / "A2Z-tuned model").
+- **AI Model**: Qwen/Qwen2.5-72B-Instruct (via AMD vLLM) → **fine-tuned via AMD AI Workbench** on a Web3 sentiment dataset (output: "vLLM-served LLM" / "A2Z-tuned model").
 - **Database**:
   - **ChromaDB** — Semantic memory vector DB for Agent A.
   - **PostgreSQL** — On-chain transaction logging + Agent B idempotency check.
@@ -115,15 +115,15 @@ Agent A is the information-gathering, sentiment-analysis, and project-filtering 
 
 * **Processing Pipeline**: Hourly cron job, target < 30 seconds per cycle.
 * **AMD-Native AI Stack**:
-  * **Model**: AIM-tuned LLM (DeepSeek v4 (via Fireworks AI) via AMD AI Workbench on ~5,000–10,000 labeled examples from Farcaster and on-chain narrative).
-  * **Deployment**: AMD Inference Microservice (AIM) served via vLLM on AMD Instinct MI300X.
+  * **Model**: vLLM-served LLM (Qwen/Qwen2.5-72B-Instruct (via AMD vLLM) via AMD AI Workbench on ~5,000–10,000 labeled examples from Farcaster and on-chain narrative).
+  * **Deployment**: vLLM model server served via vLLM on AMD Instinct MI300X.
   * **Endpoint**: OpenAI-compatible (`POST /v1/chat/completions`) on vLLM.
 * **OSINT & Scraping**:
   * Farcaster via Neynar API.
   * Airdrop pages via Puppeteer/Selenium with Stealth Plugin.
 * **Vector DB (ChromaDB) Cache**: Projects are converted to embeddings; similarity check before inference (skip duplicates).
 * **Hybrid Scoring Engine**:
-  * **70% LLM Sentiment**: AIM-tuned LLM analyzes language context, KOL signals, and project legitimacy.
+  * **70% LLM Sentiment**: vLLM-served LLM analyzes language context, KOL signals, and project legitimacy.
   * **30% On-chain Metrics**: Smart-contract verification on Basescan, minimum TVL (e.g., > $500k).
   * **Threshold**: Combined score > 85 → Agent A signs JSON payload → forwards to Agent B.
 
@@ -171,11 +171,11 @@ POST /api/v1/vault/execute
 3. Agent B verifies the signature using Agent A's public key (whitelist).
 4. Check that `timestamp` is still fresh → process.
 
-### 4.3 Inference Endpoint (Agent A → AIM)
+### 4.3 Inference Endpoint (Agent A → vLLM)
 
 Agent A calls **vLLM**, which loads the **AMD Inference Microservice**:
 ```json
-POST {vLLM_MI300X_ENDPOINT}/v1/chat/completions
+POST {AGENT_A_ENDPOINT}/v1/chat/completions
 {
   "model": "a2z-web3-tuned",
   "messages": [...],
@@ -200,7 +200,7 @@ POST {vLLM_MI300X_ENDPOINT}/v1/chat/completions
 ### 5.2 Main Page Components
 1. **Navbar** — Branding + Agent A & Agent B ping indicators + **AMD MI300X + ROCm badge** + Base Network status.
 2. **Circuit Breaker** — Global kill switch with blazing-red visual feedback when paused.
-3. **Live Log Feed** — Real-time scraping logs, embeddings, AIM inference, scoring, and transactions.
+3. **Live Log Feed** — Real-time scraping logs, embeddings, vLLM inference, scoring, and transactions.
 4. **Approval Queue** — Queue for transactions > $2 requiring human approval.
 5. **Transaction List** — Successful transaction table + Basescan links.
 
@@ -216,7 +216,7 @@ POST {vLLM_MI300X_ENDPOINT}/v1/chat/completions
 
 ### 6.1 Performance & Latency
 * End-to-end (scraping → tx broadcast) < 30 seconds on MI300X.
-* AIM inference via vLLM: minimum 100 tokens/s for single requests, > 2000 tokens/s batched.
+* vLLM inference via vLLM: minimum 100 tokens/s for single requests, > 2000 tokens/s batched.
 
 ### 6.2 Security & Integrity
 * Private key is **never** stored as plaintext in `.env` — must use KMS.
@@ -230,7 +230,7 @@ POST {vLLM_MI300X_ENDPOINT}/v1/chat/completions
 ### 6.4 AMD Stack Compliance (ACT II specific)
 * 100% AI workload on AMD Developer Cloud (MI300X).
 * Fine-tuning via AMD AI Workbench (no custom training loop).
-* Deployment via AMD Inference Microservice (AIM).
+* Deployment via vLLM model server.
 * Serving via vLLM ROCm backend.
 * No fallback to non-AMD cloud for inference.
 
@@ -267,20 +267,20 @@ volumes:
 
 ### 7.2 Fine-Tune in AMD AI Workbench
 Access AI Workbench via the AMD Developer Cloud console:
-1. Select the base model: `deepseek-ai/DeepSeek-v4 (via Fireworks AI)`
+1. Select the base model: `deepseek-ai/DeepSeek-v4 (via AMD vLLM)`
 2. Import the Web3 sentiment dataset (JSONL)
 3. Set: LoRA rank=16, alpha=32, lr=2e-4, epochs=3
-4. Train on MI300X → export as AIM
+4. Train on MI300X → export as vLLM model
 
-### 7.3 Serve AIM via vLLM
+### 7.3 Serve vLLM
 ```bash
 docker run -d \
-  --name a2z-aim-server \
+  --name a2z-vllm-server \
   --device=/dev/kfd --device=/dev/dri \
   --group-add video --cap-add=SYS_PTRACE \
   --security-opt seccomp=unconfined \
   -p 8000:8000 \
-  -v /opt/a2z/aim-model:/model \
+  -v /opt/a2z/vllm-model:/model \
   rocm/vLLM:latest \
   python -m vLLM.launch_server \
   --model-path /model --port 8000 \
@@ -291,7 +291,7 @@ docker run -d \
 ```env
 # agent-a/.env
 NEYNAR_API_KEY=your_key
-vLLM_MI300X_ENDPOINT=http://a2z-aim-server:8000/v1
+AGENT_A_ENDPOINT=http://a2z-vllm-server:8000/v1
 AGENT_A_PRIVATE_KEY=signer_keypair
 
 # agent-b/.env
@@ -316,9 +316,9 @@ AGENT_A_PUBLIC_KEY=public_key_verification
 ### Phase 2: Backend & AI Engine (In Progress) — AMD Stack Focus
 - [ ] Configure **AMD AI Workbench** workspace in AMD Developer Cloud
 - [ ] Prepare Web3 sentiment dataset (~5,000–10,000 examples)
-- [ ] Fine-tune DeepSeek v4 on **MI300X** (AIM target); live demo runs via **Fireworks AI** via AMD AI Workbench
-- [ ] Export as **AMD Inference Microservice (AIM)**
-- [ ] Deploy & serve AIM via **vLLM** on MI300X (ROCm)
+- [ ] Fine-tune Qwen/Qwen2.5-72B-Instruct on **MI300X** (vLLM target); live demo runs via **AMD vLLM** via AMD AI Workbench
+- [ ] Export as **vLLM model server**
+- [ ] Deploy & serve vLLM on MI300X (ROCm)
 - [ ] Implement Farcaster scraper (Neynar API) + ChromaDB integration
 - [ ] LangGraph state + retry policy
 

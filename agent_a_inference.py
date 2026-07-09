@@ -12,7 +12,7 @@ Responsibilities:
   1. Hybrid AI inference:
        - If AI_ENDPOINT is set to a real URL, POST to it using the
          OpenAI-compatible /v1/chat/completions schema (works against
-         SGLang, vLLM, OpenAI, TGI, etc.).
+         vLLM, OpenAI, TGI, etc.).
        - Otherwise (empty, unset, or "mock"), use a deterministic local
          mock that mimics Llama-3 8B-style scoring.
   2. Threshold-based verdict:
@@ -22,17 +22,17 @@ Responsibilities:
        ``project_target_address=...\\ntimestamp=...\\namount_usd=...\\nreason=...``
        The signing format is defined in ``web3_client.canonical_message_for_signing``
        and reused verbatim by Agent B's ``recover_signer`` for verification.
-  4. JSON Lines out — APPROVED records include `signature` and all the
+  4. JSON Lines out -- APPROVED records include `signature` and all the
      fields Agent B's VaultExecuteRequest expects; REJECTED records flow
      through for observability but will not be POSTed.
 
 Env:
-    AI_ENDPOINT        - OpenAI-compatible base URL, e.g. http://sgilang:30000/v1
-                         Empty / unset / "mock" → use local mock inference.
-    AI_API_KEY         - Bearer token. SGLang accepts any non-empty value when
+    AI_ENDPOINT - OpenAI-compatible base URL, e.g. http://sgilang-rocm:30000/v1
+                         Empty / unset / "mock" -> use local mock inference.
+    AI_API_KEY         - Bearer token. vLLM accepts any non-empty value when
                          the server is started with --api-key disabled.
     PRIVATE_KEY        - Agent A signer key (already consumed by web3_client).
-                         Missing → APPROVED projects get verdict=SIGN_FAILED.
+                         Missing -> APPROVED projects get verdict=SIGN_FAILED.
     AI_MODEL           - Model name to request (default: meta-llama/Meta-Llama-3-8B-Instruct).
 """
 
@@ -114,7 +114,7 @@ _MOCK_NEGATIVE = re.compile(
 
 def _mock_infer(description: str, target_address: str) -> AIResult:
     """
-    Deterministic mock: same (description, address) → same score every time.
+    Deterministic mock: same (description, address) -> same score every time.
     Uses hash(address) as RNG seed so signed payloads stay reproducible
     across cron runs (Agent B's idempotency depends on this).
     """
@@ -198,7 +198,7 @@ def _openai_compat_infer(
 ) -> AIResult:
     """
     POST to {endpoint}/chat/completions using the OpenAI schema.
-    Compatible with SGLang, vLLM, OpenAI, TGI, etc. — set AI_ENDPOINT to
+    Compatible with vLLM, OpenAI, TGI, etc. -- set AI_ENDPOINT to
     e.g. http://sgilang-rocm:30000/v1 and it just works.
     """
     t0 = time.time()
@@ -272,7 +272,7 @@ def run_ai_inference(description: str, target_address: str, model: str) -> AIRes
         return result
     except Exception as exc:
         logger.warning(
-            "AI endpoint FAILED (%s) — falling back to mock inference. "
+            "AI endpoint FAILED (%s) -- falling back to mock inference. "
             "Use --strict-ai to reject instead.",
             exc,
         )
@@ -317,7 +317,7 @@ def _process_record(record: dict, threshold: int, model: str, strict_ai: bool) -
     Evaluate one record. Returns the decision dict to emit on stdout, or None
     if the record should be silently dropped (e.g. semantic duplicate from chroma).
     """
-    # 0) Skip records chroma already flagged as duplicates — don't waste AI tokens
+    # 0) Skip records chroma already flagged as duplicates -- don't waste AI tokens
     if record.get("is_too_similar") is True:
         logger.info(
             "Skip (semantic duplicate flagged by chroma) | project=%s addr=%s",
@@ -382,7 +382,7 @@ def _process_record(record: dict, threshold: int, model: str, strict_ai: bool) -
     if signature is None:
         decision["verdict"] = "REJECTED"
         decision["reject_reason"] = "signing_failed"
-        logger.error("APPROVED but signing failed — flipping to REJECTED | project=%s", project_name)
+        logger.error("APPROVED but signing failed -- flipping to REJECTED | project=%s", project_name)
         return decision
 
     decision.update({
@@ -394,7 +394,7 @@ def _process_record(record: dict, threshold: int, model: str, strict_ai: bool) -
         "canonical_message": canonical,
     })
     logger.info(
-        "APPROVED + SIGNED | project=%s addr=%s score=%d amount_usd=%.2f sig=%s…",
+        "APPROVED + SIGNED | project=%s addr=%s score=%d amount_usd=%.2f sig=%s...",
         project_name, target_address, ai.score, ai.amount_usd, signature[:18],
     )
     return decision
@@ -402,7 +402,7 @@ def _process_record(record: dict, threshold: int, model: str, strict_ai: bool) -
 
 def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description="Agent A — AI inference + ECDSA signing of approved projects.",
+        description="Agent A -- AI inference + ECDSA signing of approved projects.",
     )
     p.add_argument("--threshold", type=int, default=DEFAULT_THRESHOLD,
                    help=f"Score >= threshold becomes APPROVED (default: {DEFAULT_THRESHOLD})")
@@ -432,14 +432,14 @@ def main(argv: Optional[list[str]] = None) -> int:
             try:
                 record = json.loads(line)
             except json.JSONDecodeError as exc:
-                logger.error("Line %d: invalid JSON (%s) — skipping", line_no, exc)
+                logger.error("Line %d: invalid JSON (%s) -- skipping", line_no, exc)
                 errors += 1
                 continue
 
             try:
                 decision = _process_record(record, args.threshold, args.model, args.strict_ai)
             except Exception:
-                logger.exception("Line %d: processing crashed — skipping", line_no)
+                logger.exception("Line %d: processing crashed -- skipping", line_no)
                 errors += 1
                 continue
 

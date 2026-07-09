@@ -1,18 +1,21 @@
+version: '3.8'
+
 services:
   postgres:
     image: postgres:15-alpine
     container_name: a2z_postgres
+    restart: always
     environment:
-      POSTGRES_USER: a2z_admin
-      POSTGRES_PASSWORD: a2z-project
-      POSTGRES_DB: a2z_transactions
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./database_schema.sql:/docker-entrypoint-initdb.d/01_database_schema.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U a2z_admin -d a2z_transactions"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-a2z_admin} -d ${POSTGRES_DB:-a2z_transactions}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -20,16 +23,18 @@ services:
   backend:
     build: .
     container_name: a2z_backend
+    restart: always
     ports:
       - "8080:8080"
     volumes:
       - .:/app
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     env_file:
       - .env
     environment:
-      - POSTGRES_URI=postgresql://a2z_admin:a2z-project@postgres:5432/a2z_transactions
+      - POSTGRES_URI=postgresql://${POSTGRES_USER:-a2z_admin}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-a2z_transactions}
       - PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 
 volumes:

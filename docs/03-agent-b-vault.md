@@ -2,7 +2,7 @@
 
 **Agent B** adalah sistem brankas eksekutor A2Z Agentz yang beroperasi di blockchain **Base**. Karena berurusan dengan dana sungguhan, Agent B difokuskan pada keamanan tingkat militer (*bulletproof security*) dan keandalan sistem.
 
-> **Catatan:** Agent B **tidak menjalankan LLM** — semua decision-making ada di Agent A (AIM-tuned). Agent B murni eksekutor deterministik, jadi tidak ada perubahan stack AMD di sini. Yang berubah hanya **infrastruktur deployment** (Host di AMD Developer Cloud bersama Agent A atau dedicated compute).
+> **Catatan:** Agent B **tidak menjalankan LLM** — semua decision-making ada di Agent A (vLLM-served). Agent B murni eksekutor deterministik, jadi tidak ada perubahan stack AMD di sini. Yang berubah hanya **infrastruktur deployment** (Host di AMD Developer Cloud bersama Agent A atau dedicated compute).
 
 ## 1. Manajemen Wallet & Kunci (Keys)
 

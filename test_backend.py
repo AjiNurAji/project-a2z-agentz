@@ -21,7 +21,7 @@ def run_test(name, target_address, description):
         print(f"Error: {e}")
 
 if __name__ == "__main__":
-    print("Mulai pengujian end-to-end (Flowchart Test)...")
+    print("Starting end-to-end testing (Flowchart Test)...")
     
     # Generate unique addresses so we don't hit old blacklists across runs
     good_address = "0x" + (uuid.uuid4().hex + uuid.uuid4().hex)[:40]

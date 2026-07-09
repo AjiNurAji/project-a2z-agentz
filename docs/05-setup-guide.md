@@ -38,27 +38,27 @@ Akses AMD AI Workbench via AMD Developer Cloud console. GUI no-code untuk fine-t
 #    - Batch size: 4
 #    - Max seq length: 2048
 # 4. Klik "Start Training" — berjalan di MI300X
-# 5. Export hasil sebagai AMD Inference Microservice (AIM)
+# 5. Export hasil sebagai vLLM model server
 ```
 
-Output dari step ini: container image **AIM-tuned LLM** yang siap di-serve.
+Output dari step ini: container image **Qwen/Qwen2.5-72B-Instruct** yang siap di-serve.
 
-## Langkah 3: Serve AIM via SGLang di MI300X
+## Step 3: Start vLLM on the AMD GPU Server
 
 ```bash
-# Deploy AIM-tuned LLM via SGLang di AMD Developer Cloud
-# (SGLang adalah serving framework AMD-recommended untuk ROCm)
+# Deploy Qwen/Qwen2.5-72B-Instruct via vLLM di AMD Developer Cloud
+# (vLLM adalah serving framework AMD-recommended untuk ROCm)
 
 docker run -d \
-  --name a2z-aim-server \
+  --name a2z-vllm-server \
   --device=/dev/kfd --device=/dev/dri \
   --group-add video \
   --cap-add=SYS_PTRACE \
   --security-opt seccomp=unconfined \
   -p 8000:8000 \
-  -v /opt/a2z/aim-model:/model \
-  rocm/sglang:latest \
-  python -m sglang.launch_server \
+  -v /opt/a2z/vllm-model:/model \
+  rocm/vllm:latest \
+  python3 -m vllm.entrypoints.openai.ai_server \
     --model-path /model \
     --port 8000 \
     --tensor-parallel-size 1 \
@@ -90,7 +90,7 @@ Buat file `.env` di direktori `agent-a/` dan `agent-b/`:
 ```env
 # === agent-a/.env ===
 NEYNAR_API_KEY=your_neynar_key_here
-SGLANG_ENDPOINT=http://a2z-aim-server:8000/v1
+AGENT_A_ENDPOINT=https://<tunnel>.trycloudflare.com/v1
 AGENT_A_PRIVATE_KEY=private_key_penandatangan_payload
 
 # === agent-b/.env ===
@@ -118,7 +118,7 @@ npm install
 npm run dev
 ```
 
-Buka `http://localhost:3000` untuk melihat Landing Page interaktif (dengan visualisasi Particle Network), lalu klik tombol dashboard atau navigasikan langsung ke `http://localhost:3000/dashboard` untuk memantau **Live Log** AI secara real-time — semua event dari Agent A (AIM inference), Hybrid Scoring, dan Agent B (tx execution) muncul di sini.
+Buka `http://localhost:3000` untuk melihat Landing Page interaktif (dengan visualisasi Particle Network), lalu klik tombol dashboard atau navigasikan langsung ke `http://localhost:3000/dashboard` untuk memantau **Live Log** AI secara real-time — semua event dari Agent A (vLLM inference), Hybrid Scoring, dan Agent B (transaction execution) muncul di sini.
 
 ---
 
@@ -128,7 +128,7 @@ Buka `http://localhost:3000` untuk melihat Landing Page interaktif (dengan visua
 |---|---|---|
 | 1 | Workspace setup | AMD Developer Cloud |
 | 2 | Fine-tune LLM | **AMD AI Workbench** (no-code) |
-| 3 | Serve model | **SGLang** + **AMD Inference Microservice (AIM)** di **MI300X** + **ROCm** |
+| 3 | Serve model | **vLLM** + **vLLM model server** di **MI300X** + **ROCm** |
 | 4 | Database & backend | Docker Compose (PG + Chroma) |
 | 5 | Agent runtime | LangGraph + Python |
 | 6 | Frontend | Next.js 16 + Tailwind v4 |

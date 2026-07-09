@@ -39,7 +39,7 @@ next-env.d.ts
 # Logs
 *.log
 logs/
-
+docker-compose.yml.bak
 # Secrets / keys (NEVER commit)
 *.pem
 *.key

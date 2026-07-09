@@ -1,6 +1,6 @@
 # 04. Protokol Komunikasi Antar Agen
 
-Dokumen ini menjembatani komunikasi antara **Agent A** (Scout, ditenagai AIM-tuned LLM di SGLang/MI300X) dan **Agent B** (Vault, eksekutor on-chain).
+Dokumen ini menjembatani komunikasi antara **Agent A** (Scout, ditenagai vLLM-served LLM di AMD vLLM server) dan **Agent B** (Vault, eksekutor on-chain).
 
 ## Format Payload (REST API)
 
@@ -37,10 +37,10 @@ Keduanya diorkestrasi via **LangGraph**. *State* grafik menyimpan:
 
 ## Inference Endpoint Reference
 
-Agent A memanggil **AMD Inference Microservice (AIM)** yang di-serve via **SGLang** di MI300X. Format request mengikuti OpenAI-compatible API:
+Agent A memanggil **vLLM model server** yang di-serve via **vLLM** di MI300X. Format request mengikuti OpenAI-compatible API:
 
 ```json
-POST {SGLANG_ENDPOINT}/v1/chat/completions
+POST {AI_ENDPOINT}/v1/chat/completions
 {
   "model": "a2z-web3-tuned",
   "messages": [
@@ -52,7 +52,7 @@ POST {SGLANG_ENDPOINT}/v1/chat/completions
 }
 ```
 
-Response dari AIM-tuned LLM kemudian di-parse oleh Agent A, digabung dengan on-chain TVL metric (30%), dan jika total score > threshold, payload diteruskan ke Agent B via endpoint `/api/v1/vault/execute` di atas.
+Response dari vLLM-served LLM kemudian di-parse oleh Agent A, digabung dengan on-chain TVL metric (30%), dan jika total score > threshold, payload diteruskan ke Agent B via endpoint `/api/v1/vault/execute` di atas.
 
 ## Retry Policy
 

@@ -4,7 +4,7 @@ A2Z Agentz - Agent A (The Scout): ChromaDB Semantic Dedup Stage
 
 Pipeline position:
  [current source data] -> JSON Lines -> [agent_a_chroma (THIS)] -> JSON Lines
- -> [downstream AIM / SGLang inference] -> publication to DB
+ -> [downstream vLLM inference] -> publication to DB
 
 Responsibilities:
  1. Lazy-init a PersistentClient rooted at `CHROMA_PATH` so embeddings
@@ -283,7 +283,7 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
                    help="Read JSONL from path (default: stdin, '-' = stdin)")
     p.add_argument("--insert-passed", action="store_true",
                    help="Also call insert_project_embedding() for records that pass dedup. "
-                        "Off by default - production should let the downstream AIM stage "
+                        "Off by default - production should let the downstream vLLM stage "
                         "decide which survivors are 'approved' and worth remembering.")
     return p.parse_args(argv)
 
