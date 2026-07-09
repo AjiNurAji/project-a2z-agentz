@@ -13,14 +13,15 @@ from typing import Any
 
 import aiohttp
 from dotenv import load_dotenv
+from openai import AsyncOpenAI
 
 from database import (
-  append_audit_log,
-  ensure_pipeline_tables,
-  fetch_and_lock_pending_task,
-  insert_synthesis_result,
-  insert_transaction_proposal,
-  update_task_status,
+    append_audit_log,
+    ensure_pipeline_tables,
+    fetch_and_lock_pending_task,
+    insert_synthesis_result,
+    insert_transaction_proposal,
+    update_task_status,
 )
 from routes.websockets import manager
 from web3_async import MultiRpcProvider
@@ -82,57 +83,46 @@ async def _check_goplus(session: aiohttp.ClientSession, token_address: str) -> d
 
 
 async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_summary: str) -> dict[str, Any]:
-  if not AGENT_B_API_KEY or not AGENT_B_ENDPOINT or not AGENT_B_MODEL:
-    return {"score": 0, "reason": "missing agent b config", "amount_usd": 0.0, "model": "bypass"}
-  prompt = (
-    "You are Agent B (The Vault Gatekeeper). Evaluate this Base token for honeypot/rug risk."
-    f" Token: {token_name} Address: {contract_address} GoPlus: {goplus_summary}"
-    " Return JSON with keys: score (0-100), reason, amount_usd (<=2), category, model."
-  )
-  payload = {
-    "model": AGENT_B_MODEL,
-    "messages": [
-      {"role": "system", "content": "Return only compact JSON."},
-      {"role": "user", "content": prompt},
-    ],
-    "temperature": 0.1,
-  }
-  headers = {
-    "Authorization": f"Bearer {AGENT_B_API_KEY}",
-    "Content-Type": "application/json",
-  }
-  try:
-    async with aiohttp.ClientSession() as session:
-      async with session.post(
-        AGENT_B_ENDPOINT,
-        json=payload,
-        headers=headers,
-        timeout=30,
-      ) as resp:
-        if resp.status != 200:
-          return {"score": 0, "reason": f"http {resp.status}", "amount_usd": 0.0, "model": AGENT_B_MODEL}
-        data = await resp.json()
-        content = (
-          data.get("choices", [{}])[0]
-          .get("message", {})
-          .get("content", "")
+    if not AGENT_B_API_KEY or not AGENT_B_ENDPOINT or not AGENT_B_MODEL:
+        return {"score": 0, "reason": "missing agent b config", "amount_usd": 0.0, "model": "bypass"}
+    temperature = float(os.getenv("AGENT_B_TEMPERATURE", "0.1"))
+    max_tokens = int(os.getenv("AGENT_B_MAX_TOKENS", "1024"))
+    prompt = (
+        "You are Agent B (The Vault Gatekeeper). Evaluate this Base token for honeypot/rug risk."
+        f" Token: {token_name} Address: {contract_address} GoPlus: {goplus_summary}"
+        " Return JSON with keys: score (0-100), reason, amount_usd (<=2), category, model."
+    )
+    client = AsyncOpenAI(base_url=AGENT_B_ENDPOINT, api_key=AGENT_B_API_KEY)
+    try:
+        resp = await client.chat.completions.create(
+            model=AGENT_B_MODEL,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            messages=[
+                {"role": "system", "content": "Return only compact JSON."},
+                {"role": "user", "content": prompt},
+            ],
         )
-        try:
-          parsed = json.loads(content)
-          if isinstance(parsed, dict):
+    except Exception as exc:
+        logger.warning("Agent B inference failed: %s", exc)
+        return {"score": 0, "reason": f"inference_failed: {exc}", "amount_usd": 0.0, "model": AGENT_B_MODEL}
+
+    content = resp.choices[0].message.content if resp.choices else ""
+    if not content:
+        return {"score": 0, "reason": f"http {resp.status_code}", "amount_usd": 0.0, "model": AGENT_B_MODEL}
+    try:
+        parsed = json.loads(content)
+        if isinstance(parsed, dict):
             return {
-              "score": int(parsed.get("score", 0) or 0),
-              "reason": str(parsed.get("reason", "")),
-              "amount_usd": float(parsed.get("amount_usd", 0) or 0),
-              "category": str(parsed.get("category", "unknown")),
-              "model": str(parsed.get("model", AGENT_B_MODEL)),
+                "score": int(parsed.get("score", 0) or 0),
+                "reason": str(parsed.get("reason", "")),
+                "amount_usd": float(parsed.get("amount_usd", 0) or 0),
+                "category": str(parsed.get("category", "unknown")),
+                "model": str(parsed.get("model", AGENT_B_MODEL)),
             }
-        except Exception:
-          pass
-        return {"score": 0, "reason": content[:200], "amount_usd": 0.0, "model": AGENT_B_MODEL}
-  except Exception as exc:
-    logger.warning("Agent B inference failed: %s", exc)
-    return {"score": 0, "reason": f"inference_failed: {exc}", "amount_usd": 0.0, "model": AGENT_B_MODEL}
+    except Exception:
+        pass
+    return {"score": 0, "reason": content[:200], "amount_usd": 0.0, "model": AGENT_B_MODEL}
 
 
 async def process_task(task: dict[str, Any]) -> None:

@@ -50,7 +50,7 @@ import time
 from dataclasses import dataclass
 from typing import Optional
 
-import requests
+from openai import OpenAI
 
 # Reuse the project's canonical-format helpers so Agent A and Agent B can
 # never disagree on what gets signed vs. verified.
@@ -66,20 +66,27 @@ from web3_client import (
 # ----------------------------------------------------------------------------
 DEFAULT_THRESHOLD: int = 85
 DEFAULT_MODEL: str = "meta-llama/Meta-Llama-3-8B-Instruct"
-APPROVE_AMOUNT_FULL: float = 2.00  # Agent B's AUTONOMOUS_CAP_USD ceiling
+APPROVE_AMOUNT_FULL: float = 2.00 # Agent B's AUTONOMOUS_CAP_USD ceiling
 APPROVE_AMOUNT_HALF: float = 1.50
 AI_TIMEOUT_SEC: float = 30.0
+_SAFE_STR_DEFAULT: str = "Health check"
 
 
 # ----------------------------------------------------------------------------
-# Logger (continues the a2z.* namespace family; stderr only so JSON stays pipe-clean)
+# Logger
 # ----------------------------------------------------------------------------
 logger = logging.getLogger("a2z.agent_a.inference")
 if not logger.handlers:
-    _h = logging.StreamHandler()
-    _h.setFormatter(logging.Formatter("[%(asctime)s] %(levelname)s a2z.agent_a.inference: %(message)s"))
-    logger.addHandler(_h)
+ _h = logging.StreamHandler()
+ _h.setFormatter(logging.Formatter("[%(asctime)s] %(levelname)s a2z.agent_a.inference: %(message)s"))
+ logger.addHandler(_h)
 logger.setLevel(logging.INFO)
+
+
+def _safestr(value: object, fallback: str = _SAFE_STR_DEFAULT) -> str:
+ """Coerce *value* to a non-empty str so the tokenizer never receives None/empty."""
+ text = "" if value is None else str(value).strip()
+ return text if text else fallback
 
 
 # ----------------------------------------------------------------------------
@@ -119,9 +126,8 @@ def _mock_infer(description: str, target_address: str) -> AIResult:
     across cron runs (Agent B's idempotency depends on this).
     """
     t0 = time.time()
-    text = (description or "").strip()
-
-    seed = int(hashlib.sha256((target_address or text).encode("utf-8")).hexdigest()[:8], 16)
+    text = _safestr(description or target_address)
+    seed = int(hashlib.sha256(text.encode("utf-8")).hexdigest()[:8], 16)
     rng = random.Random(seed)
 
     base = 55
@@ -194,42 +200,39 @@ _AI_SYSTEM_PROMPT = (
 
 
 def _openai_compat_infer(
-    endpoint: str, api_key: str, model: str, description: str, target_address: str,
+    endpoint: str, api_key: str, model: str,
+    temperature: float, max_tokens: int,
+    description: str, target_address: str,
 ) -> AIResult:
     """
-    POST to {endpoint}/chat/completions using the OpenAI schema.
+    Call {endpoint}/chat/completions using the official openai Python SDK.
     Compatible with vLLM, OpenAI, TGI, etc. -- set AI_ENDPOINT to
     e.g. http://sgilang-rocm:30000/v1 and it just works.
     """
     t0 = time.time()
-    url = endpoint.rstrip("/") + "/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {api_key}" if api_key else "Bearer empty",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "model": model,
-        "temperature": 0.0,  # reproducibility matters: signed payloads must be deterministic
-        "messages": [
-            {"role": "system", "content": _AI_SYSTEM_PROMPT},
-            {"role": "user", "content": (
-                f"target_address: {target_address}\n"
-                f"description: {description}"
-            )},
-        ],
-        "response_format": {"type": "json_object"},
-    }
+    client = OpenAI(base_url=endpoint.rstrip("/"), api_key=api_key or "not-required")
+
     try:
-        resp = requests.post(url, headers=headers, json=payload, timeout=AI_TIMEOUT_SEC)
-        resp.raise_for_status()
-    except requests.RequestException as exc:
+        resp = client.chat.completions.create(
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            messages=[
+                {"role": "system", "content": _AI_SYSTEM_PROMPT},
+                {"role": "user", "content": (
+                    f"target_address: {target_address}\n"
+                    f"description: {description}"
+                )},
+            ],
+            response_format={"type": "json_object"},
+        )
+    except Exception as exc:
         raise RuntimeError(f"AI endpoint unreachable: {exc}") from exc
 
-    body = resp.json()
     try:
-        content = body["choices"][0]["message"]["content"]
-    except (KeyError, IndexError, TypeError) as exc:
-        raise RuntimeError(f"Unexpected AI response shape: {body!r}") from exc
+        content = resp.choices[0].message.content
+    except (AttributeError, IndexError, TypeError) as exc:
+        raise RuntimeError(f"Unexpected AI response shape: {resp!r}") from exc
 
     try:
         parsed = json.loads(content)
@@ -263,8 +266,15 @@ def run_ai_inference(description: str, target_address: str, model: str) -> AIRes
         logger.debug("AI_ENDPOINT not set or 'mock' -> using local mock inference.")
         return _mock_infer(description, target_address)
 
+    temperature = float(os.getenv("AGENT_A_TEMPERATURE", "0.0"))
+    max_tokens = int(os.getenv("AGENT_A_MAX_TOKENS", "1024"))
+
     try:
-        result = _openai_compat_infer(endpoint, api_key, model, description, target_address)
+        result = _openai_compat_infer(
+            endpoint, api_key, model,
+            temperature=temperature, max_tokens=max_tokens,
+            description=description, target_address=target_address,
+        )
         logger.info(
             "AI endpoint OK | model=%s latency=%dms score=%d category=%s",
             result.model, result.latency_ms, result.score, result.category,
