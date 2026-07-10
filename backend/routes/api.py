@@ -201,16 +201,48 @@ async def circuit_breaker(request: Request):
 
 @require_auth
 async def get_system_status(request: Request):
-    """Returns health status of various components."""
-    cb_status = database.get_system_config("circuit_breaker", "active")
-    return JSONResponse(
-        {
-            "database": "healthy",
-            "rpc_node": "healthy",
-            "ai_model": "healthy",
-            "circuit_breaker": cb_status,
-        }
-    )
+    """Returns LIVE health status of components against AMD GPU tunnel."""
+    from urllib import request as _url_req
+    from urllib import error as _url_err
+    import json as _json
+    body = {"database": "healthy", "circuit_breaker": "unknown", "rpc_node": "healthy", "ai_model": "unknown", "ai_model_id": None, "ai_endpoint": None}
+    try:
+        cb = database.get_system_config("circuit_breaker", "active")
+        body["circuit_breaker"] = cb
+    except Exception:
+        body["circuit_breaker"] = "unknown"
+    try:
+        ep = os.getenv("AGENT_A_ENDPOINT", "").rstrip("/")
+        if not ep:
+            ep = os.getenv("AGENT_B_ENDPOINT", "").rstrip("/")
+        body["ai_endpoint"] = ep
+        if ep:
+            ep_models = ep.rstrip("/") + "/models"
+            req = _url_req.Request(ep_models, headers={"Accept": "application/json"}, method="GET")
+            with _url_req.urlopen(req, timeout=8) as resp:
+                data = _json.loads(resp.read().decode("utf-8"))
+            models = data.get("data", [])
+            if models:
+                body["ai_model"] = "healthy"
+                body["ai_model_id"] = models[0].get("id")
+                body["ai_max_model_len"] = models[0].get("max_model_len")
+            else:
+                body["ai_model"] = "empty"
+        else:
+            body["ai_model"] = "not_configured"
+    except _url_err.HTTPError as exc:
+        body["ai_model"] = f"http_{exc.code}"
+    except Exception as exc:
+        body["ai_model"] = "unreachable"
+    return JSONResponse(body)
+
+
+async def health(request: Request):
+    """Lightweight healthcheck for judges / uptime monitoring (judge token optional)."""
+    judge = request.headers.get("X-Judge-Token")
+    if JUDGE_TOKEN and judge and judge != JUDGE_TOKEN:
+        return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+    return JSONResponse({"status": "ok", "service": "a2z-agentz-backend"})
 
 
 # ---------------------------------------------------------------------------
@@ -623,6 +655,7 @@ async def get_execution_status(request: Request):
 
 
 routes = [
+    Route("/health", health, methods=["GET"]),
     Route("/stats", get_stats, methods=["GET"]),
     Route("/targets", get_targets, methods=["GET"]),
     Route("/transactions", get_transactions, methods=["GET"]),
