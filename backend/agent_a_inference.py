@@ -20,7 +20,7 @@ Responsibilities:
   3. Cryptographic signing (only for APPROVED):
        Use Agent A's PRIVATE_KEY to sign the canonical message
        ``project_target_address=...\\ntimestamp=...\\namount_usd=...\\nreason=...``
-       The signing format is defined in ``web3_client.canonical_message_for_signing``
+       The signing format is defined in ``web3_async.canonical_message_for_signing``
        and reused verbatim by Agent B's ``recover_signer`` for verification.
   4. JSON Lines out -- APPROVED records include `signature` and all the
      fields Agent B's VaultExecuteRequest expects; REJECTED records flow
@@ -31,7 +31,7 @@ Env:
                          Empty / unset / "mock" -> use local mock inference.
     AI_API_KEY         - Bearer token. vLLM accepts any non-empty value when
                          the server is started with --api-key disabled.
-    PRIVATE_KEY        - Agent A signer key (already consumed by web3_client).
+    PRIVATE_KEY        - Agent A signer key (consumed by web3_async).
                          Missing -> APPROVED projects get verdict=SIGN_FAILED.
     AI_MODEL           - Model name to request (default: meta-llama/Meta-Llama-3-8B-Instruct).
 """
@@ -54,7 +54,7 @@ from openai import OpenAI
 
 # Reuse the project's canonical-format helpers so Agent A and Agent B can
 # never disagree on what gets signed vs. verified.
-from web3_client import (
+from web3_async import (
     canonical_message_for_signing,
     get_account,
     sign_payload,

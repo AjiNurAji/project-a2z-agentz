@@ -18,7 +18,7 @@ scheduler = BackgroundScheduler()
 def run_agent_a() -> None:
     logger.info("Triggering Agent A (The Scout)...")
     try:
-        from backend.scheduler.agent_a_cycle import main as agent_a_cycle_main
+        from scheduler.agent_a_cycle import main as agent_a_cycle_main
         import asyncio
         asyncio.run(agent_a_cycle_main())
     except SystemExit:
@@ -30,7 +30,7 @@ def run_agent_a() -> None:
 def run_agent_b() -> None:
     logger.info("Triggering Agent B (Vault)...")
     try:
-        from backend.scheduler.agent_b_cycle import worker_loop as agent_b_cycle_main
+        from scheduler.agent_b_cycle import worker_loop as agent_b_cycle_main
         import asyncio
         asyncio.run(agent_b_cycle_main(poll_interval=0.1))
     except SystemExit:

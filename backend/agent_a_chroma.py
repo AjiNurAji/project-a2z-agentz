@@ -77,7 +77,7 @@ DEFAULT_THRESHOLD: float = 0.85 # similarity threshold (1 - cosine_distance)
 
 
 # ----------------------------------------------------------------------------
-# Logger (same `a2z.*` namespace family as database.py / web3_client.py /
+# Logger (same `a2z.*` namespace family as database.py / web3_async.py /
 # agent_a_producer.py - stderr only, so stdout stays pipe-clean)
 # ----------------------------------------------------------------------------
 logger = logging.getLogger("a2z.agent_a.chroma")

@@ -11,25 +11,36 @@ from dotenv import load_dotenv
 ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT / ".env", override=False)
 
+# On serverless platforms (Vercel) there are no long-lived connections or
+# background processes, so we drop WebSockets and the APScheduler loop.
+IS_SERVERLESS = os.getenv("A2Z_PLATFORM", "").lower() in ("vercel", "serverless")
+
 FIREWORKS_API_KEY = os.getenv("AGENT_B_API_KEY", "")
 
 from routes.api import routes as api_routes
 from routes.auth import routes as auth_routes
-from routes.websockets import routes as ws_routes
-from routes.websockets import poll_and_broadcast
 from scheduler.agent_runner import start_scheduler, stop_scheduler
+
+if not IS_SERVERLESS:
+    from routes.websockets import routes as ws_routes
+    from routes.websockets import poll_and_broadcast
 
 from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app: Starlette):
     print("Starting A2Z Agentz Backend (Starlette)...")
-    start_scheduler()
-    task = asyncio.create_task(poll_and_broadcast())
+    if IS_SERVERLESS:
+        print("Serverless platform detected: skipping scheduler + WebSocket broadcast.")
+    else:
+        start_scheduler()
+        task = asyncio.create_task(poll_and_broadcast())
+        yield
+        print("Shutting down A2Z Agentz Backend...")
+        stop_scheduler()
+        task.cancel()
+        return
     yield
-    print("Shutting down A2Z Agentz Backend...")
-    stop_scheduler()
-    task.cancel()
 
 async def read_root(request):
     return JSONResponse({"message": "A2Z Agentz API is running."})
@@ -202,8 +213,7 @@ app = Starlette(
         Route("/openapi.json", get_openapi, methods=["GET"]),
         Mount("/api/auth", routes=auth_routes),
         Mount("/api", routes=api_routes),
-        Mount("/", routes=ws_routes) # /ws is defined in ws_routes
-    ],
+    ] + ([Mount("/", routes=ws_routes)] if not IS_SERVERLESS else []),
     middleware=middleware,
     lifespan=lifespan
 )

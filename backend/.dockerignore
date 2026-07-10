@@ -14,3 +14,7 @@ cloudflared.log
 *.png
 venv/
 .venv/
+.git
+.env
+*.log
+venv

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "build": {
+    "env": {
+      "PYTHON_VERSION": "3.12"
+    }
+  },
+  "functions": {
+    "api/index.py": {
+      "runtime": "python3.12",
+      "maxDuration": 60,
+      "memory": 1024,
+      "includeFiles": "backend/**"
+    }
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api/index.py" }
+  ],
+  "env": {
+    "A2Z_PLATFORM": "vercel"
+  }
+}

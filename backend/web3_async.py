@@ -1,8 +1,9 @@
 """
 A2Z Agentz - Async Multi-RPC Web3 Client (v2)
 
-Lives alongside the legacy sync `web3_client.py` so we don't break the
-existing auth backend. Agent B uses this file.
+Lives alongside the legacy sync signing logic now consolidated in this file so
+we don't break the existing auth backend. Agent B uses the MultiRpcProvider
+below.
 
 Design:
     MultiRpcProvider rotates through BASE_RPC_1, BASE_RPC_2, BASE_RPC_3
@@ -333,3 +334,80 @@ class GnosisSafeClient:
                 or parsed.get("txHash")
                 or _json.dumps(parsed)
             )
+
+
+# ---------------------------------------------------------------------------
+# Agent A signing helpers (canonical format shared with the dashboard)
+# ---------------------------------------------------------------------------
+# These used to live in the legacy sync `web3_client.py`. That module is gone,
+# so they are consolidated here to keep the backend import graph self-contained.
+try:
+    from eth_account import Account as _EthAccount
+    from eth_utils import keccak as _keccak
+    _SIGNING_AVAILABLE = True
+except Exception:  # pragma: no cover - import guard for lightweight environments
+    _SIGNING_AVAILABLE = False
+
+
+def _agent_a_private_key() -> str:
+    return os.environ.get("PRIVATE_KEY", "").strip()
+
+
+def get_account():
+    """Return an eth_account.LocalAccount derived from PRIVATE_KEY.
+
+    Raises RuntimeError if the key is missing or malformed.
+    """
+    if not _SIGNING_AVAILABLE:
+        raise RuntimeError("eth_account is not installed (signing unavailable)")
+    key = _agent_a_private_key()
+    if not key:
+        raise RuntimeError("PRIVATE_KEY is not configured")
+    if not key.startswith("0x"):
+        key = "0x" + key
+    return _EthAccount.from_key(key)
+
+
+def canonical_message_for_signing(
+    project_target_address: str,
+    timestamp: int,
+    amount_usd: float,
+    reason: str,
+) -> str:
+    """Deterministic, human-readable message that gets signed/verified.
+
+    Must match exactly between signing (Agent A) and verification so the
+    dashboard / contracts can never disagree on what was authorized.
+    """
+    return (
+        f"A2Z_AGENT_A_AUTHORIZE\n"
+        f"target={project_target_address}\n"
+        f"timestamp={int(timestamp)}\n"
+        f"amount_usd={float(amount_usd):.2f}\n"
+        f"reason={reason}\n"
+    )
+
+
+def sign_payload(
+    project_target_address: str,
+    timestamp: int,
+    amount_usd: float,
+    reason: str,
+) -> str:
+    """Return a hex signature (0x...) over the canonical message.
+
+    Raises RuntimeError if PRIVATE_KEY is missing.
+    """
+    account = get_account()
+    canonical = canonical_message_for_signing(
+        project_target_address=project_target_address,
+        timestamp=timestamp,
+        amount_usd=amount_usd,
+        reason=reason,
+    )
+    # eth_account.sign_message expects EIP-191 typed data via encode_defunct
+    from eth_account.messages import encode_defunct
+
+    message = encode_defunct(text=canonical)
+    signed = account.sign_message(message)
+    return signed.signature.hex()
