@@ -20,6 +20,7 @@ FIREWORKS_API_KEY = os.getenv("AGENT_B_API_KEY", "")
 from routes.api import routes as api_routes
 from routes.auth import routes as auth_routes
 from scheduler.agent_runner import start_scheduler, stop_scheduler
+import database
 
 if not IS_SERVERLESS:
     from routes.websockets import routes as ws_routes
@@ -35,6 +36,9 @@ async def lifespan(app: Starlette):
     else:
         start_scheduler()
         task = asyncio.create_task(poll_and_broadcast())
+        # Self-heal the system/owner user (id=1) so Agent A's enqueue_target
+        # FK (scraping_queue_user_fk) doesn't fail on fresh Railway databases.
+        database.ensure_system_user()
         yield
         print("Shutting down A2Z Agentz Backend...")
         stop_scheduler()
@@ -198,9 +202,16 @@ async def get_openapi(request):
     })
 
 frontend_origin = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
+# Support comma-separated list of allowed origins (Railway/Vercel dashboards
+# often live on a different host than localhost). When allow_credentials is
+# True Starlette forbids "*", so we expand the env into an explicit list.
+allow_origins = [o.strip() for o in frontend_origin.split(",") if o.strip()]
+# In debug mode, also allow any origin so local/dev dashboards just work.
+if os.getenv("DEBUG", "false").lower() == "true":
+    allow_origins = ["*"]
 
 middleware = [
-    Middleware(CORSMiddleware, allow_origins=[frontend_origin], allow_methods=["*"], allow_headers=["*"], allow_credentials=True)
+    Middleware(CORSMiddleware, allow_origins=allow_origins, allow_methods=["*"], allow_headers=["*"], allow_credentials=True)
 ]
 
 debug = os.getenv("DEBUG", "false").lower() == "true"

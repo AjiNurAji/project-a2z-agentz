@@ -52,11 +52,17 @@ class _PoolHolder:
         with cls._lock:
             if cls._pool is not None:
                 return cls._pool
-            dsn = os.environ.get("POSTGRES_URI", "").strip()
+            # Railway / common platforms expose the DB under POSTGRES_URL or
+            # DATABASE_URL. Fall back to POSTGRES_URI (docker-stack default).
+            dsn = (
+                os.environ.get("POSTGRES_URL")
+                or os.environ.get("DATABASE_URL")
+                or os.environ.get("POSTGRES_URI", "")
+            ).strip()
             if not dsn:
                 raise RuntimeError(
-                    "POSTGRES_URI environment variable is not set. "
-                    "Refusing to initialize database pool."
+                    "POSTGRES_URI / POSTGRES_URL / DATABASE_URL environment variable is not set. "
+                    "Set one of them to a libpq connection string."
                 )
             # Mask DSN in logs (do NOT print password)
             safe_dsn = dsn
@@ -322,6 +328,35 @@ def create_user(email: str, password_hash: str, wallet_address: str = None) -> d
         logger.error("create_user failed: %s", exc)
         return None
     return None
+
+
+def ensure_system_user(user_id: int = 1, email: str = "system@a2z.agentz") -> bool:
+    """
+    Idempotently ensure the system/owner user (default id=1) exists.
+
+    Agent A's enqueue_target uses DEFAULT_USER_ID (1) as the scraping_queue
+    owner. On a fresh Railway DB the users table is empty, so the foreign key
+    (scraping_queue_user_fk) fails every cycle. Seeding the row here (called
+    from lifespan on startup) makes the schema self-healing on any new DB.
+    """
+    try:
+        with _get_cursor() as cur:
+            cur.execute(
+                "SELECT 1 FROM users WHERE id = %s LIMIT 1;", (user_id,)
+            )
+            if cur.fetchone():
+                return True
+            cur.execute(
+                """INSERT INTO users (id, email, password_hash, wallet_address)
+                   VALUES (%s, %s, %s, NULL)
+                   ON CONFLICT (id) DO NOTHING;""",
+                (user_id, email, "SYSTEM_USER_NO_LOGIN"),
+            )
+            logger.info("ensure_system_user: seeded system user id=%s", user_id)
+            return True
+    except psycopg2.Error as exc:
+        logger.error("ensure_system_user failed: %s", exc)
+        return False
 
 def get_user_by_email(email: str) -> dict:
     query = "SELECT id, email, password_hash, wallet_address, created_at, last_login_at FROM users WHERE email = %s LIMIT 1;"
