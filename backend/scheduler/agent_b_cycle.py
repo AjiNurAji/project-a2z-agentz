@@ -33,6 +33,12 @@ logger = logging.getLogger("a2z.agent_b")
 AGENT_B_ENDPOINT = os.getenv("AGENT_B_ENDPOINT", "")
 AGENT_B_MODEL = os.getenv("AGENT_B_MODEL", "")
 AGENT_B_API_KEY = os.getenv("AGENT_B_API_KEY", "")
+# Auto-discover model id from /v1/models when pointing at an OpenAI-compatible
+# server (vLLM, TGI, etc.). Reduces the chance of "model not found" errors when
+# the upstream server changes model IDs. Default: ON. Set to "0" to disable.
+AGENT_B_MODEL_AUTO_DISCOVER = os.getenv("AGENT_B_MODEL_AUTO_DISCOVER", "1") == "1"
+# Cap so we never call /v1/models in a hot inference loop.
+AGENT_B_MODEL_DISCOVER_TIMEOUT = float(os.getenv("AGENT_B_MODEL_DISCOVER_TIMEOUT", "10"))
 GOPLUS_API_URL = os.getenv("GOPLUS_API_URL", "")
 GOPLUS_API_KEY = os.getenv("GOPLUS_API_KEY", "")
 BASE_RPC_1 = os.getenv("BASE_RPC_1", "")
@@ -41,6 +47,62 @@ BASE_RPC_3 = os.getenv("BASE_RPC_3", "")
 BASE_CHAIN_ID = int(os.getenv("BASE_CHAIN_ID", "8453"))
 MAX_SCORE_FOR_AUTO = int(os.getenv("AGENT_B_AUTO_SCORE_MIN", "85"))
 DEFAULT_NETWORK_HINT = os.getenv("ACTIVE_NETWORK", "base")
+
+
+def _strip_models_path(endpoint: str) -> str:
+    """Return endpoint with any trailing /models stripped, ready for /models suffix."""
+    endpoint = (endpoint or "").rstrip("/")
+    if endpoint.endswith("/models"):
+        endpoint = endpoint[: -len("/models")]
+    # strip /v1 (so we can append /v1/models) -- but keep if no /v1 present.
+    if not endpoint.endswith("/v1"):
+        endpoint = endpoint + "/v1"
+    return endpoint
+
+
+async def _discover_model_id(
+    session: aiohttp.ClientSession, endpoint: str, api_key: str
+) -> str:
+    """
+    Hit ``GET {endpoint}/models`` and return the first model id in the list.
+
+    Compatible with the OpenAI / vLLM / TGI conventions. Returns "" on any
+    failure (network error, auth error, missing field) so the caller can fall
+    back to the AGENT_B_MODEL env value.
+    """
+    if not endpoint or not session:
+        return ""
+    base = _strip_models_path(endpoint)
+    url = f"{base}/models"
+    headers = {"accept": "application/json"}
+    if api_key:
+        headers["authorization"] = f"Bearer {api_key}"
+    try:
+        async with session.get(
+            url, headers=headers, timeout=AGENT_B_MODEL_DISCOVER_TIMEOUT
+        ) as resp:
+            if resp.status != 200:
+                logger.debug(
+                    "Agent B model discovery: %s returned HTTP %s",
+                    url, resp.status,
+                )
+                return ""
+            payload = await resp.json()
+    except Exception as exc:
+        logger.debug("Agent B model discovery failed: %s", exc)
+        return ""
+    if not isinstance(payload, dict):
+        return ""
+    data = payload.get("data", [])
+    if not isinstance(data, list) or not data:
+        return ""
+    first = data[0]
+    if isinstance(first, dict):
+        model_id = first.get("id") or first.get("model") or ""
+        return str(model_id)
+    if isinstance(first, str):
+        return first
+    return ""
 
 
 def _build_rpc_provider() -> MultiRpcProvider | None:
@@ -92,10 +154,28 @@ async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_
         f" Token: {token_name} Address: {contract_address} GoPlus: {goplus_summary}"
         " Return JSON with keys: score (0-100), reason, amount_usd (<=2), category, model."
     )
+    # Dynamic model discovery: prefer the actual model id reported by the
+    # server itself. Falls back to AGENT_B_MODEL on any failure (timeout,
+    # missing endpoint, auth error).
+    model_id = AGENT_B_MODEL
+    if AGENT_B_MODEL_AUTO_DISCOVER:
+        try:
+            async with aiohttp.ClientSession() as _sess:
+                discovered = await _discover_model_id(_sess, AGENT_B_ENDPOINT, AGENT_B_API_KEY)
+            if discovered:
+                if discovered != AGENT_B_MODEL:
+                    logger.info(
+                        "Agent B model override: env=%s server_reported=%s",
+                        AGENT_B_MODEL, discovered,
+                    )
+                model_id = discovered
+        except Exception as exc:
+            logger.debug("Agent B auto-discovery skipped: %s", exc)
+
     client = AsyncOpenAI(base_url=AGENT_B_ENDPOINT, api_key=AGENT_B_API_KEY)
     try:
         resp = await client.chat.completions.create(
-            model=AGENT_B_MODEL,
+            model=model_id,
             temperature=temperature,
             max_tokens=max_tokens,
             messages=[
@@ -105,11 +185,11 @@ async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_
         )
     except Exception as exc:
         logger.warning("Agent B inference failed: %s", exc)
-        return {"score": 0, "reason": f"inference_failed: {exc}", "amount_usd": 0.0, "model": AGENT_B_MODEL}
+        return {"score": 0, "reason": f"inference_failed: {exc}", "amount_usd": 0.0, "model": model_id}
 
     content = resp.choices[0].message.content if resp.choices else ""
     if not content:
-        return {"score": 0, "reason": f"http {resp.status_code}", "amount_usd": 0.0, "model": AGENT_B_MODEL}
+        return {"score": 0, "reason": f"http {resp.status_code}", "amount_usd": 0.0, "model": model_id}
     try:
         parsed = json.loads(content)
         if isinstance(parsed, dict):
@@ -118,11 +198,11 @@ async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_
                 "reason": str(parsed.get("reason", "")),
                 "amount_usd": float(parsed.get("amount_usd", 0) or 0),
                 "category": str(parsed.get("category", "unknown")),
-                "model": str(parsed.get("model", AGENT_B_MODEL)),
+                "model": str(parsed.get("model", model_id)),
             }
     except Exception:
         pass
-    return {"score": 0, "reason": content[:200], "amount_usd": 0.0, "model": AGENT_B_MODEL}
+    return {"score": 0, "reason": content[:200], "amount_usd": 0.0, "model": model_id}
 
 
 async def process_task(task: dict[str, Any]) -> None:
@@ -142,7 +222,7 @@ async def process_task(task: dict[str, Any]) -> None:
       goplus_raw = await _check_goplus(session, contract_address)
     except RuntimeError as exc:
       if "HTTP 404" in str(exc) or "not found" in str(exc).lower():
-        logger.warning("GoPlus 404 for %s — skipping synthesis for queue_id=%s", contract_address, queue_id)
+        logger.warning("GoPlus 404 for %s -- skipping synthesis for queue_id=%s", contract_address, queue_id)
         update_task_status(queue_id, "FAILED", retry=False)
         append_audit_log(
           "agent_b.goplus_404",

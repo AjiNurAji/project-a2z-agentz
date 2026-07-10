@@ -46,11 +46,18 @@ def check_auth(request: Request) -> bool:
     if token and verify_access_token(token):
         return True
 
-    # Allow read-only judge access: valid judge token + safe HTTP method only.
+    # Allow read-only judge access via cookie OR header.
+    # The dashboard forwards the JUDGE_TOKEN as ``X-Judge-Token`` when the
+    # public ``NEXT_PUBLIC_JUDGE_TOKEN`` env is set. The token is also still
+    # accepted as the cookie value to permit curl / scripted use.
+    judge_token_header = request.headers.get("X-Judge-Token")
     if (
         request.method in ("GET", "HEAD", "OPTIONS")
         and JUDGE_TOKEN
-        and token == JUDGE_TOKEN
+        and (
+            (token and token == JUDGE_TOKEN)
+            or (judge_token_header and judge_token_header == JUDGE_TOKEN)
+        )
     ):
         return True
 
