@@ -1,27 +1,32 @@
 "use client";
 
-import { useDashboard, type GasDataPoint, type TvlDataPoint, type SuccessDataPoint } from "./DashboardContext";
+import { useDashboard } from "./DashboardContext";
+import { useChartColors } from "@/hooks/useChartColors";
 import { motion } from "motion/react";
-import { BarChart3, TrendingUp, Activity, Zap } from "lucide-react";
+import { BarChart3, TrendingUp, Activity, Zap, LucideIcon } from "lucide-react";
 import {
-  AreaChart, Area, LineChart, Line, BarChart, Bar,
+  AreaChart, Area, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 
+
+
 /* ── Custom Tooltip ─────────────────────────── */
-function DarkTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; name: string; color: string }>; label?: string }) {
+function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; name: string; color: string }>; label?: string }) {
   if (!active || !payload?.length) return null;
   return (
     <div
-      className="rounded-lg px-3 py-2 shadow-lg text-xs"
       style={{
         background: "var(--color-card)",
         border: "1px solid var(--color-border-default)",
+        borderRadius: 12,
+        padding: "8px 12px",
+        backdropFilter: "blur(8px)",
       }}
     >
-      <p className="font-medium mb-1" style={{ color: "var(--color-heading)" }}>{label}</p>
+      <p style={{ color: "var(--color-heading)", fontSize: 12, fontWeight: 600 }}>{label}</p>
       {payload.map((p, i) => (
-        <p key={i} style={{ color: p.color }}>
+        <p key={i} style={{ color: p.color, fontSize: 11 }}>
           {p.name}: {typeof p.value === "number" ? p.value.toLocaleString() : p.value}
         </p>
       ))}
@@ -30,7 +35,7 @@ function DarkTooltip({ active, payload, label }: { active?: boolean; payload?: A
 }
 
 /* ── Summary Stat ───────────────────────────── */
-function StatCard({ label, value, icon: Icon, color }: { label: string; value: string; icon: React.ElementType; color: string }) {
+function StatCard({ label, value, icon: Icon, color }: { label: string; value: string; icon: LucideIcon; color: string }) {
   return (
     <div
       className="card flex items-center gap-3 p-4"
@@ -52,6 +57,7 @@ function StatCard({ label, value, icon: Icon, color }: { label: string; value: s
 /* ── Main Component ─────────────────────────── */
 export default function AnalyticsCharts() {
   const { gasHistory, tvlHistory, successHistory } = useDashboard();
+  const { colors: CHART_COLORS } = useChartColors();
 
   const latestGas = gasHistory[gasHistory.length - 1]?.gwei ?? 0;
   const latestTvl = tvlHistory[tvlHistory.length - 1]?.tvl ?? 0;
@@ -71,16 +77,16 @@ export default function AnalyticsCharts() {
         variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}
       >
         <motion.div variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}>
-          <StatCard label="Latest Gas" value={`${latestGas} Gwei`} icon={Zap} color="#D49A5A" />
+          <StatCard label="Latest Gas" value={`${latestGas} Gwei`} icon={Zap} color={CHART_COLORS.warning} />
         </motion.div>
         <motion.div variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}>
-          <StatCard label="Current TVL" value={`$${(latestTvl / 1_000_000).toFixed(2)}M`} icon={TrendingUp} color="#6E9C7E" />
+          <StatCard label="Current TVL" value={`$${(latestTvl / 1_000_000).toFixed(2)}M`} icon={TrendingUp} color={CHART_COLORS.success} />
         </motion.div>
         <motion.div variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}>
-          <StatCard label="Weekly Success" value={totalSuccess.toString()} icon={BarChart3} color="#42344B" />
+          <StatCard label="Weekly Success" value={totalSuccess.toString()} icon={BarChart3} color={CHART_COLORS.brand} />
         </motion.div>
         <motion.div variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}>
-          <StatCard label="Success Rate" value={`${successRate}%`} icon={Activity} color="#6E5A7C" />
+          <StatCard label="Success Rate" value={`${successRate}%`} icon={Activity} color={CHART_COLORS.accent} />
         </motion.div>
       </motion.div>
 
@@ -99,21 +105,21 @@ export default function AnalyticsCharts() {
               <AreaChart data={tvlHistory}>
                 <defs>
                   <linearGradient id="tvlGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#42344B" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#42344B" stopOpacity={0} />
+                    <stop offset="5%" stopColor={CHART_COLORS.brand} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={CHART_COLORS.brand} stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#221F2B" />
-                <XAxis dataKey="time" tick={{ fill: "#A8A3B0", fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: "#A8A3B0", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `$${(v / 1_000_000).toFixed(1)}M`} />
-                <Tooltip content={<DarkTooltip />} />
-                <Area type="monotone" dataKey="tvl" stroke="#42344B" strokeWidth={2} fill="url(#tvlGrad)" name="TVL" />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+                <XAxis dataKey="time" tick={{ fill: CHART_COLORS.muted, fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: CHART_COLORS.muted, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `$${(v / 1_000_000).toFixed(1)}M`} />
+                <Tooltip content={<CustomTooltip />} />
+                <Area type="monotone" dataKey="tvl" stroke={CHART_COLORS.brand} strokeWidth={2} fill="url(#tvlGrad)" name="TVL" dot={{ r: 3, fill: CHART_COLORS.brand }} activeDot={{ r: 6, stroke: CHART_COLORS.brand, strokeWidth: 2 }} animationDuration={2000} animationEasing="ease-out" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </motion.div>
 
-        {/* Gas Line Chart */}
+        {/* Gas Area Chart */}
         <motion.div
           className="card p-5"
           initial={{ opacity: 0, y: 16 }}
@@ -123,13 +129,19 @@ export default function AnalyticsCharts() {
           <h4 className="mb-4 font-serif" style={{ color: "var(--color-heading)" }}>Gas Price (24h)</h4>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={gasHistory}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#221F2B" />
-                <XAxis dataKey="time" tick={{ fill: "#A8A3B0", fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: "#A8A3B0", fontSize: 11 }} axisLine={false} tickLine={false} unit=" Gwei" />
-                <Tooltip content={<DarkTooltip />} />
-                <Line type="monotone" dataKey="gwei" stroke="#D49A5A" strokeWidth={2} dot={false} name="Gas" />
-              </LineChart>
+              <AreaChart data={gasHistory}>
+                <defs>
+                  <linearGradient id="gasGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={CHART_COLORS.warning} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={CHART_COLORS.warning} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+                <XAxis dataKey="time" tick={{ fill: CHART_COLORS.muted, fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: CHART_COLORS.muted, fontSize: 11 }} axisLine={false} tickLine={false} unit=" Gwei" />
+                <Tooltip content={<CustomTooltip />} />
+                <Area type="monotone" dataKey="gwei" stroke={CHART_COLORS.warning} strokeWidth={2} fill="url(#gasGrad)" name="Gas" dot={{ r: 3, fill: CHART_COLORS.warning }} activeDot={{ r: 6, stroke: CHART_COLORS.warning, strokeWidth: 2 }} animationDuration={2000} animationEasing="ease-out" />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         </motion.div>
@@ -145,13 +157,13 @@ export default function AnalyticsCharts() {
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={successHistory}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#221F2B" />
-                <XAxis dataKey="time" tick={{ fill: "#A8A3B0", fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: "#A8A3B0", fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip content={<DarkTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 12, color: "#A8A3B0" }} />
-                <Bar dataKey="success" fill="#6E9C7E" radius={[4, 4, 0, 0]} name="Success" />
-                <Bar dataKey="failed" fill="#C9596A" radius={[4, 4, 0, 0]} name="Failed" />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+                <XAxis dataKey="time" tick={{ fill: CHART_COLORS.muted, fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: CHART_COLORS.muted, fontSize: 11 }} axisLine={false} tickLine={false} />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 12, color: CHART_COLORS.muted }} />
+                <Bar dataKey="success" fill={CHART_COLORS.success} radius={[4, 4, 0, 0]} name="Success" />
+                <Bar dataKey="failed" fill={CHART_COLORS.danger} radius={[4, 4, 0, 0]} name="Failed" />
               </BarChart>
             </ResponsiveContainer>
           </div>

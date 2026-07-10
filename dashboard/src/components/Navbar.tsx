@@ -1,14 +1,34 @@
 "use client";
 
+import React, { useState, useRef, useEffect } from "react";
+
 import { useDashboard } from "./DashboardContext";
-import { Bell, Cpu, Menu, Activity } from "lucide-react";
+import { useAuth } from "./AuthProvider";
+import { Cpu, Menu, LogOut, User } from "lucide-react";
+import { CommandCenterToggle } from "./ui/CommandCenter";
+import { ThemeToggle } from "./ui/ThemeToggle";
+import { NotificationsPanel } from "./ui/NotificationsPanel";
 import { motion } from "motion/react";
 
 export default function Navbar() {
   const { kpiMetrics, agentAStatus, agentBStatus, setSidebarOpen } = useDashboard();
+  const { user, loading, logout } = useAuth();
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setProfileOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
     <motion.header
+      data-navbar="true"
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
@@ -42,22 +62,67 @@ export default function Navbar() {
         </div>
 
         {/* Right: alerts + agent pings */}
-        <div className="flex items-center gap-4">
-          {kpiMetrics.activeAlerts > 0 && (
-            <button
-              className="relative p-1.5 rounded-xl hover:bg-[var(--color-neutral-secondary-medium)] focus-ring transition-colors"
-              aria-label={`${kpiMetrics.activeAlerts} pending approvals`}
-            >
-              <Bell className="w-5 h-5 text-[var(--color-body-subtle)]" aria-hidden="true" />
-              <span
-                className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full text-[var(--color-heading)] text-[9px] flex items-center justify-center font-bold"
-                style={{ background: "var(--color-warning)" }}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1">
+          <ThemeToggle />
+          <CommandCenterToggle />
+            <kbd className="text-[10px] px-1.5 py-0.5 rounded font-mono hidden sm:inline-flex items-center" style={{ background: "var(--color-neutral-secondary-medium)", color: "var(--color-body-subtle)", border: "1px solid var(--color-border-default)" }}>⌘K</kbd>
+          </div>
+          <NotificationsPanel />
+          {/* User badge + logout */}
+          {loading ? (
+            <div className="w-20 h-7 rounded-full animate-pulse" style={{ background: "var(--color-neutral-secondary-medium)" }} />
+          ) : user ? (
+            <div className="relative" ref={profileRef}>
+              <button
+                onClick={() => setProfileOpen(!profileOpen)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs hover:bg-[var(--color-neutral-secondary-medium)] transition-all focus-ring"
+                style={{ 
+                  background: profileOpen ? "var(--color-neutral-secondary-strong)" : "var(--color-neutral-secondary-medium)", 
+                  border: "1px solid var(--color-border-default)" 
+                }}
+                aria-label="User profile menu"
+                aria-expanded={profileOpen}
               >
-                {kpiMetrics.activeAlerts}
-              </span>
-            </button>
-          )}
-          <div className="flex items-center gap-3 text-xs">
+                <User className="w-3.5 h-3.5" style={{ color: "var(--color-fg-brand)" }} aria-hidden="true" />
+                <span className="text-[var(--color-heading)] font-medium max-w-[120px] truncate hidden sm:inline-block">
+                  {user.email}
+                </span>
+              </button>
+
+              {/* Profile Dropdown */}
+              {profileOpen && (
+                <div 
+                  className="absolute right-0 mt-2 w-56 rounded-xl shadow-2xl overflow-hidden py-1 border z-50 origin-top-right animate-in fade-in slide-in-from-top-2"
+                  style={{
+                    background: "var(--color-surface)",
+                    borderColor: "var(--color-border-default)",
+                  }}
+                >
+                  <div className="px-4 py-3 border-b mb-1" style={{ borderColor: "var(--color-border-default)" }}>
+                    <p className="text-[10px] font-bold tracking-wider uppercase mb-0.5" style={{ color: "var(--color-body-subtle)" }}>
+                      Signed in as
+                    </p>
+                    <p className="text-sm font-semibold truncate" style={{ color: "var(--color-heading)" }}>
+                      {user.email}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setProfileOpen(false);
+                      logout();
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm font-medium flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors focus-ring"
+                    style={{ color: "var(--color-fg-danger)" }}
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Log Out
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : null}
+          <div className="hidden xl:flex items-center gap-3 text-xs">
             <div className="flex items-center gap-1.5">
               <span
                 className={`w-2 h-2 rounded-full ${

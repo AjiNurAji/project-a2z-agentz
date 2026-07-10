@@ -1,0 +1,55 @@
+export default function Loading() {
+  return (
+    <div className="space-y-6">
+      <style>{`@keyframes skeleton-pulse{0%,100%{opacity:.4}50%{opacity:1}}
+        .skel{background:var(--color-border-default);border-radius:.5rem;animation:skeleton-pulse 1.8s ease-in-out infinite}
+        .skel-card{background:var(--color-surface);border:1px solid var(--color-border-default);border-radius:.75rem;animation:skeleton-pulse 1.8s ease-in-out infinite}`}</style>
+
+      {/* PageHeader skeleton */}
+      <div className="flex items-center gap-4">
+        <div className="skel w-10 h-10 rounded-full shrink-0" />
+        <div className="space-y-2 flex-1">
+          <div className="skel h-6 w-28" />
+          <div className="skel h-3.5 w-96 max-w-full" />
+        </div>
+      </div>
+
+      {/* Stats row: 4 stat cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="skel-card p-4 space-y-2">
+            <div className="skel h-3 w-20" />
+            <div className="skel h-6 w-16" />
+          </div>
+        ))}
+      </div>
+
+      {/* Search / filter bar */}
+      <div className="skel-card p-4 flex items-center gap-3">
+        <div className="skel h-10 flex-1 rounded-lg" />
+        <div className="skel h-10 w-32 rounded-lg" />
+        <div className="skel h-10 w-28 rounded-lg" />
+      </div>
+
+      {/* Accordion skeleton: 5 items */}
+      <div className="skel-card overflow-hidden">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="p-4 flex items-center gap-4"
+            style={{ borderBottom: i < 4 ? "1px solid var(--color-border-default)" : "none" }}>
+            <div className="skel w-5 h-5 rounded shrink-0" />
+            <div className="skel w-6 h-6 rounded-full shrink-0" style={{ background: "var(--color-neutral-primary-medium)" }} />
+            <div className="flex-1 flex items-center justify-between">
+              <div className="space-y-2"><div className="skel h-4 w-40" /><div className="skel h-3 w-24" /></div>
+              <div className="flex items-center gap-3"><div className="skel h-5 w-16 rounded-full" /><div className="skel h-3 w-20" /></div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Pagination skeleton */}
+      <div className="flex justify-center gap-2">
+        {[1,2,3].map((n) => <div key={n} className="skel w-8 h-8 rounded" />)}
+      </div>
+    </div>
+  );
+}

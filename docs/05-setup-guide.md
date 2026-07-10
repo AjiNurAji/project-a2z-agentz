@@ -1,107 +1,107 @@
-# 05. Panduan Instalasi (Setup Guide)
+# 05. Installation Guide
 
-Dokumen ini menjelaskan langkah-langkah *deployment* A2Z Agentz di **AMD Developer Cloud** — *end-to-end* dari AMD AI Workbench fine-tune hingga Agent B di blockchain Base.
+This document covers the *deployment* steps for A2Z Agentz on **AMD Developer Cloud** — *end-to-end* from AMD AI Workbench fine-tuning through to Agent B on the Base blockchain.
 
-## Prasyarat (Prerequisites)
+## Prerequisites
 
-- **Akun AMD Developer Program** (sign-up via [amd.com/en/developer/ai-dev-program](https://www.amd.com/en/developer/ai-dev-program.html)) → klaim **$100 AMD Developer Cloud credits**.
-- Akses ke **AMD Instinct™ MI300X** via AMD Developer Cloud console.
+- **AMD Developer Program account** (sign up via [amd.com/en/developer/ai-dev-program](https://www.amd.com/en/developer/ai-dev-program.html)) -> claim **$100 in AMD Developer Cloud credits**.
+- Access to **AMD Instinct™ MI300X** through the AMD Developer Cloud console.
 - Docker & Docker Compose.
-- Node.js (v18+) untuk Web Dashboard.
-- Python (3.10+) untuk LangGraph, Agent A, dan Agent B.
-- Wallet EOA di **Base Mainnet** (untuk Agent B) + Base Sepolia (untuk testing).
+- Node.js (v18+) for the Web Dashboard.
+- Python (3.10+) for LangGraph, Agent A, and Agent B.
+- An EOA wallet on **Base Mainnet** (for Agent B) + Base Sepolia (for testing).
 
-## Langkah 1: Setup AMD AI Workbench
+## Step 1: Set Up AMD AI Workbench
 
-Akses AMD AI Workbench via AMD Developer Cloud console. GUI no-code untuk fine-tune.
+Access AMD AI Workbench from the AMD Developer Cloud console. This is the no-code GUI for fine-tuning.
 
 ```bash
-# Login ke AMD Developer Cloud (dari browser)
-# https://developer.amd.com/  → AI Workbench → New Workspace
+# Log in to AMD Developer Cloud (from your browser)
+# https://developer.amd.com/ -> AI Workbench -> New Workspace
 
-# Pilih environment:
-#   - GPU: AMD Instinct MI300X
-#   - Base Image: ROCm 6.2 + PyTorch 2.4
-#   - Storage: 200GB (untuk dataset + model)
+# Choose environment:
+# - GPU: AMD Instinct MI300X
+# - Base Image: ROCm 6.2 + PyTorch 2.4
+# - Storage: 200GB (for dataset + model)
 ```
 
-## Langkah 2: Fine-Tune Model dengan AMD AI Workbench
+## Step 2: Fine-Tune the Model with AMD AI Workbench
 
 ```bash
-# Di dalam AI Workbench GUI:
-# 1. Import dataset Web3 sentiment (format JSONL)
-# 2. Pilih base model: meta-llama/Meta-Llama-3-8B-Instruct
+# Inside the AI Workbench GUI:
+# 1. Import the Web3 sentiment dataset (JSONL format)
+# 2. Select the base model: meta-llama/Meta-Llama-3-8B-Instruct
 # 3. Set training config:
-#    - Method: LoRA (rank=16, alpha=32)
-#    - Learning rate: 2e-4
-#    - Epochs: 3
-#    - Batch size: 4
-#    - Max seq length: 2048
-# 4. Klik "Start Training" — berjalan di MI300X
-# 5. Export hasil sebagai AMD Inference Microservice (AIM)
+# - Method: LoRA (rank=16, alpha=32)
+# - Learning rate: 2e-4
+# - Epochs: 3
+# - Batch size: 4
+# - Max sequence length: 2048
+# 4. Click "Start Training" -> runs on MI300X
+# 5. Export the result as a vLLM model server
 ```
 
-Output dari step ini: container image **AIM-tuned LLM** yang siap di-serve.
+Output from this step: a **Qwen/Qwen2.5-72B-Instruct-AWQ** container image ready to serve.
 
-## Langkah 3: Serve AIM via SGLang di MI300X
+## Step 3: Start vLLM on the AMD GPU Server
 
 ```bash
-# Deploy AIM-tuned LLM via SGLang di AMD Developer Cloud
-# (SGLang adalah serving framework AMD-recommended untuk ROCm)
+# Deploy Qwen/Qwen2.5-72B-Instruct-AWQ via vLLM on AMD Developer Cloud
+# (vLLM is the AMD-recommended serving framework for ROCm)
 
 docker run -d \
-  --name a2z-aim-server \
-  --device=/dev/kfd --device=/dev/dri \
-  --group-add video \
-  --cap-add=SYS_PTRACE \
-  --security-opt seccomp=unconfined \
-  -p 8000:8000 \
-  -v /opt/a2z/aim-model:/model \
-  rocm/sglang:latest \
-  python -m sglang.launch_server \
-    --model-path /model \
-    --port 8000 \
-    --tensor-parallel-size 1 \
-    --device rocm \
-    --quantization fp8
+ --name a2z-vllm-server \
+ --device=/dev/kfd --device=/dev/dri \
+ --group-add video \
+ --cap-add=SYS_PTRACE \
+ --security-opt seccomp=unconfined \
+ -p 8000:8000 \
+ -v /opt/a2z/vllm-model:/model \
+ rocm/vllm:latest \
+ python3 -m vllm.entrypoints.openai.ai_server \
+ --model-path /model \
+ --port 8000 \
+ --tensor-parallel-size 1 \
+ --device rocm \
+ --quantization fp8
 ```
 
-Verifikasi:
+Verify:
 ```bash
 curl http://localhost:8000/v1/models
-# Harus return list model: a2z-web3-tuned
+# Should return the model list: a2z-web3-tuned
 ```
 
-## Langkah 4: Setup Database & Backend
+## Step 4: Set Up Database & Backend
 
 ```bash
 git clone https://github.com/axzss/project-a2z-agentz.git
 cd project-a2z-agentz
 docker-compose up -d
-# Spins up: PostgreSQL (5432) + ChromaDB (8000)
+# Starts: PostgreSQL (5432) + ChromaDB (8000)
 ```
 
-*(Lihat `docker-compose.yml` di root repository — file ini ditambahkan setelah Sesi dokumentasi.)*
+*(See `docker-compose.yml` at the repository root — added after the documentation session.)*
 
-## Langkah 5: Konfigurasi Environment Variables
+## Step 5: Configure Environment Variables
 
-Buat file `.env` di direktori `agent-a/` dan `agent-b/`:
+Create a `.env` file in both `agent-a/` and `agent-b/`:
 
 ```env
 # === agent-a/.env ===
 NEYNAR_API_KEY=your_neynar_key_here
-SGLANG_ENDPOINT=http://a2z-aim-server:8000/v1
-AGENT_A_PRIVATE_KEY=private_key_penandatangan_payload
+AGENT_A_ENDPOINT=https://<tunnel>.trycloudflare.com/v1
+AGENT_A_PRIVATE_KEY=signer_keypair
 
 # === agent-b/.env ===
 BASE_RPC_URL_PRIMARY=https://base-mainnet.g.alchemy.com/v2/YOUR_API
 BASE_RPC_URL_FALLBACK=https://mainnet.base.org
 KMS_REGION=us-east-1
 POSTGRES_URI=postgresql://a2z_admin:***@localhost:5432/a2z_transactions
-AGENT_A_PUBLIC_KEY=public_key_verifikasi_whitelist
+AGENT_A_PUBLIC_KEY=public_key_verification
 ```
 
-## Langkah 6: Jalankan Orchestrator (LangGraph)
+## Step 6: Run the Orchestrator (LangGraph)
 
 ```bash
 cd src/orchestrator
@@ -109,31 +109,31 @@ pip install -r requirements.txt
 python main_graph.py
 ```
 
-## Langkah 7: Jalankan Next.js Web Dashboard
+## Step 7: Launch the Next.js Web Dashboard
 
-Di terminal terpisah:
+In a separate terminal:
 ```bash
 cd dashboard
 npm install
 npm run dev
 ```
 
-Buka `http://localhost:3000` untuk memantau **Live Log** AI secara real-time — semua event dari Agent A (AIM inference), Hybrid Scoring, dan Agent B (tx execution) muncul di sini.
+Open `http://localhost:3000` to view the interactive Landing Page (with a Particle Network visualization), then click the dashboard button or navigate directly to `http://localhost:3000/dashboard` to monitor **Live AI Logs** in real time — every event from Agent A (vLLM inference), Hybrid Scoring, and Agent B (transaction execution) appears here.
 
 ---
 
-## Ringkasan Alur
+## Flow Summary
 
-| # | Step | Tools AMD |
+| # | Step | AMD Tooling |
 |---|---|---|
 | 1 | Workspace setup | AMD Developer Cloud |
 | 2 | Fine-tune LLM | **AMD AI Workbench** (no-code) |
-| 3 | Serve model | **SGLang** + **AMD Inference Microservice (AIM)** di **MI300X** + **ROCm** |
-| 4 | Database & backend | Docker Compose (PG + Chroma) |
+| 3 | Serve model | **vLLM** + **vLLM model server** on **MI300X** + **ROCm** |
+| 4 | Database & backend | Docker Compose (PostgreSQL + Chroma) |
 | 5 | Agent runtime | LangGraph + Python |
 | 6 | Frontend | Next.js 16 + Tailwind v4 |
 | 7 | Monitoring | Web Dashboard (real-time WebSocket) |
 
 ---
 
-*Hanya untuk tujuan hackathon. Pastikan untuk menonaktifkan debug mode sebelum pitching.*
+*For hackathon use only. Be sure to disable debug mode before presenting.*

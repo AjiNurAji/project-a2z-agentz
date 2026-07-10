@@ -2,9 +2,27 @@
 import { useDashboard } from "./DashboardContext";
 import { motion, AnimatePresence } from "motion/react";
 import { ListChecks, CheckCircle2, XCircle, Clock, Inbox, AlertTriangle } from "lucide-react";
+import { useToast } from "./ui/Toast";
+import { EmptyState } from "./ui/EmptyState";
+
+import { RadialGauge } from "./ui/RadialGauge";
+import { ScoreBreakdown } from "./ui/ScoreBreakdown";
 
 export default function ApprovalQueue() {
-  const { approvalQueue, handleApprove, handleReject } = useDashboard();
+  const { approvalQueue, handleApprove, handleReject, config } = useDashboard();
+  const toast = useToast();
+
+  const onApprove = (id: string) => {
+    const item = approvalQueue.find((a) => a.id === id);
+    handleApprove(id);
+    if (item) toast.success("Transaction Approved", `${item.projectName} ($${item.amountUsd}) sent to Agent B`);
+  };
+
+  const onReject = (id: string) => {
+    const item = approvalQueue.find((a) => a.id === id);
+    handleReject(id);
+    if (item) toast.warning("Transaction Rejected", `${item.projectName} ($${item.amountUsd}) skipped`);
+  };
 
   return (
     <div
@@ -46,25 +64,12 @@ export default function ApprovalQueue() {
       <div className="flex-1 overflow-y-auto p-2 sm:p-3 space-y-2">
         <AnimatePresence mode="popLayout">
           {approvalQueue.length === 0 ? (
-            <motion.div
+            <EmptyState
               key="empty"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex flex-col items-center justify-center py-12 text-center px-6"
-            >
-              <div
-                className="flex items-center justify-center w-14 h-14 rounded-2xl mb-4"
-                style={{ background: "var(--color-neutral-secondary-medium)" }}
-              >
-                <Inbox className="w-7 h-7" style={{ color: "var(--color-fg-disabled)" }} />
-              </div>
-              <p className="text-sm font-medium" style={{ color: "var(--color-body-subtle)" }}>
-                Queue is empty
-              </p>
-              <p className="text-xs mt-1.5" style={{ color: "var(--color-fg-disabled)" }}>
-                All transactions are within the $2 autonomous limit
-              </p>
-            </motion.div>
+              icon={Inbox}
+              title="Queue is empty"
+              description="All transactions are within the $2 autonomous limit. Agent B executes directly."
+            />
           ) : (
             approvalQueue.map((item, index) => (
               <motion.div
@@ -101,19 +106,16 @@ export default function ApprovalQueue() {
                       {item.targetAddress.slice(0, 20)}...
                     </p>
                   </div>
-                  <div className="flex-shrink-0 text-right">
-                    <p
-                      className="text-lg font-bold tabular-nums"
-                      style={{ color: "var(--color-fg-warning)", fontFamily: "var(--font-serif)" }}
-                    >
-                      ${item.amountUsd}
-                    </p>
-                    <p className="text-[11px]" style={{ color: "var(--color-fg-disabled)" }}>
-                      Score:{" "}
-                      <span className="font-semibold" style={{ color: "var(--color-fg-success)" }}>
-                        {item.llmScore}/100
-                      </span>
-                    </p>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <RadialGauge value={item.llmScore} size={48} />
+                    <div className="text-right">
+                      <p
+                        className="text-lg font-bold tabular-nums"
+                        style={{ color: "var(--color-fg-warning)", fontFamily: "var(--font-serif)" }}
+                      >
+                        ${item.amountUsd}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
@@ -124,6 +126,14 @@ export default function ApprovalQueue() {
                 >
                   {item.reason}
                 </p>
+
+                <ScoreBreakdown
+                  sentimentPct={config.agentA.sentimentWeight}
+                  tvlPct={config.agentA.tvlWeight}
+                  sentimentPts={Math.round(item.llmScore * config.agentA.sentimentWeight / 100)}
+                  tvlPts={Math.round(item.llmScore * config.agentA.tvlWeight / 100)}
+                  total={item.llmScore}
+                />
 
                 {/* Footer: Time + Buttons */}
                 <div className="flex items-center gap-2 pt-1">
@@ -140,7 +150,7 @@ export default function ApprovalQueue() {
                   <div className="ml-auto flex gap-2">
                     <motion.button
                       whileTap={{ scale: 0.92 }}
-                      onClick={() => handleReject(item.id)}
+                      onClick={() => onReject(item.id)}
                       aria-label={`Reject transaction for ${item.projectName}`}
                       className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-2xl transition-colors min-h-[36px]"
                       style={{
@@ -155,7 +165,7 @@ export default function ApprovalQueue() {
                     </motion.button>
                     <motion.button
                       whileTap={{ scale: 0.92 }}
-                      onClick={() => handleApprove(item.id)}
+                      onClick={() => onApprove(item.id)}
                       aria-label={`Approve transaction for ${item.projectName}`}
                       className="btn-glint flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-2xl transition-colors min-h-[36px]"
                       style={{

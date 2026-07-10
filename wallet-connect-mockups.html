@@ -1,0 +1,820 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>A2Z AgentZ — Wallet Connect Mockups</title>
+  <style>
+    :root {
+      --bg: #0f0b18;
+      --bg-2: #171321;
+      --surface: rgba(22, 18, 32, 0.86);
+      --surface-2: rgba(43, 36, 53, 0.88);
+      --border: rgba(255,255,255,.12);
+      --border-strong: rgba(255,255,255,.2);
+      --text: #f7f0ff;
+      --muted: #b9adc7;
+      --subtle: #8e819f;
+      --purple: #b89be9;
+      --purple-2: #8c6aad;
+      --cyan: #73d5ff;
+      --green: #79f2b3;
+      --amber: #ffd985;
+      --danger: #ff6f93;
+      --shadow: 0 24px 80px rgba(0,0,0,.42);
+      --radius: 24px;
+      --radius-sm: 14px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 18% 18%, rgba(130, 79, 190, .22), transparent 34%),
+        radial-gradient(circle at 74% 30%, rgba(87, 126, 222, .12), transparent 32%),
+        radial-gradient(circle at 52% 88%, rgba(117, 64, 198, .2), transparent 34%),
+        linear-gradient(135deg, #11101b 0%, #20172d 48%, #12101a 100%);
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: .42;
+      background-image:
+        radial-gradient(circle, rgba(140, 106, 173, .9) 0 2px, transparent 3px),
+        radial-gradient(circle, rgba(115, 213, 255, .65) 0 1px, transparent 2px);
+      background-size: 120px 120px, 170px 170px;
+      background-position: 10px 24px, 76px 92px;
+    }
+
+    .page {
+      position: relative;
+      z-index: 1;
+      width: min(1440px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 44px 0 80px;
+    }
+
+    .hero {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 24px;
+      margin-bottom: 28px;
+    }
+
+    .eyebrow {
+      color: var(--purple);
+      text-transform: uppercase;
+      font-size: 12px;
+      letter-spacing: .16em;
+      font-weight: 800;
+    }
+
+    h1, h2, h3, p { margin: 0; }
+
+    h1 {
+      margin-top: 10px;
+      font-size: clamp(32px, 5vw, 58px);
+      line-height: .95;
+      letter-spacing: -.04em;
+    }
+
+    .hero p {
+      margin-top: 14px;
+      max-width: 680px;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.05);
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 22px;
+      align-items: start;
+    }
+
+    .mock-card {
+      position: relative;
+      min-height: 650px;
+      padding: 22px;
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      background: rgba(255,255,255,.045);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+
+    .mock-label {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+
+    .mock-label h2 { font-size: 18px; letter-spacing: -.02em; }
+    .mock-label p { margin-top: 4px; font-size: 13px; color: var(--subtle); line-height: 1.45; }
+
+    .recommended {
+      background: rgba(121, 242, 179, .12);
+      color: var(--green);
+      border-color: rgba(121, 242, 179, .25);
+    }
+
+    .login-card {
+      width: 100%;
+      max-width: 440px;
+      margin: 0 auto;
+      padding: 28px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius);
+      background: rgba(18, 14, 28, .88);
+      box-shadow: 0 20px 70px rgba(0,0,0,.34);
+    }
+
+    .login-head {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 26px;
+    }
+
+    .icon-box {
+      width: 46px;
+      height: 46px;
+      display: grid;
+      place-items: center;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #8f6aae, #66517f);
+      color: white;
+      font-size: 22px;
+      font-weight: 900;
+    }
+
+    .login-head h3 {
+      font-size: 36px;
+      line-height: .9;
+      font-family: Georgia, 'Times New Roman', serif;
+      letter-spacing: -.04em;
+    }
+
+    .login-head p { margin-top: 4px; color: var(--muted); font-size: 13px; }
+
+    label {
+      display: block;
+      margin: 15px 0 8px;
+      color: #d8cfdf;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .input {
+      height: 52px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 14px;
+      border: 1px solid var(--border-strong);
+      border-radius: 13px;
+      background: var(--surface-2);
+      color: var(--muted);
+      font-weight: 650;
+    }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .checkbox {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .check {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      background: white;
+      box-shadow: inset 0 0 0 2px rgba(0,0,0,.08);
+    }
+
+    .link { color: #c7aee5; text-decoration: none; font-weight: 700; }
+
+    .primary-btn, .wallet-btn, .continue-btn {
+      width: 100%;
+      min-height: 52px;
+      border: 0;
+      border-radius: 14px;
+      cursor: pointer;
+      font-weight: 900;
+      letter-spacing: -.01em;
+    }
+
+    .primary-btn {
+      margin-top: 20px;
+      color: white;
+      background: linear-gradient(135deg, #c3add4, #8f6aa6);
+    }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 22px 0;
+      color: var(--subtle);
+      font-size: 13px;
+    }
+
+    .divider::before, .divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .wallet-btn {
+      border: 1px solid var(--border-strong);
+      background: rgba(255,255,255,.055);
+      color: #e8dfef;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .wallet-list {
+      margin-top: 12px;
+      padding: 9px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: #171321;
+    }
+
+    .wallet-option {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px;
+      border: 0;
+      border-radius: 12px;
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .wallet-option:hover { background: rgba(255,255,255,.055); }
+
+    .wallet-name {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+    }
+
+    .wallet-logo {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border-radius: 9px;
+      background: rgba(255,255,255,.08);
+      font-size: 14px;
+    }
+
+    .status-pill {
+      padding: 5px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 900;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+
+    .detected { color: var(--green); background: rgba(121,242,179,.1); border-color: rgba(121,242,179,.22); }
+    .available { color: var(--muted); background: rgba(255,255,255,.06); border-color: var(--border); }
+    .install { color: var(--amber); background: rgba(255,217,133,.1); border-color: rgba(255,217,133,.22); }
+
+    .warning {
+      margin-top: 14px;
+      padding: 14px;
+      border-radius: 15px;
+      border: 1px solid rgba(255, 217, 133, .28);
+      background: rgba(255, 217, 133, .1);
+    }
+
+    .warning h4 { margin: 0; color: #ffe6aa; font-size: 14px; }
+    .warning p { margin-top: 7px; color: rgba(255, 230, 170, .78); line-height: 1.5; font-size: 12px; }
+
+    .continue-btn {
+      margin-top: 12px;
+      min-height: 46px;
+      color: #16100a;
+      background: linear-gradient(135deg, #ffe2a0, #ffc65e);
+    }
+
+    .mini-note {
+      margin-top: 18px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .mini-note b { color: #d6c3ee; }
+
+    .modal-stage {
+      position: relative;
+      height: 560px;
+      border-radius: 22px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background:
+        linear-gradient(rgba(10,8,14,.55), rgba(10,8,14,.55)),
+        radial-gradient(circle at 30% 30%, rgba(143,106,174,.25), transparent 40%),
+        #120e1c;
+    }
+
+    .tiny-login {
+      width: 310px;
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%) scale(.82);
+      opacity: .45;
+      filter: blur(.5px);
+    }
+
+    .modal-backdrop {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      background: rgba(0,0,0,.48);
+      backdrop-filter: blur(7px);
+    }
+
+    .modal {
+      width: min(390px, 100%);
+      padding: 20px;
+      border-radius: 22px;
+      border: 1px solid var(--border-strong);
+      background: #15111f;
+      box-shadow: var(--shadow);
+    }
+
+    .modal-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: flex-start;
+      margin-bottom: 16px;
+    }
+
+    .modal h3 { font-size: 21px; }
+    .modal p { margin-top: 5px; color: var(--muted); font-size: 13px; line-height: 1.45; }
+
+    .close {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.04);
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .info-note {
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(115,213,255,.2);
+      background: rgba(115,213,255,.08);
+      color: #caefff;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .split-panel {
+      margin-top: 18px;
+      padding: 15px;
+      border-radius: 16px;
+      border: 1px solid rgba(184,155,233,.22);
+      background: rgba(184,155,233,.065);
+    }
+
+    .split-panel-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .split-panel h4 { margin: 0; font-size: 15px; }
+    .split-panel p { margin-top: 5px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+
+    .beta {
+      padding: 5px 9px;
+      border-radius: 999px;
+      color: var(--amber);
+      background: rgba(255,217,133,.12);
+      border: 1px solid rgba(255,217,133,.2);
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .proscons {
+      margin-top: 16px;
+      display: grid;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .proscons b { color: var(--text); }
+
+    .dashboard {
+      margin-top: 30px;
+      padding: 24px;
+      border-radius: 30px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.045);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+
+    .dash-section {
+      padding: 24px;
+      border-radius: 24px;
+      border: 1px solid var(--border-strong);
+      background: rgba(20, 16, 30, .82);
+    }
+
+    .dash-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: flex-start;
+      margin-bottom: 20px;
+    }
+
+    .dash-head h2 {
+      margin-top: 5px;
+      font-size: clamp(22px, 3vw, 34px);
+      letter-spacing: -.04em;
+    }
+
+    .dash-head p { margin-top: 8px; color: var(--muted); line-height: 1.55; max-width: 760px; }
+
+    .dash-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .metric {
+      min-height: 130px;
+      padding: 17px;
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.045);
+    }
+
+    .metric p { color: var(--subtle); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+    .metric h3 { margin-top: 14px; font-size: 20px; }
+    .metric code, .metric span { display: block; margin-top: 8px; color: var(--muted); font-size: 13px; }
+    .green-text { color: var(--green) !important; }
+    .amber-text { color: var(--amber) !important; }
+    .cyan-text { color: var(--cyan) !important; }
+
+    .flow {
+      margin-top: 16px;
+      padding: 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(184,155,233,.2);
+      background: rgba(184,155,233,.06);
+      color: var(--muted);
+      line-height: 1.75;
+      font-size: 14px;
+    }
+
+    .flow b { color: var(--text); }
+
+    @media (max-width: 1120px) {
+      .grid { grid-template-columns: 1fr; }
+      .mock-card { min-height: auto; }
+      .dashboard { margin-top: 22px; }
+    }
+
+    @media (max-width: 760px) {
+      .page { width: min(100% - 24px, 1440px); padding-top: 24px; }
+      .hero { display: block; }
+      .hero .badge { margin-top: 18px; }
+      .login-card { padding: 22px; }
+      .dash-head { display: block; }
+      .dash-head .badge { margin-top: 14px; }
+      .dash-grid { grid-template-columns: 1fr; }
+      .mock-card { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <div>
+        <div class="eyebrow">A2Z AgentZ · Auth Design Mockup</div>
+        <h1>Wallet Connect UX Options</h1>
+        <p>
+          A standalone HTML file to compare 3 wallet-connect login/register options. All options use a hybrid approach:
+          users can connect a wallet and enter the dashboard frontend-only, but are still warned that backend SIWE/sign-in-with-wallet is not yet available.
+        </p>
+      </div>
+      <div class="badge">Base/EVM core · MetaMask · Coinbase · Rabby · Injected</div>
+    </header>
+
+    <section class="grid" aria-label="Wallet connect mockup options">
+      <!-- Option A -->
+      <article class="mock-card">
+        <div class="mock-label">
+          <div>
+            <h2>Option A — Compact Dropdown</h2>
+            <p>Most focused and tidy. The wallet picker appears inline below the button.</p>
+          </div>
+          <span class="badge recommended">Recommended</span>
+        </div>
+
+        <div class="login-card">
+          <div class="login-head">
+            <div class="icon-box">↪</div>
+            <div>
+              <h3>Log In</h3>
+              <p>Enter Mission Control</p>
+            </div>
+          </div>
+
+          <label>Email</label>
+          <div class="input">✉️ <span>you@agent.io</span></div>
+          <label>Password</label>
+          <div class="input">🔒 <span>••••••••</span></div>
+
+          <div class="row">
+            <span class="checkbox"><span class="check"></span> Remember me</span>
+            <a class="link" href="#">Forgot password?</a>
+          </div>
+
+          <button class="primary-btn">ENTER MISSION CONTROL →</button>
+
+          <div class="divider">or</div>
+          <button class="wallet-btn">◇ Connect Wallet</button>
+
+          <div class="wallet-list" aria-label="Detected wallets">
+            <button class="wallet-option">
+              <span class="wallet-name"><span class="wallet-logo">M</span> MetaMask</span>
+              <span class="status-pill detected">Detected</span>
+            </button>
+            <button class="wallet-option">
+              <span class="wallet-name"><span class="wallet-logo">C</span> Coinbase Wallet</span>
+              <span class="status-pill detected">Detected</span>
+            </button>
+            <button class="wallet-option">
+              <span class="wallet-name"><span class="wallet-logo">R</span> Rabby / Browser Wallet</span>
+              <span class="status-pill available">Available</span>
+            </button>
+            <button class="wallet-option">
+              <span class="wallet-name"><span class="wallet-logo">＋</span> Wallet extension</span>
+              <span class="status-pill install">Install required</span>
+            </button>
+          </div>
+
+          <div class="warning">
+            <h4>Wallet login is frontend-only</h4>
+            <p>
+              Connected as <b>0x12...89ab</b>. Backend SIWE is not ready yet, so protected backend auth still requires email/password.
+            </p>
+            <button class="continue-btn">Continue to dashboard</button>
+          </div>
+
+          <p class="mini-note">No account? <b>Register</b></p>
+        </div>
+
+        <div class="proscons">
+          <div><b>Strength:</b> cleanest, closest to the screenshot, easy to drop into login/register.</div>
+          <div><b>Drawback:</b> if many wallets are present, the list can be long.</div>
+        </div>
+      </article>
+
+      <!-- Option B -->
+      <article class="mock-card">
+        <div class="mock-label">
+          <div>
+            <h2>Option B — Modal Selector</h2>
+            <p>The wallet selector appears as a professional overlay after clicking Connect Wallet.</p>
+          </div>
+          <span class="badge">Scalable</span>
+        </div>
+
+        <div class="modal-stage">
+          <div class="login-card tiny-login">
+            <div class="login-head">
+              <div class="icon-box">↪</div>
+              <div><h3>Log In</h3><p>Enter Mission Control</p></div>
+            </div>
+            <label>Email</label><div class="input">✉️ you@agent.io</div>
+            <label>Password</label><div class="input">🔒 ••••••••</div>
+            <button class="primary-btn">ENTER MISSION CONTROL →</button>
+            <div class="divider">or</div>
+            <button class="wallet-btn">◇ Connect Wallet</button>
+          </div>
+
+          <div class="modal-backdrop">
+            <div class="modal">
+              <div class="modal-top">
+                <div>
+                  <h3>Connect Wallet</h3>
+                  <p>Choose an active EVM wallet for Base Network.</p>
+                </div>
+                <button class="close">×</button>
+              </div>
+
+              <div class="wallet-list">
+                <button class="wallet-option">
+                  <span class="wallet-name"><span class="wallet-logo">M</span> MetaMask</span>
+                  <span class="status-pill detected">Detected</span>
+                </button>
+                <button class="wallet-option">
+                  <span class="wallet-name"><span class="wallet-logo">C</span> Coinbase Wallet</span>
+                  <span class="status-pill detected">Detected</span>
+                </button>
+                <button class="wallet-option">
+                  <span class="wallet-name"><span class="wallet-logo">R</span> Rabby / Injected</span>
+                  <span class="status-pill available">Available</span>
+                </button>
+              </div>
+
+              <div class="info-note">
+                Wallet login currently creates a frontend-only session until backend SIWE is implemented.
+              </div>
+
+              <div class="warning">
+                <h4>Backend action needed</h4>
+                <p>Add SIWE endpoint later so this wallet session can become a real JWT backend session.</p>
+                <button class="continue-btn">Continue to dashboard</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="proscons">
+          <div><b>Strength:</b> most professional for multi-wallet and mobile/install hints.</div>
+          <div><b>Drawback:</b> more UI state and an extra layer.</div>
+        </div>
+      </article>
+
+      <!-- Option C -->
+      <article class="mock-card">
+        <div class="mock-label">
+          <div>
+            <h2>Option C — Split Auth Panel</h2>
+            <p>Email login and wallet login are clearly separated within a single card.</p>
+          </div>
+          <span class="badge">Most explicit</span>
+        </div>
+
+        <div class="login-card">
+          <div class="login-head">
+            <div class="icon-box">↪</div>
+            <div>
+              <h3>Log In</h3>
+              <p>Enter Mission Control</p>
+            </div>
+          </div>
+
+          <label>Email</label>
+          <div class="input">✉️ <span>you@agent.io</span></div>
+          <label>Password</label>
+          <div class="input">🔒 <span>••••••••</span></div>
+          <div class="row">
+            <span class="checkbox"><span class="check"></span> Remember me</span>
+            <a class="link" href="#">Forgot?</a>
+          </div>
+          <button class="primary-btn">ENTER MISSION CONTROL →</button>
+
+          <div class="divider">or</div>
+
+          <section class="split-panel">
+            <div class="split-panel-top">
+              <div>
+                <h4>Wallet Login</h4>
+                <p>Frontend-only until SIWE backend is ready.</p>
+              </div>
+              <span class="beta">Beta</span>
+            </div>
+            <button class="wallet-btn" style="margin-top: 13px;">◇ Connect active wallet</button>
+
+            <div class="wallet-list">
+              <button class="wallet-option">
+                <span class="wallet-name"><span class="wallet-logo">M</span> MetaMask</span>
+                <span class="status-pill detected">Detected</span>
+              </button>
+              <button class="wallet-option">
+                <span class="wallet-name"><span class="wallet-logo">C</span> Coinbase</span>
+                <span class="status-pill detected">Detected</span>
+              </button>
+            </div>
+          </section>
+
+          <div class="warning">
+            <h4>SIWE backend pending</h4>
+            <p>This mode opens dashboard as a wallet session, not a full backend-authenticated account.</p>
+            <button class="continue-btn">Continue to dashboard</button>
+          </div>
+
+          <p class="mini-note">No account? <b>Register</b></p>
+        </div>
+
+        <div class="proscons">
+          <div><b>Strength:</b> clearest for reminding about backend/SIWE.</div>
+          <div><b>Drawback:</b> the card login feels busier than the screenshot.</div>
+        </div>
+      </article>
+    </section>
+
+    <section class="dashboard" aria-label="Dashboard section mockup">
+      <div class="mock-label">
+        <div>
+          <h2>New Dashboard Section</h2>
+          <p>A2A Identity & Backend Readiness — a section to surface wallet session status, backend auth, and the Agent-to-Agent backend.</p>
+        </div>
+        <span class="badge recommended">Recommended with Option A</span>
+      </div>
+
+      <section class="dash-section">
+        <div class="dash-head">
+          <div>
+            <div class="eyebrow">Agent-to-Agent Backend</div>
+            <h2>Identity Handshake Status</h2>
+            <p>
+              Tracks wallet session, backend auth readiness, and A2A WebSocket state. This makes the next backend task obvious:
+              implement SIWE/sign-in-with-wallet to convert wallet sessions into real authenticated JWT sessions.
+            </p>
+          </div>
+          <span class="badge" style="color: var(--amber); border-color: rgba(255,217,133,.24); background: rgba(255,217,133,.1);">SIWE Pending</span>
+        </div>
+
+        <div class="dash-grid">
+          <div class="metric">
+            <p>Wallet Session</p>
+            <h3 class="green-text">Connected</h3>
+            <code>0x12...89ab</code>
+          </div>
+          <div class="metric">
+            <p>Backend Auth</p>
+            <h3 class="amber-text">Email/JWT only</h3>
+            <span>SIWE endpoint needed</span>
+          </div>
+          <div class="metric">
+            <p>A2A WebSocket</p>
+            <h3 class="cyan-text">Connected / Fallback</h3>
+            <span>Agent A ↔ Agent B sync</span>
+          </div>
+        </div>
+
+        <div class="flow">
+          <b>Recommended final flow:</b> Connect Wallet → choose active wallet → request <code>eth_requestAccounts</code> → show address + SIWE warning → Continue to dashboard → dashboard displays wallet session + backend auth readiness.
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

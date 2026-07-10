@@ -1,9 +1,11 @@
 "use client";
 
 import { useDashboard } from "./DashboardContext";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { History, Search, ChevronDown, ChevronRight, Hash, Clock, ExternalLink, Copy, FileText, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
+import { History, Search, ChevronRight, Clock, CheckCircle2, XCircle, AlertTriangle, Download, LucideIcon } from "lucide-react";
+import { exportToCSV } from "./ui/exportUtils";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 interface AuditEntry {
   id: string;
@@ -14,13 +16,15 @@ interface AuditEntry {
   detail: Record<string, string>;
 }
 
-const STATUS_STYLES: Record<string, { bg: string; border: string; text: string; icon: React.ElementType }> = {
+const STATUS_STYLES: Record<string, { bg: string; border: string; text: string; icon: LucideIcon }> = {
   success: { bg: "var(--color-success-soft)", border: "var(--color-border-success-subtle)", text: "var(--color-fg-success-strong)", icon: CheckCircle2 },
   failed: { bg: "var(--color-danger-soft)", border: "var(--color-border-danger-subtle)", text: "var(--color-fg-danger-strong)", icon: XCircle },
   pending: { bg: "var(--color-warning-soft)", border: "var(--color-border-warning-subtle)", text: "var(--color-fg-warning)", icon: AlertTriangle },
   approved: { bg: "var(--color-success-soft)", border: "var(--color-border-success-subtle)", text: "var(--color-fg-success-strong)", icon: CheckCircle2 },
   rejected: { bg: "var(--color-danger-soft)", border: "var(--color-border-danger-subtle)", text: "var(--color-fg-danger-strong)", icon: XCircle },
 };
+
+const getNow = () => Date.now();
 
 export default function AuditTrail() {
   const { transactions, approvalQueue } = useDashboard();
@@ -29,6 +33,12 @@ export default function AuditTrail() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const perPage = 10;
+  const [now, setNow] = useState<number | null>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setNow(getNow()), 0);
+    return () => clearTimeout(t);
+  }, []);
 
   // Merge transactions + approvals into unified audit entries
   const allEntries: AuditEntry[] = [
@@ -79,10 +89,21 @@ export default function AuditTrail() {
   };
 
   const timeAgo = (d: Date) => {
-    const sec = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (!now) return "just now";
+    const sec = Math.floor((now - d.getTime()) / 1000);
     if (sec < 60) return `${sec}s ago`;
     if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
     return `${Math.floor(sec / 3600)}h ago`;
+  };
+
+  const handleExport = () => {
+    const data = filtered.map((e) => ({
+      type: e.type,
+      project: e.projectName,
+      status: e.status,
+      timestamp: e.timestamp.toISOString(),
+    }));
+    exportToCSV(data, `a2z-audit-trail-${getNow()}`);
   };
 
   return (
@@ -143,6 +164,16 @@ export default function AuditTrail() {
           <option value="failed">Failed</option>
           <option value="pending">Pending</option>
         </select>
+        {filtered.length > 0 && (
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-[var(--color-neutral-secondary-medium)]"
+            style={{ color: "var(--color-body-subtle)", border: "1px solid var(--color-border-default-medium)" }}
+          >
+            <Download size={14} />
+            Export CSV
+          </button>
+        )}
       </div>
 
       {/* Accordion Entries */}
@@ -218,10 +249,11 @@ export default function AuditTrail() {
         </div>
 
         {pageEntries.length === 0 && (
-          <div className="p-12 text-center">
-            <FileText size={36} className="mx-auto mb-3" style={{ color: "var(--color-body-subtle)" }} />
-            <p className="text-sm" style={{ color: "var(--color-body-subtle)" }}>No audit entries found.</p>
-          </div>
+          <EmptyState
+            icon={History}
+            title="No audit entries"
+            description="No audit entries match your current search or filter criteria."
+          />
         )}
       </div>
 

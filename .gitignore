@@ -39,7 +39,7 @@ next-env.d.ts
 # Logs
 *.log
 logs/
-
+docker-compose.yml.bak
 # Secrets / keys (NEVER commit)
 *.pem
 *.key
@@ -47,7 +47,8 @@ secrets/
 .aws/
 .gcp/
 .gcp-credentials.json
-
+cloudflare_frontend.log
+cloudflare_backend.log
 # AMD-specific
 *.safetensors
 *.bin
@@ -59,8 +60,19 @@ wandb/
 test.html
 test_cache/
 .cookies.txt
+test_*-passed/
 
 # Misc
 *.tmp
 *.bak
 .cache/
+
+# Superpowers brainstorming mockups (local only)
+.superpowers/
+
+# ChromaDB persistent vector store (regenerated from scraper pipeline)
+chroma_db/
+.agents/
+.skill-archive/
+.worktrees/
+_archive_stale/
