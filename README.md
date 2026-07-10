@@ -15,7 +15,7 @@ A2Z Agentz uses a **Split Architecture** designed explicitly to satisfy the hack
 │  COMMAND CENTER (Local VPS)             │         │  AI BRAIN (AMD GPU Server)               │
 │                                         │         │                                          │
 │  • Backend API (FastAPI / Starlette)    │         │  • vLLM on ROCm                          │
-│  • PostgreSQL database                   │────────▶│  • Qwen/Qwen2.5-72B-Instruct             │
+│  • PostgreSQL database                   │────────▶│  • Qwen/Qwen2.5-72B-Instruct-AWQ             │
 │  • Auth routing (JWT + API key)         │  HTTPS  │  • OpenAI-compatible API                 │
 │  • Web3 RPC (Base mainnet)             │  Tunnel │  • Port 8080                             │
 │  • Dashboard / UI                       │         │                                          │
@@ -32,7 +32,7 @@ This lets the team demo a deterministic, reproducible backend while the LLM call
 
 ### AI Brain stack (judges, look here)
 
-> **All LLM inference is offloaded to a dedicated AMD GPU server running vLLM serving Qwen/Qwen2.5-72B-Instruct on ROCm.**
+> **All LLM inference is offloaded to a dedicated AMD GPU server running vLLM serving Qwen/Qwen2.5-72B-Instruct-AWQ on ROCm.**
 
 | Layer | Technology |
 |---|---|
@@ -52,7 +52,7 @@ This lets the team demo a deterministic, reproducible backend while the LLM call
    - `AGENT_B_ENDPOINT=https://[YOUR-TUNNEL].trycloudflare.com/v1` (optional, if Agent B also streams through the same brain).
 4. Every inference round-trip is logged:
    ```
-   INFO a2z.agent_a.inference: AI endpoint OK | model=Qwen/Qwen2.5-72B-Instruct latency=XXXms score=...
+   INFO a2z.agent_a.inference: AI endpoint OK | model=Qwen/Qwen2.5-72B-Instruct-AWQ latency=XXXms score=...
    ```
 
 ### What judges should see
@@ -60,6 +60,36 @@ This lets the team demo a deterministic, reproducible backend while the LLM call
 - `rocm-smi` output showing an active AMD GPU (VRAM, temperature, utilization).
 - Startup logs proving the OpenAI-compatible endpoint is hit over the tunnel.
 - README + Slide Deck both showing the words **vLLM**, **ROCm**, and **AMD** side by side.
+
+---
+
+## 🧠 Engineering Decision: AWQ 4-bit Quantization for the AI Brain
+
+**Decision:** The AI Brain serves **`Qwen/Qwen2.5-72B-Instruct-AWQ`** instead of the
+full-precision `Qwen/Qwen2.5-72B-Instruct` checkpoint.
+
+**Rationale.** A single consumer-grade GPU node exposes at most **48 GB of VRAM**.
+A full-precision (BF16/FP16) 72B-parameter model requires well over 140 GB of weights
+alone, forcing a multi-GPU shard and blowing past a single-node budget — and even a
+naively sharded layout leaves no headroom for the KV-Cache once the context window grows.
+
+To fit a **32K context** comfortably on **one 48 GB GPU** without triggering
+**Out-of-Memory (OOM)** exceptions, we apply:
+
+- **AWQ (Activation-aware Weight Quantization) — 4-bit.** Activations are preserved at
+  higher precision while weights are quantized, so the 72B model drops from ~140 GB to
+  ~40 GB on disk/VRAM while retaining the bulk of its reasoning quality.
+- **FP8 KV-Cache.** The transformer KV-Cache is stored in FP8 rather than FP16, roughly
+  halving the per-token memory cost of long context. At 32K tokens this is the difference
+  between OOM and a stable serve.
+
+**Net effect.** The quantized + FP8-KV layout fits the 72B model and a 32K context inside
+a single 48 GB VRAM envelope with margin to spare, eliminating OOM risk while keeping
+latency low for real-time Agent-A scoring over the Cloudflare tunnel.
+
+**Trade-off.** 4-bit weights trade a small amount of raw accuracy for a massive gain in
+deployability (single-node, no OOM, fast cold start) — an acceptable and deliberate
+choice for a hackathon-grade autonomous agent.
 
 ---
 

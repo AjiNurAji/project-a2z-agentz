@@ -15,7 +15,7 @@ In the Web3 ecosystem, opportunities such as airdrops and new DeFi protocol laun
 
 **A2Z Agentz** automates the full pipeline of discovery (*scraping*), sentiment analysis (AI), filtering, and on-chain payment execution — fully autonomous, agent-to-agent (*Agent-to-Agent Payment*) on the **Base** network.
 
-> **Runtime note**: The system is architected for AMD vLLM / MI300X; **current live production and demo inference runs on Qwen/Qwen2.5-72B-Instruct via AMD vLLM**.
+> **Runtime note**: The system is architected for AMD vLLM / MI300X; **current live production and demo inference runs on Qwen/Qwen2.5-72B-Instruct-AWQ via AMD vLLM**.
 
 ### 1.2 Core Concepts
 
@@ -39,7 +39,7 @@ graph TD
  O[On-Chain Block Explorer]
  end
     subgraph AMD Developer Cloud (Agent A - The Scout)
-        AW[AMD AI Workbench<br/>Qwen/Qwen2.5-72B-Instruct Inference]
+        AW[AMD AI Workbench<br/>Qwen/Qwen2.5-72B-Instruct-AWQ Inference]
         VLL[vLLM model server<br/>A2Z-tuned model]
         SGL[vLLM Server<br/>ROCm / MI300X]
         VDB[(ChromaDB - Memory)]
@@ -96,7 +96,7 @@ graph TD
   - **AMD AI Workbench** — No-code GUI for LLM fine-tuning.
   - **vLLM model server** — Standard deployment format for AMD fine-tuned models.
   - **vLLM** — AMD-recommended LLM serving framework (ROCm-native).
-- **AI Model**: Qwen/Qwen2.5-72B-Instruct (via AMD vLLM) → **fine-tuned via AMD AI Workbench** on a Web3 sentiment dataset (output: "vLLM-served LLM" / "A2Z-tuned model").
+- **AI Model**: Qwen/Qwen2.5-72B-Instruct-AWQ (via AMD vLLM) → **fine-tuned via AMD AI Workbench** on a Web3 sentiment dataset (output: "vLLM-served LLM" / "A2Z-tuned model").
 - **Database**:
   - **ChromaDB** — Semantic memory vector DB for Agent A.
   - **PostgreSQL** — On-chain transaction logging + Agent B idempotency check.
@@ -115,7 +115,7 @@ Agent A is the information-gathering, sentiment-analysis, and project-filtering 
 
 * **Processing Pipeline**: Hourly cron job, target < 30 seconds per cycle.
 * **AMD-Native AI Stack**:
-  * **Model**: vLLM-served LLM (Qwen/Qwen2.5-72B-Instruct (via AMD vLLM) via AMD AI Workbench on ~5,000–10,000 labeled examples from Farcaster and on-chain narrative).
+  * **Model**: vLLM-served LLM (Qwen/Qwen2.5-72B-Instruct-AWQ (via AMD vLLM) via AMD AI Workbench on ~5,000–10,000 labeled examples from Farcaster and on-chain narrative).
   * **Deployment**: vLLM model server served via vLLM on AMD Instinct MI300X.
   * **Endpoint**: OpenAI-compatible (`POST /v1/chat/completions`) on vLLM.
 * **OSINT & Scraping**:
@@ -316,7 +316,7 @@ AGENT_A_PUBLIC_KEY=public_key_verification
 ### Phase 2: Backend & AI Engine (In Progress) — AMD Stack Focus
 - [ ] Configure **AMD AI Workbench** workspace in AMD Developer Cloud
 - [ ] Prepare Web3 sentiment dataset (~5,000–10,000 examples)
-- [ ] Fine-tune Qwen/Qwen2.5-72B-Instruct on **MI300X** (vLLM target); live demo runs via **AMD vLLM** via AMD AI Workbench
+- [ ] Fine-tune Qwen/Qwen2.5-72B-Instruct-AWQ on **MI300X** (vLLM target); live demo runs via **AMD vLLM** via AMD AI Workbench
 - [ ] Export as **vLLM model server**
 - [ ] Deploy & serve vLLM on MI300X (ROCm)
 - [ ] Implement Farcaster scraper (Neynar API) + ChromaDB integration

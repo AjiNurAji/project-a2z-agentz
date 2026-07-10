@@ -349,7 +349,7 @@ The **AMD AI Developer Program** is a **free** program for building, optimizing,
 ```
 [Web3 sentiment dataset]
  |
-[AMD AI Workbench GUI] -> Fine-tune Qwen 2.5 72B -> vLLM-served Web3 scorer
+[AMD AI Workbench GUI] -> Fine-tune Qwen/Qwen2.5-72B-Instruct-AWQ -> vLLM-served Web3 scorer
  |
 [vLLM-served weights (.safetensors)]
  |
@@ -376,7 +376,7 @@ The **AMD AI Developer Program** is a **free** program for building, optimizing,
 | Training | AMD AI Workbench | [academy.amd.com](https://academy.amd.com) |
 | Deployment | AMD Inference Microservice (AIM) | [AIM blog](https://rocm.blogs.amd.com/) |
 | Serving | vLLM | [vLLM on AMD](https://rocm.blogs.amd.com/software-tools-optimization/disaggregation/README.html) |
-| Base model | Qwen 2.5 72B Instruct | HuggingFace |
+| Base model | Qwen/Qwen2.5-72B-Instruct-AWQ | HuggingFace |
 | Fine-tune dataset | Custom Web3 sentiment | Internal |
 
 ### 4-Week Hackathon Cost Estimate

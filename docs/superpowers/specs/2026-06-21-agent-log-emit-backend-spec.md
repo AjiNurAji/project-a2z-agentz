@@ -1,21 +1,21 @@
 # Backend Handoff Spec — Emit `AGENT_LOG` via WebSocket
 
-> **Tanggal:** 2026-06-21
-> **Untuk:** Backend developer (teman)
-> **Status:** Frontend sudah siap menerima; implementasi backend ini agar percakapan Agent A↔B tampil real di dashboard.
+> **Date:** 2026-06-21
+> **For:** Backend developer (teammate)
+> **Status:** The frontend is ready to receive; implement this backend so the Agent A↔B conversation displays live on the dashboard.
 > **Spec induk:** [`2026-06-21-agent-to-agent-ws-sync-design.md`](./2026-06-21-agent-to-agent-ws-sync-design.md) §5
 
 ---
 
 ## TL;DR
 
-Frontend `AgentCommPanel` sudah siap menerima pesan WebSocket baru bertipe `AGENT_LOG`. Saat ini backend `/ws` hanya broadcast `LATEST_TRANSACTIONS`. Mohon tambahkan broadcast `AGENT_LOG` agar percakapan Agent A (Scout) ↔ Agent B (Vault) tampil **real**, bukan dummy.
+The frontend `AgentCommPanel` is ready to receive a new WebSocket message of type `AGENT_LOG`. Currently the backend `/ws` only broadcasts `LATEST_TRANSACTIONS`. Please add the `AGENT_LOG` broadcast so the Agent A (Scout) ↔ Agent B (Vault) conversation displays **live**, not dummy data.
 
-Frontend **tidak akan error** bila ini belum diimplementasi — pesan tipe tak dikenal diabaikan, dan mock tetap aktif sebagai fallback.
+The frontend **will not error** if this is not yet implemented — unknown message types are ignored and the mock remains active as a fallback.
 
 ---
 
-## Kontrak Pesan `AGENT_LOG`
+## `AGENT_LOG` Message Contract
 
 ```json
 {
@@ -33,29 +33,29 @@ Frontend **tidak akan error** bila ini belum diimplementasi — pesan tipe tak d
 }
 ```
 
-| Field | Wajib | Tipe | Catatan |
+| Field | Required | Type | Note |
 |---|---|---|---|
 | `type` | ✅ | `"AGENT_LOG"` | string literal |
-| `data.sender` | ✅ | `"agent_a" \| "agent_b" \| "system"` | menentukan avatar/bubble di panel |
-| `data.content` | ✅ | `string` | teks yang tampil sebagai bubble chat |
-| `data.metadata` | ❌ | `object` | bila ada, tampil sebagai chip |
-| `data.metadata.projectName` | ❌ | `string` | chip "Project" |
-| `data.metadata.score` | ❌ | `number` | chip "Score" (mis. 92) |
-| `data.metadata.amountUsd` | ❌ | `number` | chip "Amount" |
-| `data.metadata.txHash` | ❌ | `string` | chip "Tx" (kode monospace, bisa copy) |
+| `data.sender` | ✅ | `"agent_a" \| "agent_b" \| "system"` | determines the avatar/bubble in the panel |
+| `data.content` | ✅ | `string` | text shown as a chat bubble |
+| `data.metadata` | ❌ | `object` | if present, shown as a chip |
+| `data.metadata.projectName` | ❌ | `string` | "Project" chip |
+| `data.metadata.score` | ❌ | `number` | "Score" chip (e.g. 92) |
+| `data.metadata.amountUsd` | ❌ | `number` | "Amount" chip |
+| `data.metadata.txHash` | ❌ | `string` | "Tx" chip (monospace, copyable) |
 
-`agent_a` = The Scout (ungu, bubble kiri). `agent_b` = The Vault (cyan, bubble kanan). `system` = pesan terpusat kecil.
+`agent_a` = The Scout (purple, left bubble). `agent_b` = The Vault (cyan, right bubble). `system` = small centered message.
 
 ---
 
-## Cara Emit (Backend)
+## How to Emit (Backend)
 
-Pakai `ConnectionManager` yang sudah ada di `backend/routes/websockets.py`:
+Use the existing `ConnectionManager` from `backend/routes/websockets.py`:
 
 ```python
 import json
 import asyncio
-from routes.websockets import manager  # import manager yang sudah ada
+from routes.websockets import manager  # import the existing manager
 
 async def emit_agent_log(sender: str, content: str, metadata: dict | None = None):
     payload = {"type": "AGENT_LOG", "data": {"sender": sender, "content": content}}
@@ -64,31 +64,31 @@ async def emit_agent_log(sender: str, content: str, metadata: dict | None = None
     await manager.broadcast(json.dumps(payload))
 ```
 
-### Panggil di titik-titik pipeline
+### Call at Pipeline Stages
 
-**Scheduler** (`backend/scheduler/agent_runner.py` — saat ini stub `pass`):
-- `run_agent_a`: emit tiap langkah scrape → inference (mis. "Scanning Farcaster...", "Embedding N posts into ChromaDB", "Score Engine: 98/100")
-- `run_agent_b`: emit tiap langkah execute (mis. "Signature verified", "Simulation passed", "Tx included in block #...")
+**Scheduler** (`backend/scheduler/agent_runner.py` — currently a `pass` stub):
+- `run_agent_a`: emit at each scrape step → inference (e.g. "Scanning Farcaster...", "Embedding N posts into ChromaDB", "Score Engine: 98/100")
+- `run_agent_b`: emit at each execute step (e.g. "Signature verified", "Simulation passed", "Tx included in block #...")
 
-**Endpoint `/api/analyze`** (`backend/routes/api.py`): bila dipanggil manual, emit log per-langkah yang sama (`inference`, `chromadb_dedup`, `blacklist_check`, `executed`/`pending_approval`).
+**Endpoint `/api/analyze`** (`backend/routes/api.py`): when called manually, emit the same per-step log (`inference`, `chromadb_dedup`, `blacklist_check`, `executed`/`pending_approval`).
 
-> Catatan: `manager.broadcast` adalah `async`. Bila dipanggil dari fungsi sync (APScheduler job), bungkus dengan `asyncio.run(...)` atau jadwalkan ke event loop.
-
----
-
-## Opsional (tidak wajib)
-
-1. **Persistensi:** tabel `agent_logs` baru bila ingin history di backend. Frontend tidak butuh ini — cukup broadcast real-time.
-2. **Timestamp:** frontend saat ini pakai waktu-terima. Bila ingin akurat, tambahkan `data.ts` (ISO 8601).
-3. **Auth WS via query param:** bila cookie httpOnly cross-origin diblokir browser di dev, tambahkan cek `?token=` di `check_ws_auth` (`backend/routes/websockets.py`). Frontend sudah siap menangani 1008 (fallback mock).
+> Note: `manager.broadcast` is `async`. When called from a sync function (APScheduler job), wrap it with `asyncio.run(...)` or schedule it on the event loop.
 
 ---
 
-## Verifikasi
+## Optional (not required)
 
-Setelah implementasi:
-1. Login di frontend → dapat cookie `a2z-token`.
-2. Buka `/dashboard` → WebSocket `/ws` connect (status 101).
-3. Saat scheduler jalan / `/api/analyze` dipanggil → bubble percakapan real muncul di panel "Agent Communication".
+1. **Persistence:** a new `agent_logs` table if you want history on the backend. The frontend does not need this — real-time broadcast is sufficient.
+2. **Timestamp:** the frontend currently uses receive time. For accuracy, add `data.ts` (ISO 8601).
+3. **WS auth via query param:** if the httpOnly cookie is blocked cross-origin by the browser in dev, add a `?token=` check in `check_ws_auth` (`backend/routes/websockets.py`). The frontend is already prepared to handle 1008 (mock fallback).
 
-Bila hanya `LATEST_TRANSACTIONS` yang ada (tanpa `AGENT_LOG`), dashboard tetap jalan — hanya transaksi yang real, percakapan tetap mock.
+---
+
+## Verification
+
+After implementation:
+1. Log in on the frontend → receive the `a2z-token` cookie.
+2. Open `/dashboard` → WebSocket `/ws` connects (status 101).
+3. When the scheduler runs / `/api/analyze` is called → live conversation bubbles appear in the "Agent Communication" panel.
+
+If only `LATEST_TRANSACTIONS` is present (without `AGENT_LOG`), the dashboard still works — only transactions are live, the conversation stays mocked.

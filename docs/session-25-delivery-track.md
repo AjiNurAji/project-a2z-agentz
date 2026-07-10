@@ -1,4 +1,4 @@
-# A2Z AGENTZ — SESI 25 DELIVERY TRACK
+# A2Z AGENTZ — SESSION 25 DELIVERY TRACK
 > Updated: realtime during wiring session
 > Rule: every step here must have a concrete file + verification reference.
 
@@ -6,10 +6,10 @@
 - [ ] #1 Wire real Fireworks inference path in `backend/routes/api.py`
 - [ ] #2 Wire real Base Sepolia tx execution in `backend/routes/api.py` via `web3_async.py`
 - [ ] #3 Integrate GoPlus gate before execution
-- [ ] `panduan.txt` updated for manual test steps
+- [ ] `guide.txt` updated for manual test steps
 
 ## ENVIRONMENT
-| Variabel | Value / Source | Verified |
+| Variable | Value / Source | Verified |
 |---|---|---|
 | VENV_PATH | `/workspaces/codespaces-blank/project-a2z-agentz/venv` | ✅ |
 | Python | 3.12.x | `python -V` check required |
@@ -40,7 +40,7 @@ Lockfile/pinning decision: still pending. Current install traces version mismatc
 |---|---|---|
 | `backend/routes/api.py` | alive | real Fireworks wiring not yet implemented |
 | `backend/routes/api.py` | alive | real Base Sepolia execution not yet implemented |
-| `panduan.txt` | updated | manual test checklist provided |
+| `guide.txt` | updated | manual test checklist provided |
 | `requirements.txt` | earlier fixed certifi/requests pins | driver for later install |
 
 ## TEST LOG
@@ -55,13 +55,13 @@ Lockfile/pinning decision: still pending. Current install traces version mismatc
 
 ## BLOCKERS
 - venv install surfaced version mismatch for `openai` vs `hermes-agent` pin
-- `panduan.txt` exists but backend startup test has NOT been executed in this session
+- `guide.txt` exists but backend startup test has NOT been executed in this session
 - No real inference or on-chain tx test result yet
 - API key present in `.env` but no end-to-end call confirmed
 
 ## NEXT ACTIONS (ORDERED)
 1. Decide lockfile strategy for venv (pin vs allow)
-2. Re-run dependency check and baseline test from `panduan.txt`
+2. Re-run dependency check and baseline test from `guide.txt`
 3. Implement `_real_infer()` in `api.py`
 4. Implement `_real_execute()` via `web3_async.py`
 5. Run short Base Sepolia smoke test with `use_mock=false`

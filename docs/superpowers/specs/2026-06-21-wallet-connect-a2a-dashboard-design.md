@@ -1,22 +1,22 @@
 # Wallet Connect Hybrid Auth + A2A Dashboard Readiness — Design Spec
 
-> **Tanggal:** 2026-06-21  
-> **Scope:** Frontend `dashboard/` saja. Backend auth tetap email/password + JWT sampai backend memiliki SIWE/sign-in-with-wallet.  
-> **Mockup preview:** `wallet-connect-mockups.html` di root proyek.  
-> **Pilihan desain final:** Opsi B — Modal Wallet Selector.
+> **Date:** 2026-06-21  
+> **Scope:** Frontend `dashboard/` only. Backend auth remains email/password + JWT until the backend has SIWE/sign-in-with-wallet.  
+> **Mockup preview:** `wallet-connect-mockups.html` in the project root.  
+> **Final design choice:** Option B — Modal Wallet Selector.
 
 ---
 
 ## 1. Tujuan
 
-Tambahkan wallet connect pada halaman login/register dengan deteksi wallet EVM multi-provider, sambil mempertahankan pendekatan hybrid:
+Add wallet connect on the login/register pages with multi-provider EVM wallet detection, while keeping the hybrid approach:
 
-1. Frontend dapat connect wallet dan membuat wallet session lokal.
-2. User dapat melanjutkan ke dashboard melalui wallet session frontend-only.
-3. UI secara eksplisit memperingatkan bahwa backend SIWE/sign-in-with-wallet belum tersedia.
-4. Backend auth saat ini tetap email/password + JWT cookie.
-5. Dashboard menampilkan section baru yang cocok dengan Agent-to-Agent backend: status wallet session, status backend auth, dan status A2A WebSocket.
-6. Perbaiki error frontend yang mengganggu dalam scope wallet/auth/dashboard: SSR safety, wallet typing, modal accessibility, dan error handling.
+1. The frontend can connect a wallet and create a local wallet session.
+2. Users can continue to the dashboard via a frontend-only wallet session.
+3. The UI explicitly warns that backend SIWE/sign-in-with-wallet is not yet available.
+4. Backend auth currently remains email/password + JWT cookie.
+5. The dashboard shows a new section that fits the Agent-to-Agent backend: wallet session status, backend auth status, and A2A WebSocket status.
+6. Fix the disruptive frontend errors within the wallet/auth/dashboard scope: SSR safety, wallet typing, modal accessibility, and error handling.
 
 ---
 
@@ -24,15 +24,15 @@ Tambahkan wallet connect pada halaman login/register dengan deteksi wallet EVM m
 
 | Area | Keputusan | Alasan |
 |---|---|---|
-| Wallet UX | **Modal Wallet Selector** | Paling profesional dan scalable untuk multi-wallet. |
-| Wallet target | Multi-wallet EVM UX dengan Base/EVM sebagai inti | Cocok dengan Base Network dan existing Web3 product direction. |
-| Providers | MetaMask, Coinbase Wallet, Rabby, Generic injected EIP-1193 provider | Provider paling relevan untuk browser extension/desktop/mobile wallet browser. |
-| Auth model | Hybrid frontend wallet session + backend email/password | Backend belum punya SIWE; jangan klaim backend-authenticated wallet login. |
-| Wallet login behavior | Hard redirect dengan warning dan tombol Continue | User bisa demo wallet login, tetapi warning mengingatkan backend task ke teman developer. |
+| Wallet UX | **Modal Wallet Selector** | Most professional and scalable for multi-wallet. |
+| Wallet target | Multi-wallet EVM UX with Base/EVM as the core | Fits the Base Network and the existing Web3 product direction. |
+| Providers | MetaMask, Coinbase Wallet, Rabby, Generic injected EIP-1193 provider | Most relevant providers for browser extension/desktop/mobile wallet browsers. |
+| Auth model | Hybrid frontend wallet session + backend email/password | Backend has no SIWE yet; do not claim backend-authenticated wallet login. |
+| Wallet login behavior | Hard redirect with a warning and a Continue button | Users can demo wallet login, but the warning reminds them of the backend task for the developer teammate. |
 | Dashboard addition | `A2A Identity & Backend Readiness` section | Menjelaskan status identity/auth/A2A secara eksplisit. |
-| Register behavior | Connected wallet dapat mengisi/menautkan wallet address otomatis | Lebih baik daripada input wallet manual saja. |
-| No WalletConnect QR | Tidak masuk scope | User minta extension/mobile/desktop detection; QR bisa future milestone. |
-| No SIWE backend | Tidak masuk scope | Backend sign-in-with-wallet belum tersedia. |
+| Register behavior | A connected wallet can auto-fill/link the wallet address | Better than manual wallet input alone. |
+| No WalletConnect QR | Out of scope | User requested extension/mobile/desktop detection; QR could be a future milestone. |
+| No SIWE backend | Out of scope | Backend sign-in-with-wallet is not yet available. |
 
 ---
 
@@ -40,10 +40,10 @@ Tambahkan wallet connect pada halaman login/register dengan deteksi wallet EVM m
 
 ### 3.1 User Flow
 
-1. User membuka `/login` atau `/register`.
+1. The user opens `/login` or `/register`.
 2. User klik tombol `Connect Wallet`.
-3. App membuka modal overlay `Connect Wallet`.
-4. Modal menampilkan daftar wallet EVM berdasarkan deteksi runtime:
+3. The app opens the `Connect Wallet` modal overlay.
+4. The modal shows the list of EVM wallets based on runtime detection:
    - MetaMask
    - Coinbase Wallet
    - Rabby
@@ -53,48 +53,48 @@ Tambahkan wallet connect pada halaman login/register dengan deteksi wallet EVM m
    - `Available`
    - `Install required`
    - `Open in wallet browser`
-6. User memilih wallet.
+6. The user picks a wallet.
 7. App request account via EIP-1193:
    - `eth_requestAccounts`
-8. Jika connect berhasil:
-   - App menyimpan wallet session lokal.
-   - Modal menampilkan shortened address, contoh `0x12...89ab`.
-   - Modal menampilkan warning bahwa wallet login masih frontend-only sampai SIWE backend tersedia.
+8. If the connection succeeds:
+   - The app stores the local wallet session.
+   - The modal shows the shortened address, e.g. `0x12...89ab`.
+   - The modal shows a warning that wallet login is still frontend-only until the backend SIWE is available.
 9. User klik `Continue to dashboard`.
-10. App redirect ke `/dashboard`.
+10. The app redirects to `/dashboard`.
 
 ### 3.2 Login Page Behavior
 
-Halaman login tetap mempertahankan email/password sebagai primary backend-authenticated auth path.
+The login page keeps email/password as the primary backend-authenticated auth path.
 
-Tombol wallet connect menjadi secondary path:
+The wallet connect button becomes a secondary path:
 
 - Label: `Connect Wallet`
-- Tidak memakai emoji sebagai structural icon; gunakan icon vector/Lucide.
-- Klik membuka modal, bukan inline dropdown.
-- Setelah wallet connect, user tidak otomatis redirect tanpa membaca warning; user harus klik `Continue to dashboard`.
+- Do not use emoji as a structural icon; use a vector/Lucide icon.
+- Click opens the modal, not an inline dropdown.
+- After wallet connect, the user is not auto-redirected without reading the warning; the user must click `Continue to dashboard`.
 
-Wallet-only login state tidak boleh menampilkan copy seperti “Authenticated with backend”. Copy yang benar:
+A wallet-only login state must not show copy like “Authenticated with backend”. The correct copy:
 
 > Wallet session active. Backend SIWE is pending.
 
 ### 3.3 Register Page Behavior
 
-Halaman register tetap mempertahankan email/password sebagai backend registration path.
+The register page keeps email/password as the backend registration path.
 
-Wallet connect pada register memiliki tambahan:
+Wallet connect on register has additions:
 
-- Setelah connect berhasil, wallet address otomatis diisi/ditampilkan sebagai linked wallet.
-- Jika existing register form masih memiliki input wallet address manual, input dapat menjadi read-only/auto-filled saat wallet session ada, dengan opsi disconnect/change.
-- Submit register tetap menggunakan email/password backend flow saat user menekan create account.
+- After a successful connection, the wallet address is auto-filled/shown as the linked wallet.
+- If the existing register form still has a manual wallet address input, that input can become read-only/auto-filled when a wallet session exists, with a disconnect/change option.
+- Submitting registration still uses the email/password backend flow when the user clicks create account.
 
 ### 3.4 Modal Content
 
 Modal layout:
 
 - Overlay backdrop blur/dim.
-- Container card dengan title, subtitle, close button.
-- Wallet list buttons dengan provider name, description/status, badge.
+- Container card with title, subtitle, and close button.
+- Wallet list buttons with provider name, description/status, and badge.
 - Info note:
 
 ```txt

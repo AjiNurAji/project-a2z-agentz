@@ -112,11 +112,15 @@ def _build_rpc_provider() -> MultiRpcProvider | None:
   return MultiRpcProvider(rpc_urls=urls, chain_id=BASE_CHAIN_ID)
 
 
-def _rpc_health_ok(provider: MultiRpcProvider | None) -> bool:
+async def _rpc_health_ok(provider: MultiRpcProvider | None) -> bool:
   if provider is None:
     return False
   try:
-    health = provider.health()
+    # `health()` is an async coroutine (web3_async.MultiRpcProvider.health);
+    # it MUST be awaited or it returns a coroutine object whose `.get()` raises
+    # AttributeError, which previously made this always return False and forced
+    # every task down the FAILED/retry path (infinite loop on the same address).
+    health = await provider.health()
     return bool(health.get("endpoints"))
   except Exception:
     return False
@@ -266,7 +270,7 @@ async def process_task(task: dict[str, Any]) -> None:
     except Exception:
       pass
 
-    if score >= MAX_SCORE_FOR_AUTO and _rpc_health_ok(_build_rpc_provider()):
+    if score >= MAX_SCORE_FOR_AUTO and await _rpc_health_ok(_build_rpc_provider()):
       amount_usd = min(float(inference.get("amount_usd", 0) or 0), 2.0)
       proposal_id = insert_transaction_proposal(synthesis_id, amount_usd, None)
       append_audit_log(
@@ -290,6 +294,13 @@ async def process_task(task: dict[str, Any]) -> None:
       update_task_status(queue_id, "COMPLETED", retry=False)
       return
 
+    # Terminal FAILED state. Note: the schema CHECK constraint on
+    # scraping_queue.processing_status only permits
+    # ('PENDING','PROCESSING','COMPLETED','FAILED'), so we deliberately use
+    # 'FAILED' (not 'DONE'/'PROCESSED', which would violate the constraint).
+    # Combined with the fixed async _rpc_health_ok() above, an auto-passed task
+    # now reliably lands in 'COMPLETED' and is no longer re-locked by the
+    # worker loop (which only selects PENDING or FAILED-with-retries-remaining).
     update_task_status(queue_id, "FAILED", retry=True)
 
 

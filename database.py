@@ -458,15 +458,94 @@ def ensure_pipeline_tables() -> None:
      CREATE INDEX IF NOT EXISTS scraping_queue_status_idx ON scraping_queue (processing_status);
      CREATE INDEX IF NOT EXISTS transaction_proposals_status_idx ON transaction_proposals (status);
      CREATE INDEX IF NOT EXISTS audit_log_created_at_idx ON audit_log (created_at DESC);
-    """
+    """  # noqa: E501  (multi-statement DDL; executed statement-by-statement below)
     try:
         with _get_cursor() as cur:
+            # The CREATE TABLE block above is one statement; run it first.
             cur.execute(query)
+
+            # ------------------------------------------------------------------
+            # Migration: UNIQUE constraint for enqueue_target's
+            #   INSERT ... ON CONFLICT (target_address) DO NOTHING
+            # (database.py). Postgres refuses an ON CONFLICT spec unless a
+            # unique / exclusion constraint exists on the conflict column,
+            # so this index is MANDATORY for startup to succeed.
+            #
+            # `target_address` is nullable, so we use a PARTIAL unique index
+            # (WHERE target_address IS NOT NULL). NULLs never conflict, which
+            # matches the ON CONFLICT semantics exactly and keeps the index
+            # small. CONCURRENTLY avoids locking the table on big prod tables.
+            # Idempotent: CREATE INDEX IF NOT EXISTS + safe DROP path below.
+            # ------------------------------------------------------------------
+            _ensure_scraping_queue_target_address_unique(cur)
     except psycopg2.Error as exc:
         if "duplicate key value violates unique constraint" in str(exc):
             logger.info('ensure_pipeline_tables race condition caught (tables already created)')
         else:
             logger.error('ensure_pipeline_tables failed: %s', exc)
+            raise
+
+
+def _ensure_scraping_queue_target_address_unique(cur) -> None:
+    """
+    Guarantee scraping_queue.target_address has a unique constraint.
+
+    Runs *after* table creation so it is safe to call on every boot. It is
+    idempotent and self-healing:
+
+      * If a partial unique index on (target_address) already exists, nothing
+        happens (CREATE INDEX IF NOT EXISTS).
+      * If a legacy full (non-partial) unique index exists but our partial one
+        does not, the legacy one is dropped so the partial one can be created.
+      * If the table already holds duplicate target_address rows, they are
+        deduplicated (keep newest by id) BEFORE the unique index is built, so
+        a live database never crashes at startup.
+
+    NOTE: a plain (non-CONCURRENTLY) CREATE INDEX is used on purpose. A
+    CONCURRENTLY build runs in a separate transaction and is not visible to the
+    current session's planner within the same connection, which would make the
+    immediately-following enqueue_target() ON CONFLICT still fail. A regular
+    CREATE INDEX takes a brief ACCESS EXCLUSIVE lock but is committed by the
+    surrounding _get_conn() context manager, so the index is immediately
+    visible to subsequent statements in the same pool. For very large tables
+    you may instead run migrations/0003_*.sql (which uses CONCURRENTLY) during
+    a maintenance window; both paths land on the same final index.
+    """
+    idx_name = "scraping_queue_target_address_key"
+    try:
+        # 1) Heal pre-existing duplicate rows so the unique index can build.
+        cur.execute(
+            """
+            DELETE FROM scraping_queue a
+            USING scraping_queue b
+            WHERE a.id < b.id
+              AND a.target_address IS NOT NULL
+              AND a.target_address = b.target_address;
+            """
+        )
+        # 2) Drop any legacy full unique index so our partial one can exist.
+        cur.execute(
+            "DROP INDEX IF EXISTS scraping_queue_target_address_full_key;"
+        )
+        # 3) Create the unique index (plain, committed by caller).
+        #    IMPORTANT: this MUST be a FULL (non-partial) unique index.
+        #    Postgres's ON CONFLICT (col) inference spec requires a complete
+        #    unique index on exactly those columns; a PARTIAL unique index is
+        #    NOT matched by inference, so the original error would persist.
+        #    A plain UNIQUE index still permits multiple NULLs (NULLs are not
+        #    equal), so nullable target_address is fine without a WHERE clause.
+        cur.execute(
+            f"CREATE UNIQUE INDEX IF NOT EXISTS {idx_name} "
+            "ON scraping_queue (target_address);"
+        )
+        logger.info("scraping_queue.target_address unique index ensured (%s)", idx_name)
+    except psycopg2.Error as exc:
+        msg = str(exc)
+        # Still racing with another boot? Treat as benign and move on.
+        if "already exists" in msg or "duplicate key value violates unique constraint" in msg:
+            logger.info("scraping_queue.target_address unique index already present")
+        else:
+            logger.error("_ensure_scraping_queue_target_address_unique failed: %s", exc)
             raise
 
 

@@ -47,7 +47,8 @@ secrets/
 .aws/
 .gcp/
 .gcp-credentials.json
-
+cloudflare_frontend.log
+cloudflare_backend.log
 # AMD-specific
 *.safetensors
 *.bin

@@ -105,7 +105,7 @@ export default async function Image() {
               letterSpacing: '0.04em',
             }}
           >
-            Powered by AMD Instinct MI300X + AIM-tuned Qwen 2.5 72B
+            Powered by AMD Instinct MI300X + AIM-tuned Qwen/Qwen2.5-72B-Instruct-AWQ
           </div>
         </div>
       </div>

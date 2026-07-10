@@ -1,27 +1,27 @@
-# Auth Backend Spec — Untuk Backend Developer
+# Auth Backend Spec — For the Backend Developer
 
-> **Dokumen ini** menjelaskan endpoint autentikasi yang dibutuhkan oleh frontend yang sudah dibuat. Frontend sudah siap dan memanggil endpoint-endpoint di bawah. Backend perlu mengimplementasikannya.
+> **This document** describes the authentication endpoints required by the already-built frontend. The frontend is ready and calls the endpoints listed below. The backend must implement them.
 
 ## Overview
 
-Frontend auth system menggunakan:
-- **JWT** di httpOnly cookie (nama cookie: `a2z-token`) untuk email/password auth
-- **bcrypt** untuk hash password
-- **PostgreSQL** tabel `users` baru
-- **Frontend-only wallet demo session** (`a2z-wallet-session`) untuk demo Connect Wallet sampai SIWE endpoint tersedia
+Frontend auth system uses:
+- **JWT** in the httpOnly cookie (cookie name: `a2z-token`) for email/password auth
+- **bcrypt** to hash the password
+- **PostgreSQL** `users` table (new)
+- **Frontend-only wallet demo session** (`a2z-wallet-session`) for the demo Connect Wallet until the SIWE endpoint is available
 
-> Status wallet auth: UI sudah punya Connect Wallet modal, provider detection, demo fallback, dan dashboard readiness card. Backend production masih perlu endpoint SIWE agar wallet login bisa menerbitkan cookie JWT `a2z-token` yang aman.
+> Wallet auth status: the UI already has the Connect Wallet modal, provider detection, demo fallback, and dashboard readiness card. Production backend still needs a SIWE endpoint so wallet login can issue a secure `a2z-token` JWT cookie.
 
-## Database — Tabel `users`
+## Database — Table `users`
 
-Jalankan SQL ini setelah `database_schema.sql`:
+Run this SQL after `database_schema.sql`:
 
 ```sql
 CREATE TABLE IF NOT EXISTS users (
     id              SERIAL        PRIMARY KEY,
     email           VARCHAR(255)  UNIQUE NOT NULL,
     password_hash   TEXT          NOT NULL,        -- bcrypt $2b$...
-    wallet_address  VARCHAR(42),                   -- opsional, 0x... Base addr
+    wallet_address  VARCHAR(42),                   -- optional, 0x... Base address
     created_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_login_at   TIMESTAMP,
     CONSTRAINT chk_wallet CHECK (
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE INDEX IF NOT EXISTS users_email_idx ON users (email);
 ```
 
-## Endpoints yang Dibutuhkan
+## Required Endpoints
 
 ### 1. `POST /api/auth/register`
 
@@ -40,7 +40,7 @@ CREATE INDEX IF NOT EXISTS users_email_idx ON users (email);
 {
   "email": "user@agent.io",
   "password": "securepass123",
-  "wallet_address": "0x..." // opsional
+  "wallet_address": "0x..." // optional
 }
 ```
 
@@ -59,14 +59,14 @@ CREATE INDEX IF NOT EXISTS users_email_idx ON users (email);
 
 **Response Error:**
 - `409` — `{"error": "Email already registered"}`
-- `422` — `{"error": "Invalid email format"}` atau `{"error": "Password must be at least 8 characters"}`
+- `422` — `{"error": "Invalid email format"}` or `{"error": "Password must be at least 8 characters"}`
 
 **Logic:**
-1. Validasi email format + password min 8 char
-2. Cek apakah email sudah ada di tabel `users`
-3. Hash password dengan bcrypt (12 rounds)
-4. INSERT ke `users`
-5. Return user (TANPA `password_hash`)
+1. Validate email format + password min 8 chars
+2. Check whether the email already exists in the `users` table
+3. Hash the password with bcrypt (12 rounds)
+4. INSERT into `users`
+5. Return the user (WITHOUT `password_hash`)
 
 ---
 
@@ -99,13 +99,13 @@ Set-Cookie: a2z-token=<JWT>; HttpOnly; Path=/; Max-Age=604800; SameSite=Lax
 ```
 
 **Response Error:**
-- `401` — `{"error": "Invalid email or password"}` (email tidak ada ATAU password salah — samakan pesannya untuk hindari enumeration)
+- `401` — `{"error": "Invalid email or password"}` (email does not exist OR password is wrong — keep the message identical to avoid user enumeration)
 
 **Logic:**
-1. Cari user by email
-2. Verify password dengan bcrypt
+1. Find the user by email
+2. Verify the password with bcrypt
 3. Update `last_login_at`
-4. Sign JWT (HS256, exp 7 hari, payload: `{sub: user_id, email: email}`)
+4. Sign JWT (HS256, exp 7 days, payload: `{sub: user_id, email: email}`)
 5. Set cookie `a2z-token` httpOnly
 6. Return user
 
@@ -113,7 +113,7 @@ Set-Cookie: a2z-token=<JWT>; HttpOnly; Path=/; Max-Age=604800; SameSite=Lax
 
 ### 3. `GET /api/auth/me`
 
-**Request:** Tidak ada body. Hanya baca cookie `a2z-token`.
+**Request:** No body. Reads only the `a2z-token` cookie.
 
 **Response Success (200):**
 ```json
@@ -129,20 +129,20 @@ Set-Cookie: a2z-token=<JWT>; HttpOnly; Path=/; Max-Age=604800; SameSite=Lax
 ```
 
 **Response Error:**
-- `401` — `{"error": "Not authenticated"}` (cookie tidak ada)
+- `401` — `{"error": "Not authenticated"}` (cookie missing)
 - `401` — `{"error": "Invalid or expired token"}` (JWT invalid/expired)
 
 **Logic:**
-1. Baca cookie `a2z-token`
+1. Read the `a2z-token` cookie
 2. Decode + verify JWT
-3. Query user by `id` dari payload `sub`
-4. Return user (TANPA `password_hash`)
+3. Query the user by `id` from the payload `sub`
+4. Return the user (WITHOUT `password_hash`)
 
 ---
 
 ### 4. `POST /api/auth/logout`
 
-**Request:** Tidak ada body.
+**Request:** No body.
 
 **Response (200):**
 ```json
@@ -155,13 +155,13 @@ Set-Cookie: a2z-token=; HttpOnly; Path=/; Max-Age=0
 ```
 
 **Logic:**
-1. Clear cookie `a2z-token` (set Max-Age=0)
+1. Clear the `a2z-token` cookie (set Max-Age=0)
 
 ---
 
 ### 5. Future Wallet Auth / SIWE Endpoints
 
-Frontend saat ini sudah siap untuk wallet UX, tetapi belum menganggap wallet session sebagai backend-authenticated identity. Untuk production, tambahkan endpoint SIWE berikut.
+The frontend is currently ready for the wallet UX, but does not yet treat the wallet session as a backend-authenticated identity. For production, add the following SIWE endpoints.
 
 #### `POST /api/auth/wallet/challenge`
 
@@ -182,9 +182,9 @@ Frontend saat ini sudah siap untuk wallet UX, tetapi belum menganggap wallet ses
 ```
 
 **Logic:**
-1. Validasi address EVM.
-2. Generate nonce one-time-use dengan expiry pendek (mis. 5 menit).
-3. Return SIWE message yang mencakup domain frontend, address, chain id, nonce, issued-at.
+1. Validate the EVM address.
+2. Generate a one-time-use nonce with a short expiry (e.g. 5 minutes).
+3. Return a SIWE message that includes the frontend domain, address, chain id, nonce, and issued-at.
 
 #### `POST /api/auth/wallet/verify`
 
@@ -197,30 +197,30 @@ Frontend saat ini sudah siap untuk wallet UX, tetapi belum menganggap wallet ses
 }
 ```
 
-**Response Success (200):** sama seperti `/api/auth/login`, plus `Set-Cookie: a2z-token=<JWT>; HttpOnly; Path=/; Max-Age=604800; SameSite=Lax`.
+**Response Success (200):** same as `/api/auth/login`, plus `Set-Cookie: a2z-token=<JWT>; HttpOnly; Path=/; Max-Age=604800; SameSite=Lax`.
 
 **Logic:**
-1. Verify signature terhadap address.
-2. Verify nonce belum dipakai dan belum expired.
-3. Upsert/find user berdasarkan `wallet_address`.
+1. Verify the signature against the address.
+2. Verify the nonce has not been used and has not expired.
+3. Upsert/find the user by `wallet_address`.
 4. Set `last_login_at`.
 5. Issue JWT cookie `a2z-token`.
 
-**Catatan keamanan:** jangan gunakan cookie `a2z-wallet-session` untuk keputusan backend authorization. Cookie itu hanya frontend demo flag dan bukan httpOnly.
+**Security note:** do not use the `a2z-wallet-session` cookie for backend authorization decisions. That cookie is only a frontend demo flag and is not httpOnly.
 
 ---
 
-## Mount di Starlette
+## Mount in Starlette
 
 ```python
 # main.py
 from routes.auth import routes as auth_routes
 
-# Di routes list:
+# In the routes list:
 Mount("/api/auth", routes=auth_routes),
 ```
 
-## Dependencies yang Dibutuhkan
+## Required Dependencies
 
 ```
 # requirements.txt
@@ -236,11 +236,11 @@ JWT_SECRET=<random-string-min-32-chars>
 FRONTEND_ORIGIN=http://localhost:3000
 ```
 
-**Catatan CORS:** Saat ini `allow_origins=["*"]` dengan `allow_credentials=True`. Ini bisa jadi masalah di production karena browser menolak `*` + credentials. Untuk development lokal cukup, tapi untuk production perlu ganti ke `FRONTEND_ORIGIN`.
+**CORS note:** currently `allow_origins=["*"]` with `allow_credentials=True`. This can be a problem in production because browsers reject `*` + credentials. It is acceptable for local development, but for production it must be changed to `FRONTEND_ORIGIN`.
 
-## Response Shape (Konsisten)
+## Response Shape (Consistent)
 
-Semua endpoint yang mengembalikan user harus menggunakan shape ini (TANPA `password_hash`):
+All endpoints that return a user must use this shape (WITHOUT `password_hash`):
 
 ```json
 {

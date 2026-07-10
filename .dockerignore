@@ -1,0 +1,16 @@
+dashboard/
+dashboard/node_modules/
+dashboard/.next/
+.git
+.gitignore
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+vllm_*.log
+cloudflared.log
+*.jpg
+*.png
+venv/
+.venv/

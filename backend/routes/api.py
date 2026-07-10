@@ -103,21 +103,33 @@ async def get_stats(request: Request):
 
             tvl_endpoint = os.getenv("TVL_ENDPOINT", "https://api.llama.fi/v2/chains")
             total_tvl = 0.0
+            client = None
             try:
-                async with httpx.AsyncClient() as client:
-                    response = await client.get(tvl_endpoint, timeout=5.0)
-                    if response.status_code == 200:
-                        data = response.json()
-                        for chain in data:
-                            if chain.get("name") == "Base":
-                                total_tvl = float(chain.get("tvl", 0.0))
-                                break
-                    else:
-                        print(f"Error fetching TVL from {tvl_endpoint}: {response.status_code}")
+                client = httpx.AsyncClient()
+                response = await client.get(tvl_endpoint, timeout=5.0)
+                if response.status_code == 200:
+                    data = response.json()
+                    for chain in data:
+                        if chain.get("name") == "Base":
+                            total_tvl = float(chain.get("tvl", 0.0))
+                            break
+                else:
+                    print(f"Error fetching TVL from {tvl_endpoint}: {response.status_code}")
             except Exception as e:
                 print(f"Error fetching TVL from {tvl_endpoint}: {e}")
                 # Fallback to simulated data if API fails
                 total_tvl = projects_scanned * 1200000
+            finally:
+                # Guarantee the client is closed even when the event loop is
+                # tearing down or an exception fired. Without this, an unclosed
+                # httpx.AsyncClient raises "RuntimeError: Event loop is closed".
+                if client is not None:
+                    try:
+                        await client.aclose()
+                    except Exception:
+                        # Loop may already be closed; swallow to avoid masking
+                        # the original error.
+                        pass
 
             success_rate = (success_tx / total_tx * 100) if total_tx > 0 else 0
 

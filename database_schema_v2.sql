@@ -57,6 +57,15 @@ CREATE INDEX IF NOT EXISTS scraping_queue_status_idx
 CREATE INDEX IF NOT EXISTS scraping_queue_user_status_idx
     ON scraping_queue (user_id, processing_status);
 
+-- Partial UNIQUE index backing enqueue_target()'s
+--   INSERT ... ON CONFLICT (target_address) DO NOTHING
+-- Postgres rejects an ON CONFLICT spec whose inference column list is not
+-- covered by a COMPLETE unique index (a partial index is NOT matched by
+-- inference). target_address is nullable, but a plain UNIQUE index still
+-- allows multiple NULLs (NULLs are not equal), so no WHERE clause is needed.
+CREATE UNIQUE INDEX IF NOT EXISTS scraping_queue_target_address_key
+    ON scraping_queue (target_address);
+
 -- ============================================================================
 -- STEP 2: synthesis_results
 -- Agent B's LLM output (sentiment score + risk flags) for a processed queue row.

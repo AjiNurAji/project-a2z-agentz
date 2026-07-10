@@ -1,88 +1,88 @@
 # Agent-to-Agent WebSocket Sync — Design Spec
 
-> **Tanggal:** 2026-06-21
-> **Tujuan:** Sinkronisasi & koneksi frontend dashboard ke komunikasi Agent-to-Agent (A↔B) secara real-time via WebSocket backend, dengan fallback mock saat backend offline.
-> **Scope:** Frontend (`dashboard/`) saja. Perubahan backend ditulis sebagai spec terpisah untuk teman (backend developer) — **tidak diimplementasikan** di sesi ini.
+> **Date:** 2026-06-21
+> **Objective:** Synchronization & connection of the frontend dashboard to Agent-to-Agent (A↔B) communication in real time via the backend WebSocket, with a mock fallback when the backend is offline.
+> **Scope:** Frontend (`dashboard/`) only. Backend changes are written as a separate spec for the teammate (backend developer) — **not implemented** in this session.
 
 ---
 
-## 1. Latar Belakang & Masalah Saat Ini
+## 1. Background & Current Problem
 
-Backend (milik teman, sudah berjalan) menyediakan:
+Backend (owned by teammate, already running) provides:
 - `POST /api/auth/*` — register/login/me/logout (JWT cookie `a2z-token`) ✅
-- REST API `/api/stats`, `/api/status`, `/api/transactions`, `/api/analyze` (dilindungi `@require_auth` — cek cookie `a2z-token` **atau** header `X-API-Key`)
-- WebSocket `/ws` yang menutup koneksi (code 1008) bila tidak ter-autentikasi, dan broadcast transaksi terbaru (`{"type":"LATEST_TRANSACTIONS","data":[...]}`) setiap 5 detik dari tabel `execution_logs`
-- Scheduler APScheduler: Agent A (5 min) + Agent B (1 min) — saat ini masih stub (`pass`)
+- REST API `/api/stats`, `/api/status`, `/api/transactions`, `/api/analyze` (protected by `@require_auth` — checks the `a2z-token` cookie **or** the `X-API-Key` header)
+- WebSocket `/ws` that closes the connection (code 1008) when not authenticated, and broadcasts the latest transactions (`{"type":"LATEST_TRANSACTIONS","data":[...]}`) every 5 seconds from the `execution_logs` table
+- APScheduler: Agent A (5 min) + Agent B (1 min) — currently still a stub (`pass`)
 
-Frontend (`dashboard/`) punya dua masalah konkret yang ditemukan saat eksplorasi:
+The frontend (`dashboard/`) has two concrete problems found during exploration:
 
-### Bug 1 — Port & credentials salah di `DashboardContext.tsx`
+### Bug 1 — Wrong port & missing credentials in `DashboardContext.tsx`
 ```typescript
-// Line 388 & 427 — fetch raw ke port SALAH tanpa credentials:
+// Line 388 & 427 — raw fetch to the WRONG port without credentials:
 fetch("http://localhost:8080/api/analyze", { ... })   // 8080 bukan 8000; tanpa credentials
 fetch("http://localhost:8080/api/status")             // idem
 ```
-Backend Starlette berjalan di **8000**, dan semua endpoint dilindungi → request ini selalu 401/gagal koneksi. Akibatnya selalu jatuh ke mock fallback.
+The Starlette backend runs on **8000**, and all endpoints are protected → these requests always return 401 / connection failure. As a result they always fall back to the mock.
 
 ### Bug 2 — Panel "Agent Communication" sepenuhnya mock
-`AgentCommPanel.tsx` menampilkan percakapan Agent A↔B yang **seluruhnya di-generate** oleh `genAgentConversation()` di `DashboardContext.tsx`. Tidak ada koneksi ke WebSocket `/ws` atau REST API manapun. Komponen UI-nya bagus, tapi datanya dummy.
+`AgentCommPanel.tsx` displays an Agent A↔B conversation that is **entirely generated** by `genAgentConversation()` in `DashboardContext.tsx`. There is no connection to the WebSocket `/ws` or any REST API. The UI component is fine, but the data is dummy.
 
 ### Tujuan
-Hubungkan panel & dashboard ke backend real via WebSocket. Saat backend offline (mode dev/demo), pertahankan mock sebagai fallback agar dashboard tetap hidup untuk presentasi hackathon.
+Connect the panel & dashboard to the real backend via WebSocket. When the backend is offline (dev/demo mode), keep the mock as a fallback so the dashboard stays alive for the hackathon demo.
 
 ---
 
-## 2. Keputusan Desain (dari brainstorming)
+## 2. Design Decisions (from brainstorming)
 
 | Aspek | Keputusan | Alasan |
 |---|---|---|
-| Fokus | Real-time via WebSocket | Minta user; paling sesuai "connect A2A" |
-| Sumber pesan A2A | Backend kirim log agen via WS (`AGENT_LOG`) | Agar percakapan scout↔vault real, bukan dikarang frontend |
-| Implementasi backend | **Tidak** disentuh; ditulis spec terpisah untuk teman | User: "Frontend dulu" |
-| Fallback saat offline | Pertahankan mock (status quo) | Demo hackathon tetap hidup tanpa backend |
-| Auth WS | Andalkan cookie httpOnly terkirim otomatis | Pilihan user; bila cross-origin block, fallback log warning + mock |
+| Focus | Real-time via WebSocket | Requested by user; best fit for "connect A2A" |
+| A2A message source | Backend sends agent logs via WS (`AGENT_LOG`) | So the scout↔vault conversation is real, not fabricated by the frontend |
+| Backend implementation | **Not** touched; written as a separate spec for the teammate | User: "Frontend first" |
+| Offline fallback | Keep the mock (status quo) | Hackathon demo stays alive without backend |
+| WS auth | Rely on the httpOnly cookie sent automatically | User's choice; if cross-origin blocks it, fall back to log warning + mock |
 
-Pendekatan terpilih: **A — WebSocket Client + Connection Adapter** (dari 3 opsi). Dipilih karena satu-satunya yang (a) memenuhi syarat fallback mock, (b) mengisolasi logic WS di file baru, (c) tidak menyentuh UI yang sudah berjalan.
+Chosen approach: **A — WebSocket Client + Connection Adapter** (from 3 options). Chosen because it is the only one that (a) satisfies the mock-fallback requirement, (b) isolates WS logic in a new file, (c) does not touch the already-working UI.
 
 ---
 
 ## 3. Arsitektur
 
 ```
-┌─ Backend (:8000) — TIDAK DIUBAH sesi ini ──────────┐
+┌─ Backend (:8000) — NOT CHANGED this session ──────────┐
 │  Starlette                                          │
 │  ├─ /api/auth/*        (login/register/me/logout)   │
 │  ├─ /api/status        (REST: execution_logs)       │
 │  ├─ /api/analyze       (REST: trigger pipeline)     │
 │  └─ /ws  ←──broadcast setiap 5s───                  │
 │        {type:"LATEST_TRANSACTIONS", data:[...]}     │
-│        {type:"AGENT_LOG", data:{...}}   ⬅ BARU (spec untuk teman) │
+│        {type:"AGENT_LOG", data:{...}}   ⬅ NEW (spec for teammate) │
 └─────────────────────────────────────────────────────┘
-                    ▲ WS (credentials otomatis)
+                    ▲ WS (credentials automatic)
 ┌─ Frontend (:3000) ─┴────────────────────────────────┐
-│  hooks/useAgentWebSocket.ts   ⬅ BARU               │
-│   ↳ lib/ws.ts (WS client + reconnect) ⬅ BARU       │
+│  hooks/useAgentWebSocket.ts   ⬅ NEW               │
+│   ↳ lib/ws.ts (WS client + reconnect) ⬅ NEW       │
 │        │ exposes {status, transactions, agentLogs}  │
 │        ▼                                            │
 │  DashboardContext.tsx   (MODIFY)                    │
-│   ├─ useAgentWebSocket() → real data bila connected │
+│   ├─ useAgentWebSocket() → real data when connected │
 │   ├─ existing mock generators → fallback offline    │
 │   └─ expose: wsStatus, agentMessages, transactions  │
 │        ▼                                            │
-│  AgentCommPanel.tsx   (TIDAK DIUBAH)               │
-│   ↳ baca agentMessages dari context (sudah jalan)   │
+│  AgentCommPanel.tsx   (NOT CHANGED)               │
+│   ↳ reads agentMessages from context (already working)   │
 └─────────────────────────────────────────────────────┘
 ```
 
-**Prinsip:** Logic WebSocket terisolasi di 2 file baru. `DashboardContext` menjadi "connection adapter" yang memprioritaskan data real bila WS connected dan jatuh ke mock bila offline. Semua komponen UI lain (`AgentCommPanel`, `TransactionList`, `ApprovalQueue`, KPI, dll) **tidak diubah** → zero regression risk pada UI yang sudah jalan.
+**Principle:** WebSocket logic is isolated in 2 new files. `DashboardContext` becomes a "connection adapter" that prioritizes real data when the WS is connected and falls back to mock when offline. All other UI components (`AgentCommPanel`, `TransactionList`, `ApprovalQueue`, KPI, etc.) are **unchanged** → zero regression risk on the working UI.
 
 ---
 
-## 4. Komponen Detail
+## 4. Component Detail
 
-### 4.1 `dashboard/src/lib/ws.ts` — WS Client (BARU)
+### 4.1 `dashboard/src/lib/ws.ts` — WS Client (NEW)
 
-Modul murni, framework-agnostic, testable tanpa React. Factory function, bukan class.
+Pure module, framework-agnostic, testable without React. A factory function, not a class.
 
 ```typescript
 export type WsStatus = "connecting" | "connected" | "disconnected";
@@ -120,17 +120,17 @@ export function createAgentSocket(handlers: WsMessageHandlers): AgentSocketContr
 ```
 
 **Perilaku:**
-- URL dibangun dari `NEXT_PUBLIC_API_URL`: `http://localhost:8000` → `ws://localhost:8000/ws`. Mendukung `https`→`wss`. Bila env kosong, default `ws://localhost:8000/ws`.
-- Browser mengirim cookie `a2z-token` httpOnly otomatis (tanpa opsi eksplisit di `WebSocket` constructor). Bila backend menutup koneksi 1008 (unauthorized) atau cross-origin memblokir cookie → `onStatusChange("disconnected")`, hook fallback ke mock.
-- **Auto-reconnect exponential backoff:** 1s, 2s, 4s, 8s, … capped 30s. Reset ke 1s setelah connect berhasil.
-- Parsing pesan: `JSON.parse` dengan `try/catch`. Route berdasarkan `.type`:
+- URL is built from `NEXT_PUBLIC_API_URL`: `http://localhost:8000` → `ws://localhost:8000/ws`. Supports `https`→`wss`. If the env is empty, default to `ws://localhost:8000/ws`.
+- The browser sends the `a2z-token` httpOnly cookie automatically (no explicit option in the `WebSocket` constructor). If the backend closes the connection with 1008 (unauthorized) or cross-origin blocks the cookie → `onStatusChange("disconnected")`, and the hook falls back to mock.
+- **Auto-reconnect with exponential backoff:** 1s, 2s, 4s, 8s, … capped at 30s. Reset to 1s after a successful connection.
+- Parsing messages: `JSON.parse` with `try/catch`. Route based on `.type`:
   - `"LATEST_TRANSACTIONS"` → `handlers.onTransactions(data)`
   - `"AGENT_LOG"` → `handlers.onAgentLog(data)`
-  - Lainnya → diabaikan (forward-compatible)
-- `close()`: set flag `closed=true`, tutup socket, batalkan timer reconnect. Idempoten.
-- SSR-safe: bila `typeof window === "undefined"`, return controller no-op (hook hanya memanggil di `useEffect` client, tapi tetap defensif).
+  - Others → ignored (forward-compatible)
+- `close()`: set flag `closed=true`, close the socket, cancel the reconnect timer. Idempotent.
+- SSR-safe: if `typeof window === "undefined"`, return a controller no-op (the hook only calls it inside the client `useEffect`, but stays defensive).
 
-### 4.2 `dashboard/src/hooks/useAgentWebSocket.ts` — React Hook (BARU)
+### 4.2 `dashboard/src/hooks/useAgentWebSocket.ts` — React Hook (NEW)
 
 ```typescript
 export interface UseAgentWebSocketResult {
@@ -145,19 +145,19 @@ export function useAgentWebSocket(): UseAgentWebSocketResult
 
 **Perilaku:**
 - `useEffect` create socket on mount, `close()` on unmount.
-- Akumulasi `agentLogs`: append baru, cap 50 entry (FIFO — buang paling lama).
-- `transactions`: **replace** (bukan append) saat batch baru datang — sesuai perilaku backend sekarang yang mengirim top-5 terbaru.
-- `lastMessageAt`: timestamp pesan terakhir (untuk deteksi stale / indikator "live").
-- Hook netral: **tidak** import React Context (bisa dipakai ulang, mudah di-test).
+- Accumulate `agentLogs`: append new entries, cap at 50 (FIFO — drop the oldest).
+- `transactions`: **replace** (not append) when a new batch arrives — matches the backend's current behavior of sending the top-5 latest.
+- `lastMessageAt`: timestamp of the last message (for stale detection / "live" indicator).
+- Neutral hook: **does not** import React Context (reusable, easy to test).
 
 ### 4.3 `dashboard/src/components/DashboardContext.tsx` — MODIFY
 
 #### A. Fix bug (critical)
 
-Ganti semua `fetch("http://localhost:8080/...")` raw dengan `apiFetch` dari `@/lib/api` (yang sudah benar: port via `NEXT_PUBLIC_API_URL`, `credentials:'include'`, auto-redirect 401).
+Replace all raw `fetch("http://localhost:8080/...")` calls with `apiFetch` from `@/lib/api` (which is already correct: port via `NEXT_PUBLIC_API_URL`, `credentials:'include'`, auto-redirect on 401).
 
 ```typescript
-// SEBELUM:
+// BEFORE:
 const res = await fetch("http://localhost:8080/api/analyze", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
@@ -166,7 +166,7 @@ const res = await fetch("http://localhost:8080/api/analyze", {
 // ...
 const res = await fetch("http://localhost:8080/api/status");
 
-// SESUDAH:
+// AFTER:
 import { apiFetch } from "@/lib/api";
 const data = await apiFetch<AnalyzeResp>("/api/analyze", {
   method: "POST",
@@ -181,7 +181,7 @@ const data = await apiFetch<StatusResp>("/api/status");
 ```typescript
 import { useAgentWebSocket } from "@/hooks/useAgentWebSocket";
 
-// di dalam DashboardProvider:
+// inside DashboardProvider:
 const ws = useAgentWebSocket();                       // data real
 const [usingReal, setUsingReal] = useState(false);
 
@@ -189,39 +189,39 @@ useEffect(() => { setUsingReal(ws.status === "connected"); }, [ws.status]);
 
 // agentMessages:
 //   - connected → map ws.agentLogs → AgentMessage[] (sender/content/metadata)
-//   - offline   → mock generator (genAgentConversation + simulasi, status quo)
+//   - offline   → mock generator (genAgentConversation + simulation, status quo)
 useEffect(() => {
-  if (!usingReal) return;            // mock jalan via logic existing
+  if (!usingReal) return;            // mock runs via existing logic
   const mapped = ws.agentLogs.map(mapLogToAgentMessage);  // kap 50
   setAgentMessages(mapped);
 }, [ws.agentLogs, usingReal]);
 
 // transactions:
-//   - connected → replace dengan map ws.transactions (real)
-//   - offline   → existing polling /api/status + simulasi mock
+//   - connected → replace with mapped ws.transactions (real)
+//   - offline   → existing polling of /api/status + mock simulation
 useEffect(() => {
   if (!usingReal) return;
   setTransactions(ws.transactions.map(mapRawTxToTransaction));
 }, [ws.transactions, usingReal]);
 ```
 
-**Aturan prioritas (state machine sederhana):**
+**Priority rules (simple state machine):**
 | `ws.status` | Data agentMessages/transactions | Mock generator & polling mock |
 |---|---|---|
-| `connected` | **Real** dari WS | **Pause** |
+| `connected` | **Real** from WS | **Pause** |
 | `connecting` | Tahan state terakhir | Tahan |
-| `disconnected` | **Mock** (status quo) | **Aktif** (demo mode) |
+| `disconnected` | **Mock** (status quo) | **Active** (demo mode) |
 
-**Yang TIDAK berubah:** signature context, semua key yang diekspos (`agentMessages`, `transactions`, `kpiMetrics`, dll), `AgentCommPanel`, dan komponen lain. Ekspos `wsStatus` baru (opsional, untuk indikator badge).
+**What is NOT changed:** the context signature, all exposed keys (`agentMessages`, `transactions`, `kpiMetrics`, etc.), `AgentCommPanel`, and other components. Expose a new `wsStatus` (optional, for a badge indicator).
 
-**Fungsi mapper (helper privat):**
+**Mapper function (private helper):**
 ```typescript
 function mapLogToAgentMessage(log: AgentLogPayload): AgentMessage {
   return {
     id: genId(),
     sender: log.sender,
     content: log.content,
-    timestamp: new Date(),            // backend belum kirim ts; pakai waktu terima
+    timestamp: new Date(),            // backend does not yet send ts; use receive time
     status: "done",
     metadata: log.metadata,
   };
@@ -230,7 +230,7 @@ function mapLogToAgentMessage(log: AgentLogPayload): AgentMessage {
 function mapRawTxToTransaction(tx: RawTransaction): Transaction {
   return {
     id: tx.tx_hash_id,
-    projectName: "On-Chain Target",   // backend execution_logs belum punya nama proyek
+    projectName: "On-Chain Target",   // backend execution_logs does not yet store a project name
     targetAddress: tx.project_target_address,
     amountUsd: tx.amount_usd,
     status: tx.status.toLowerCase() === "success" ? "success"
@@ -238,24 +238,24 @@ function mapRawTxToTransaction(tx: RawTransaction): Transaction {
     txHash: tx.tx_hash_id,
     timestamp: new Date(tx.created_at),
     reason: "Autonomous Execution",
-    gasUsedGwei: 42,                  // backend belum simpan gas; placeholder
+    gasUsedGwei: 42,                  // backend does not yet store gas; placeholder
   };
 }
 ```
-(Mapper sengaja ditarik ke helper terpisah agar mudah di-unit-test tanpa React.)
+(The mapper is intentionally pulled into a separate helper to make unit-testing easy without React.)
 
-### 4.4 `AgentCommPanel.tsx` — TIDAK DIUBAH
-Sudah membaca `agentMessages` dari `useDashboard()`. Bila context kirim real data, panel otomatis tampilkan real. Zero change, zero regression.
+### 4.4 `AgentCommPanel.tsx` — NOT CHANGED
+Already reads `agentMessages` from `useDashboard()`. When the context sends real data, the panel automatically displays it. Zero change, zero regression.
 
 ---
 
-## 5. Kontrak WS untuk Backend (Spec untuk Teman)
+## 5. WS Contract for Backend (Spec for Teammate)
 
-> Dokumen ini **bukan** implementasi. Frontend sudah siap menerima kedua tipe pesan; bila backend belum kirim `AGENT_LOG`, frontend tetap jalan via mock (tidak breaking).
+> This document is **not** an implementation. The frontend is ready to receive both message types; if the backend has not yet sent `AGENT_LOG`, the frontend still works via mock (non-breaking).
 
-### Tipe pesan yang frontend harapkan dari `/ws`
+### Message types the frontend expects from `/ws`
 
-**1. `LATEST_TRANSACTIONS`** — sudah ada di backend, **tidak perlu ubahan**:
+**1. `LATEST_TRANSACTIONS`** — already exists in the backend, **no change needed**:
 ```json
 {
   "type": "LATEST_TRANSACTIONS",
@@ -271,7 +271,7 @@ Sudah membaca `agentMessages` dari `useDashboard()`. Bila context kirim real dat
 }
 ```
 
-**2. `AGENT_LOG`** — BARU, diminta ditambahkan:
+**2. `AGENT_LOG`** — NEW, requested to be added:
 ```json
 {
   "type": "AGENT_LOG",
@@ -288,46 +288,46 @@ Sudah membaca `agentMessages` dari `useDashboard()`. Bila context kirim real dat
 }
 ```
 - `sender`: `"agent_a" | "agent_b" | "system"`
-- `content`: teks bebas yang akan tampil sebagai bubble chat
-- `metadata`: opsional; bila ada tampil sebagai chip (Project/Score/Amount/Tx)
+- `content`: free text that will appear as a chat bubble
+- `metadata`: optional; if present, shown as a chip (Project/Score/Amount/Tx)
 
-### Yang diminta dari teman (backend developer)
-1. Saat scheduler `run_agent_a` / `run_agent_b` mengeksekusi pipeline (atau endpoint `/api/analyze` dipanggil), **emit log per-langkah** (scraping → inference → vault execution) dengan memanggil:
+### What is requested from the teammate (backend developer)
+1. When the scheduler `run_agent_a` / `run_agent_b` executes the pipeline (or the `/api/analyze` endpoint is called), **emit a per-step log** (scraping → inference → vault execution) by calling:
    ```python
    await manager.broadcast(json.dumps({"type": "AGENT_LOG", "data": {...}}))
    ```
-2. Opsional: persistensi ke tabel `agent_logs` baru bila ingin history (frontend tidak butuh ini; cukup broadcast real-time).
-3. Frontend **tidak akan error** bila `AGENT_LOG` belum diimplementasi — pesan tipe tak dikenal diabaikan, dan mock tetap aktif.
+2. Optional: persistence to a new `agent_logs` table if you want history (the frontend does not need this; real-time broadcast is enough).
+3. The frontend **will not error** if `AGENT_LOG` is not yet implemented — unknown message types are ignored and the mock stays active.
 
-### Catatan auth WS
-Backend menutup koneksi 1008 bila tidak ada cookie `a2z-token` / `X-API-Key`. Frontend andalkan cookie httpOnly terkirim otomatis (SameSite=Lax). Bila dev lintas-origin memblokir cookie, frontend fallback ke mock + log warning di console — tidak crash. Bila teman ingin lebih reliable, bisa tambahkan cek query param `?token=` di `check_ws_auth` (opsional, bukan syarat).
+### WS auth note
+The backend closes the connection with 1008 when there is no `a2z-token` / `X-API-Key` cookie. The frontend relies on the httpOnly cookie being sent automatically (SameSite=Lax). If dev cross-origin blocks the cookie, the frontend falls back to mock + a console warning — it does not crash. If the teammate wants more reliability, an optional `?token=` query-param check can be added in `check_ws_auth` (optional, not required).
 
 ---
 
 ## 6. Testing
 
-### Unit test — `dashboard/src/lib/__tests__/ws.test.ts` (BARU)
-- Mock `WebSocket` global (vi.stubGlobal).
-- `createAgentSocket` memanggil `onStatusChange("connecting")` lalu `"connected"` saat `onopen`.
-- Pesan `LATEST_TRANSACTIONS` → `onTransactions` dipanggil dengan data.
-- Pesan `AGENT_LOG` → `onAgentLog` dipanggil.
-- Pesan tipe tak dikenal → tidak ada handler dipanggil (tidak throw).
+### Unit test — `dashboard/src/lib/__tests__/ws.test.ts` (NEW)
+- Mock the global `WebSocket` (vi.stubGlobal).
+- `createAgentSocket` calls `onStatusChange("connecting")` then `"connected"` on `onopen`.
+- `LATEST_TRANSACTIONS` message → `onTransactions` is called with the data.
+- `AGENT_LOG` message → `onAgentLog` is called.
+- Unknown message type → no handler is called (does not throw).
 - Disconnect → `onStatusChange("disconnected")` → reconnect terjadwal.
-- `close()` → tidak ada reconnect lanjutan; idempoten.
-- SSR: `typeof window === undefined` → controller no-op (tidak throw).
+- `close()` → no further reconnect; idempotent.
+- SSR: `typeof window === undefined` → controller no-op (does not throw).
 
-### Unit test — mapper (di `DashboardContext` atau file helper)
-- `mapLogToAgentMessage`: sender/content/metadata terpetik benar, `status` selalu `"done"`.
-- `mapRawTxToTransaction`: status `"SUCCESS"`→`"success"`, `"PENDING_APPROVAL"`→`"pending"`, lainnya→`"failed"`.
+### Unit test — mapper (in `DashboardContext` or a helper file)
+- `mapLogToAgentMessage`: sender/content/metadata are captured correctly, `status` is always `"done"`.
+- `mapRawTxToTransaction`: status `"SUCCESS"`→`"success"`, `"PENDING_APPROVAL"`→`"pending"`, others→`"failed"`.
 
 ### Regression — existing vitest
-- Jalankan `npm run test:e2e` (vitest): semua test existing di `src/lib/__tests__/` dan `src/components/__tests__/` **harus tetap lulus**. Tidak ada perubahan signature context yang boleh membreak konsumer.
+- Run `npm run test:e2e` (vitest): all existing tests in `src/lib/__tests__/` and `src/components/__tests__/` **must still pass**. No context signature change may break consumers.
 
-### Manual smoke (saat backend & frontend hidup)
-1. Login → dapat cookie `a2z-token`.
-2. Buka `/dashboard` → `ws.status` connected → `AgentCommPanel` tampilkan log real (jika backend emit `AGENT_LOG`) atau mock (jika belum).
-3. Matikan backend → `ws.status` disconnected → mock generator aktif, dashboard tetap hidup.
-4. Nyalakan lagi → reconnect otomatis, kembali ke real.
+### Manual smoke test (when backend & frontend are running)
+1. Log in → receive the `a2z-token` cookie.
+2. Open `/dashboard` → `ws.status` connected → `AgentCommPanel` shows real logs (if the backend emits `AGENT_LOG`) or mock (if not yet).
+3. Stop the backend → `ws.status` disconnected → mock generator active, dashboard stays alive.
+4. Start it again → automatic reconnect, back to real data.
 
 ---
 
@@ -335,27 +335,27 @@ Backend menutup koneksi 1008 bila tidak ada cookie `a2z-token` / `X-API-Key`. Fr
 
 | File | Aksi | Risiko |
 |---|---|---|
-| `dashboard/src/lib/ws.ts` | **CREATE** | Rendah (file baru, terisolasi) |
-| `dashboard/src/hooks/useAgentWebSocket.ts` | **CREATE** | Rendah (file baru) |
+| `dashboard/src/lib/ws.ts` | **CREATE** | Low (new file, isolated) |
+| `dashboard/src/hooks/useAgentWebSocket.ts` | **CREATE** | Low (new file) |
 | `dashboard/src/lib/__tests__/ws.test.ts` | **CREATE** | Test unit |
-| `dashboard/src/components/DashboardContext.tsx` | **MODIFY** (fix port + integrasi WS) | Sedang (satu file inti) |
-| `docs/superpowers/specs/2026-06-21-agent-log-emit-backend-spec.md` | **CREATE** | Rendah (dokumen handoff) |
-| `AgentCommPanel.tsx` & semua komponen UI lain | **TIDAK DIUBAH** | — |
+| `dashboard/src/components/DashboardContext.tsx` | **MODIFY** (fix port + WS integration) | Medium (one core file) |
+| `docs/superpowers/specs/2026-06-21-agent-log-emit-backend-spec.md` | **CREATE** | Low (handoff doc) |
+| `AgentCommPanel.tsx` & all other UI components | **NOT CHANGED** | — |
 
 ---
 
 ## 8. Out of Scope (YAGNI)
-- Implementasi perubahan backend (`agent_logs` emit) — serahkan ke teman via spec.
-- Refactor besar `DashboardContext` jadi multi-provider — over-engineering untuk hackathon.
-- Implementasi wallet connect di login page — sudah ada UI-nya, di luar scope A2A sync.
-- Fitur pause/resume Agent via WS bidirectional — backend WS saat ini read-only (ignore incoming).
-- Persistensi log agen di frontend (localStorage) — tidak diminta.
+- Implement backend changes (`agent_logs` emit) — hand off to teammate via spec.
+- Large refactor of `DashboardContext` into multi-provider — over-engineering for a hackathon.
+- Implement wallet connect on the login page — its UI already exists, but it is outside the A2A sync scope.
+- Agent pause/resume feature via bidirectional WS — the backend WS is currently read-only (ignores incoming).
+- Persisting agent logs on the frontend (localStorage) — not requested.
 
 ---
 
 ## 9. Success Criteria
-1. Bug port `8080→8000` & credentials hilang di `DashboardContext.tsx`; `/api/analyze` & `/api/status` memakai `apiFetch`.
-2. `lib/ws.ts` & `hooks/useAgentWebSocket.ts` ada, ter-connect ke `/ws` saat backend online.
-3. `AgentCommPanel` menampilkan data real (`LATEST_TRANSACTIONS` / `AGENT_LOG`) saat WS connected, dan mock saat disconnected.
-4. Semua test vitest existing tetap lulus; test baru untuk `ws.ts` lulus.
-5. Spec handoff backend (`agent-log-emit-backend-spec.md`) tersedia untuk teman.
+1. Port bug `8080→8000` & missing credentials in `DashboardContext.tsx`; `/api/analyze` & `/api/status` use `apiFetch`.
+2. `lib/ws.ts` & `hooks/useAgentWebSocket.ts` exist, connect to `/ws` when the backend is online.
+3. `AgentCommPanel` displays real data (`LATEST_TRANSACTIONS` / `AGENT_LOG`) when the WS is connected, and mock when disconnected.
+4. All existing vitest tests still pass; the new test for `ws.ts` passes.
+5. The backend handoff spec (`agent-log-emit-backend-spec.md`) is available for the teammate.
