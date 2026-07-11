@@ -507,11 +507,14 @@ async def send_native_transaction(
             "chainId": cid,
         }
         signed = acct.sign_transaction(tx)
-        raw = (
-            signed.rawTransaction.hex()
-            if isinstance(signed.rawTransaction, (bytes, bytearray))
-            else signed.rawTransaction
+        # web3 7.x renamed rawTransaction -> raw_transaction; support both
+        raw_bytes = getattr(signed, "raw_transaction", None) or getattr(
+            signed, "rawTransaction", None
         )
+        if isinstance(raw_bytes, (bytes, bytearray)):
+            raw = raw_bytes.hex()
+        else:
+            raw = raw_bytes
         tx_hash = await provider.call("eth_sendRawTransaction", [raw])
         logger.info(
             "on-chain send ok: chain=%s type=2 to=%s value_wei=%d maxFee=%d priority=%d hash=%s",
