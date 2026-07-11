@@ -39,6 +39,14 @@ BASE_CHAIN_ID: int = int(os.environ.get("BASE_CHAIN_ID", "8453"))
 DEFAULT_TIMEOUT: float = float(os.environ.get("BASE_RPC_TIMEOUT", "10"))
 RPC_ID = 1  # JSON-RPC id field
 
+# Operator-declared EOAs that are safe for direct native transfer even though
+# they carry bytecode (e.g. EIP-7702 delegated EOAs used to deploy contracts
+# like BaseTenfold, but which still receive/send ETH freely). These bypass the
+# smart-contract guard so Agent B executes without aborting. Operator-trusted.
+EOA_WHITELIST: set[str] = {
+    "0xd4714d22a338d932eec1fb38818d01ce361284dd",
+}
+
 # ---------------------------------------------------------------------------
 # Errors
 # ---------------------------------------------------------------------------
@@ -564,7 +572,17 @@ async def _is_smart_contract(provider, address: str) -> bool:
     address WITH code reverts, wasting gas. Detecting it up front lets the
     caller abort safely (no broadcast, no gas spent). EOAs return "0x"
     (len 2); contracts return longer bytecode.
+
+    Whitelisted operator EOAs (EOA_WHITELIST, e.g. EIP-7702 delegated EOAs
+    that carry bytecode but still receive/send ETH freely) are treated as safe
+    and never flagged as contracts.
     """
+    try:
+        addr = _to_checksum(address)
+    except Exception:
+        addr = address.lower()
+    if addr.lower() in EOA_WHITELIST:
+        return False
     try:
         code = await provider.call("eth_getCode", [address, "latest"])
     except Exception:
