@@ -576,6 +576,11 @@ async def _is_smart_contract(provider, address: str) -> bool:
     Whitelisted operator EOAs (EOA_WHITELIST, e.g. EIP-7702 delegated EOAs
     that carry bytecode but still receive/send ETH freely) are treated as safe
     and never flagged as contracts.
+
+    Fail-closed: if eth_getCode cannot be read (RPC error), the address is
+    treated AS a contract (abort) rather than assumed safe. This prevents
+    accidentally broadcasting a transfer that would revert on Base and waste
+    gas when the chain probe is unavailable.
     """
     try:
         addr = _to_checksum(address)
@@ -586,7 +591,12 @@ async def _is_smart_contract(provider, address: str) -> bool:
     try:
         code = await provider.call("eth_getCode", [address, "latest"])
     except Exception:
-        code = None
+        # Fail closed: cannot verify -> assume contract, abort safely.
+        logger.warning(
+            "eth_getCode failed for %s; treating as smart contract (abort to save gas)",
+            address,
+        )
+        return True
     if not code:
         code = "0x"
     return len(code) > 2
