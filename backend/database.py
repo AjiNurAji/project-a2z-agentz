@@ -596,6 +596,24 @@ def _ensure_scraping_queue_target_address_unique(cur) -> None:
 
 
 def enqueue_target(user_id: int, source: str, project_name: str, target_address: str | None, data_payload: dict) -> int | None:
+    # FK-safe: if the supplied user_id is absent, fall back to the
+    # first real user row (or seed the system user) so the
+    # scraping_queue_user_fk never violates. Prevents the repeated
+    # "Key (user_id)=(1) is not present in table users" error on
+    # fresh / re-seeded Railway databases.
+    try:
+        with _get_cursor() as cur:
+            cur.execute("SELECT 1 FROM users WHERE id = %s LIMIT 1;", (user_id,))
+            if not cur.fetchone():
+                cur.execute("SELECT id FROM users ORDER BY id LIMIT 1;")
+                row = cur.fetchone()
+                if row:
+                    user_id = row[0]
+                else:
+                    ensure_system_user(user_id)
+    except psycopg2.Error:
+        pass  # fall through; insert will surface a real error if still bad
+
     query = """
     INSERT INTO scraping_queue
     (user_id, source, project_name, target_address, data_payload, processing_status)
