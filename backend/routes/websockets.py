@@ -113,6 +113,13 @@ class WSEndpoint(WebSocketEndpoint):
             websocket.scope.setdefault("subprotocol", protocols[0] if protocols else None)
             await manager.connect(websocket)
             return
+        # BYPASS (demo mode): no subprotocol presented -> accept anyway so
+        # the dashboard's plain `new WebSocket(url)` connects without a
+        # shared API_KEY/NEXT_PUBLIC_API_KEY. Token auth above still
+        # works when a client sends one. Origin is still enforced above.
+        if not protocols:
+            await manager.connect(websocket)
+            return
         await websocket.close(code=1008)
 
     async def on_receive(self, websocket, data):
