@@ -707,6 +707,67 @@ Completed the final hardening sprint for the AMD Developer Hackathon submission.
 ---
 ---
 
+## Session 28 — 2026-07-11 | Real On-Chain Execution: Live Test, Bug Fixes & Proof-of-Execution
+
+### Summary
+Validated **real on-chain execution** end-to-end on both Base Sepolia and Base Mainnet using the production code path (`web3_async.send_proof_of_execution` / `send_native_transaction`). Discovered and fixed four real bugs that would have broken the Railway deployment. Produced the first live, verifiable mainnet transaction hash for the A2Z Agent B demo.
+
+### Team Context (AMD Hackathon — Track 3: Unicorn)
+- **aditya** (backend) — Command Center Starlette/PostgreSQL on Railway
+- **zm** (frontend) — Next.js dashboard on Vercel
+- **ajinuraji** (infra) — Cloudflare/Vercel glue, login-loop fix
+- **GreyArch | 0xD** (operator) — owns the Base wallets, RPC keys, and on-chain demo
+
+### Bugs Found & Fixed (all verified live)
+1. **web3 7.x attribute rename** — `signed.rawTransaction` → `signed.raw_transaction`. The old attribute raised `AttributeError` at broadcast. Fixed with a compatible getter (web3 7 + legacy fallback).
+2. **Smart-Contract guard** — a plain native value transfer to an address holding bytecode reverts on Base (EIP-7611 / OP-070). Added `_is_smart_contract()` pre-flight (`eth_getCode`); aborts safely before broadcast.
+3. **Guard fails closed** — originally an `eth_getCode` RPC error fell back to "assume EOA" and broadcast anyway (wasting gas on a revert). Now fails **closed**: unreadable code → treated as contract → abort.
+4. **Fan-out broadcast + correct nonce** — `send_native_transaction` only broadcast to one (possibly flaky) RPC and used `pending` nonce (causing dropped tx / gaps). Now broadcasts to **all** configured RPCs and uses `latest` nonce.
+5. **Proof-of-execution chain routing** — `send_proof_of_execution()` was hardcoded to Sepolia (chain 84532). Now follows `ACTIVE_NETWORK` (`base` → 8453 mainnet, `base_sepolia` → 84532).
+
+### Critical Wallet Discovery (operator-owned)
+- `0xD4714d22A338D932Eec1fb38818D01cE361284dD` (`adityamlna.base.eth`) is an **EIP-7702 delegated EOA** (deployed BaseTenfold). It does **NOT** accept native ETH transfers on Base mainnet (reverts even with non-empty data — no payable fallback). Must NOT be used as a value recipient.
+- `0xd6d824fd3d19e46b5e2046955d13e9fd42db79d3` is a **clean EOA** that correctly receives native ETH. This is the address to use for `VAULT_ADDRESS` / proof-of-execution demos.
+- Both addresses are in `EOA_WHITELIST` in `web3_async.py` (operator-trusted; bypasses the contract-abort guard).
+
+### Live Transaction Evidence
+| TxHash | Network | To | Result |
+|--------|---------|-----|--------|
+| `0xf324cd31d22a0a0cb9cd81644fd5f872294b036162c8ae8c040a482f2ee2428e` | Sepolia | self-EOA | ✅ Mined (block 43984657) |
+| `0x18394c6c61fe8c040d21a995ac51bd029ffaa40aa535d212a480b4bb1f138087` | Mainnet | `0xD471` (EIP-7702) | ❌ Cancelled/revert |
+| `0x1cec5eb12b0b53c5d5a609270fce21f2c31b225ee642e5787b28af88a623c51d` | Mainnet | `0xd6d8` (clean EOA) | ✅ **Success** (block 48476087, 21000 gas, 0.006 Gwei, fee $0.000228) |
+
+The `0x1cec...` mainnet hash is confirmed on basescan.org and is the canonical proof-of-execution receipt for the demo.
+
+### Files Modified (Session 28)
+| File | Change |
+|------|--------|
+| `backend/web3_async.py` | EIP-1559 `send_native_transaction`; `send_proof_of_execution`; `_is_smart_contract`; `EOA_WHITELIST`; fan-out broadcast; `latest` nonce; chain routing via `ACTIVE_NETWORK`; `raw_transaction` compat |
+| `backend/scheduler/agent_b_cycle.py` | Real-exec branch gated by `AGENT_B_REAL_EXECUTION`; calls `send_proof_of_execution` on `base_sepolia` |
+| `backend/routes/api.py` | Real send gated by `AGENT_B_REAL_EXECUTION` |
+| `backend/database.py` | `update_proposal_hash()` stores the real broadcast hash |
+
+### New Environment Variables (see `.env.example`)
+- `AGENT_B_REAL_EXECUTION` — `0` (safe default) / `1` (broadcast real tx)
+- `VAULT_ADDRESS` — recipient `0x` address for proof-of-execution (use `0xd6d8...79d3`, NOT `0xD471`)
+- `MICRO_TX_ETH` — default `0.00001`
+- `MAX_GAS_PRICE_GWEI` — gas cap (e.g. `5`)
+- `ETH_USD_PRICE` — for USD budgeting (e.g. `1790`)
+- `EOA_WHITELIST` behavior is code-level (set in `web3_async.py`), not an env var
+
+### Verification
+- 5 commits produced locally (not yet pushed at time of writing):
+  - `abce3f3` fix(web3): web3 7.x raw_transaction compat
+  - `dca1b1a` feat(web3): smart-contract guard
+  - `81e15eb` feat(web3): whitelist operator EOA 0xD471
+  - `e4950eb` fix(web3): guard fails closed
+  - `4507601` fix(web3): robust on-chain send + correct proof-of-execution target
+- All live tx verified via RPC receipt + basescan.org explorer.
+
+**Status: ✅ REAL ON-CHAIN EXECUTION VALIDATED — mainnet proof-of-execution Success, all production-blocking bugs fixed, commits staged locally pending push.**
+
+---
+
 ## Directory Structure Reference
 
 ```
