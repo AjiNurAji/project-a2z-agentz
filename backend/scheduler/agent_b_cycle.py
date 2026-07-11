@@ -231,9 +231,10 @@ async def process_task(task: dict[str, Any]) -> None:
   contract_address = payload.get("contract_address") or task.get("target_address") or ""
   source = task.get("source") or "unknown"
 
-  # Bridge Agent A's enriched DexScreener signals into Agent B's prompt so the
-  # LLM scores on real market context, not just the contract address.
+  # Bridge Agent A's enriched DexScreener signals AND its LLM verdict into
+  # Agent B's prompt so the vault scores with full A2Z agent-to-agent context.
   dex_context = ""
+  agent_a_llm = payload.get("agent_a_llm")
   try:
     liq = payload.get("liquidity_usd")
     mcap = payload.get("market_cap")
@@ -254,6 +255,12 @@ async def process_task(task: dict[str, Any]) -> None:
       parts.append(f"price_change_24h={pc}")
     if parts:
       dex_context = ", ".join(parts)
+    if isinstance(agent_a_llm, dict):
+      dex_context += (
+        f" | agent_a_verdict=score:{agent_a_llm.get('score')},"
+        f"category:{agent_a_llm.get('category')},"
+        f"reason:{agent_a_llm.get('reason')}"
+      )
   except Exception:
     dex_context = ""
 

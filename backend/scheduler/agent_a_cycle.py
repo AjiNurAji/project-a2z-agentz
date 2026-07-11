@@ -47,6 +47,11 @@ from dotenv import load_dotenv
 
 from database import ensure_pipeline_tables, enqueue_target, append_audit_log
 from routes.websockets import manager
+# Opsi 2 (A2Z Agent-to-Agent): Agent A calls the LLM brain on the AMD GPU
+# server (via Cloudflare tunnel) to extract + score social sentiment BEFORE
+# handing the target to Agent B. run_ai_inference() is the shared entrypoint
+# also used by the standalone agent_a_inference CLI.
+from agent_a_inference import run_ai_inference
 
 load_dotenv()
 
@@ -59,6 +64,10 @@ NEYNAR_CAST_LIMIT = int(os.getenv("AGENT_A_NEYNAR_LIMIT", "3"))
 NEYNAR_MAX_RETRIES = int(os.getenv("NEYNAR_MAX_RETRIES", "2"))
 NEYNAR_BACKOFF_SECONDS = float(os.getenv("NEYNAR_RETRY_BACKOFF_SECONDS", "5"))
 DEFAULT_USER_ID = int(os.getenv("AGENT_A_DEFAULT_USER_ID", "1"))
+# LLM brain for Agent A (Qwen on AMD via Cloudflare tunnel). Falls back to the
+# generic AI_MODEL env if AGENT_A_MODEL is not set. Empty endpoint -> mock.
+AI_MODEL = os.getenv("AGENT_A_MODEL", os.getenv("AI_MODEL", ""))
+AGENT_A_LLM_THRESHOLD = int(os.getenv("AGENT_A_LLM_THRESHOLD", "85"))
 
 # Quality gate for discovered Base tokens (Agent A OSINT "good data" filter).
 # Tokens below these thresholds are dropped before reaching Agent B so the
@@ -314,6 +323,38 @@ async def run_cycle() -> None:
                 "social_signals": signals,
                 "opportunity": _is_opportunity(signals),
             }
+
+            # ---- Opsi 2 (A2Z Agent-to-Agent): Agent A LLM extraction + sentiment score ----
+            # Agent A calls the AMD GPU brain (Qwen via Cloudflare tunnel) to extract
+            # a structured verdict from the DexScreener + Farcaster signal, then passes
+            # that judgment to Agent B as an enriched payload. Soft-fails to mock so a
+            # GPU/tunnel outage never blocks the scout cycle.
+            try:
+                description = (
+                    f"Token {token.get('token_name')} ({address}) on {token.get('chain') or 'base'}. "
+                    f"Liquidity ${token.get('liquidity_usd')}, MCap {token.get('market_cap')}, "
+                    f"24h vol {token.get('volume_24h')}, 24h txns {token.get('txns_24h')}. "
+                    f"Social signal: {' | '.join(signals[:5]) if signals else 'none'}"
+                )
+                ai = run_ai_inference(description, address, AI_MODEL)
+                payload["agent_a_llm"] = {
+                    "score": ai.score,
+                    "category": ai.category,
+                    "reason": ai.reason,
+                    "amount_usd": ai.amount_usd,
+                    "model": ai.model,
+                }
+                payload["agent_a_passed"] = ai.score >= AGENT_A_LLM_THRESHOLD
+                append_audit_log(
+                    "agent_a.llm",
+                    f"LLM score={ai.score} passed={payload['agent_a_passed']} for {address}",
+                    {"address": address, "score": ai.score, "model": ai.model},
+                )
+            except Exception as exc:
+                logger.warning("Agent A LLM analysis skipped (fallback mock): %s", exc)
+                payload["agent_a_llm"] = None
+                payload["agent_a_passed"] = None
+
             queue_id = enqueue_target(
                 user_id=DEFAULT_USER_ID,
                 source="farcaster",
