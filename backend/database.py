@@ -338,6 +338,10 @@ def ensure_system_user(user_id: int = 1, email: str = "system@a2z.agentz") -> bo
     owner. On a fresh Railway DB the users table is empty, so the foreign key
     (scraping_queue_user_fk) fails every cycle. Seeding the row here (called
     from lifespan on startup) makes the schema self-healing on any new DB.
+
+    We insert by EMAIL (not a forced id=1) so we never collide with the
+    SERIAL sequence, then normalise the seeded row's id back to user_id (1)
+    so DEFAULT_USER_ID stays correct. Idempotent: safe to call every boot.
     """
     try:
         with _get_cursor() as cur:
@@ -346,12 +350,19 @@ def ensure_system_user(user_id: int = 1, email: str = "system@a2z.agentz") -> bo
             )
             if cur.fetchone():
                 return True
+            # Insert by email (let SERIAL assign), avoid forcing id=1 collision.
             cur.execute(
-                """INSERT INTO users (id, email, password_hash, wallet_address)
-                   VALUES (%s, %s, %s, NULL)
-                   ON CONFLICT (id) DO NOTHING;""",
-                (user_id, email, "SYSTEM_USER_NO_LOGIN"),
+                "INSERT INTO users (email, password_hash, wallet_address) "
+                "VALUES (%s, %s, NULL) "
+                "ON CONFLICT (email) DO NOTHING RETURNING id;",
+                (email, "SYSTEM_USER_NO_LOGIN"),
             )
+            row = cur.fetchone()
+            if row:
+                # Normalise the system user's id to user_id (1) for FK consistency.
+                cur.execute(
+                    "UPDATE users SET id = %s WHERE id = %s;", (user_id, row[0])
+                )
             logger.info("ensure_system_user: seeded system user id=%s", user_id)
             return True
     except psycopg2.Error as exc:
