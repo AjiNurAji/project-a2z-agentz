@@ -705,4 +705,26 @@ def append_audit_log(event_type: str, description: str, metadata: dict | None = 
         with _get_cursor() as cur:
             cur.execute(query, (event_type, description, json.dumps(metadata or {})))
     except psycopg2.Error as exc:
-        logger.error('append_audit_log failed: %s', exc)
+        logger.error("append_audit_log failed: %s", exc)
+
+
+def get_daily_spend_usd() -> float:
+    """Sum of auto-approved transaction proposal amounts since local midnight.
+
+    Used by Agent B's budget guard (MAX_DAILY_SPEND_USD) so the vault never
+    blows past the operator-configured daily cap.
+    """
+    query = (
+        "SELECT COALESCE(SUM(amount_usd), 0) "
+        "FROM transaction_proposals "
+        "WHERE created_at >= CURRENT_DATE;"
+    )
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query)
+            row = cur.fetchone()
+            if row:
+                return float(row[0] or 0)
+    except psycopg2.Error as exc:
+        logger.error("get_daily_spend_usd failed: %s", exc)
+    return 0.0

@@ -47,6 +47,12 @@ BASE_RPC_3 = os.getenv("BASE_RPC_3", "")
 BASE_CHAIN_ID = int(os.getenv("BASE_CHAIN_ID", "8453"))
 MAX_SCORE_FOR_AUTO = int(os.getenv("AGENT_B_AUTO_SCORE_MIN", "85"))
 DEFAULT_NETWORK_HINT = os.getenv("ACTIVE_NETWORK", "base")
+# Budget guard (env already provided by operator). Enforced before any
+# auto-execution proposal so the vault stays within operator limits.
+MAX_TX_AMOUNT_USD = float(os.getenv("MAX_TX_AMOUNT_USD", "2.0"))
+MAX_DAILY_SPEND_USD = float(os.getenv("MAX_DAILY_SPEND_USD", "10.0"))
+# Concurrency: how many queued tasks Agent B processes per worker tick.
+AGENT_B_CONCURRENCY = int(os.getenv("AGENT_B_CONCURRENCY", "1"))
 
 
 def _strip_models_path(endpoint: str) -> str:
@@ -148,7 +154,7 @@ async def _check_goplus(session: aiohttp.ClientSession, token_address: str) -> d
   raise RuntimeError(f"goplus upstream unavailable for {token_address}")
 
 
-async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_summary: str) -> dict[str, Any]:
+async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_summary: str, dex_context: str = "") -> dict[str, Any]:
     if not AGENT_B_API_KEY or not AGENT_B_ENDPOINT or not AGENT_B_MODEL:
         return {"score": 0, "reason": "missing agent b config", "amount_usd": 0.0, "model": "bypass"}
     temperature = float(os.getenv("AGENT_B_TEMPERATURE", "0.1"))
@@ -156,6 +162,10 @@ async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_
     prompt = (
         "You are Agent B (The Vault Gatekeeper). Evaluate this Base token for honeypot/rug risk."
         f" Token: {token_name} Address: {contract_address} GoPlus: {goplus_summary}"
+    )
+    if dex_context:
+        prompt += f" Market: {dex_context}"
+    prompt += (
         " Return JSON with keys: score (0-100), reason, amount_usd (<=2), category, model."
     )
     # Dynamic model discovery: prefer the actual model id reported by the
@@ -221,13 +231,39 @@ async def process_task(task: dict[str, Any]) -> None:
   contract_address = payload.get("contract_address") or task.get("target_address") or ""
   source = task.get("source") or "unknown"
 
+  # Bridge Agent A's enriched DexScreener signals into Agent B's prompt so the
+  # LLM scores on real market context, not just the contract address.
+  dex_context = ""
+  try:
+    liq = payload.get("liquidity_usd")
+    mcap = payload.get("market_cap")
+    vol = payload.get("volume_24h")
+    txns = payload.get("txns_24h") or {}
+    buys = (txns.get("buys") if isinstance(txns, dict) else None)
+    pc = payload.get("price_change_24h")
+    parts = []
+    if liq is not None:
+      parts.append(f"liquidity_usd={liq}")
+    if mcap is not None:
+      parts.append(f"mcap={mcap}")
+    if vol is not None:
+      parts.append(f"volume_24h={vol}")
+    if buys is not None:
+      parts.append(f"buys_24h={buys}")
+    if pc is not None:
+      parts.append(f"price_change_24h={pc}")
+    if parts:
+      dex_context = ", ".join(parts)
+  except Exception:
+    dex_context = ""
+
   async with aiohttp.ClientSession() as session:
     try:
       goplus_raw = await _check_goplus(session, contract_address)
     except RuntimeError as exc:
       if "HTTP 404" in str(exc) or "not found" in str(exc).lower():
         logger.warning("GoPlus 404 for %s -- skipping synthesis for queue_id=%s", contract_address, queue_id)
-        update_task_status(queue_id, "FAILED", retry=False)
+        update_task_status(queue_id, "COMPLETED", retry=False)
         append_audit_log(
           "agent_b.goplus_404",
           f"Token not found on GoPlus for {contract_address}",
@@ -237,16 +273,29 @@ async def process_task(task: dict[str, Any]) -> None:
       raise
     result = goplus_raw.get("result") if isinstance(goplus_raw, dict) else None
     if isinstance(result, dict):
+      # Pass a richer signal set to the LLM: honeypot/tax basics plus the
+      # strong rug predictors (holder concentration, mintable/owner, anti-whale).
       goplus_summary = json.dumps({
         "is_honeypot": result.get("is_honeypot"),
         "buy_tax": result.get("buy_tax"),
         "sell_tax": result.get("sell_tax"),
         "is_open_source": result.get("is_open_source"),
+        "is_mintable": result.get("is_mintable"),
+        "can_take_back_ownership": result.get("can_take_back_ownership"),
+        "hidden_owner": result.get("hidden_owner"),
+        "is_proxy": result.get("is_proxy"),
+        "is_anti_whale": result.get("is_anti_whale"),
+        "slippage_modifiable": result.get("slippage_modifiable"),
+        "creator_balance": result.get("creator_balance"),
+        "holder_count": result.get("holder_count"),
+        "top10_holder_rate": result.get("top10_holder_rate"),
+        "is_in_dex": result.get("is_in_dex"),
+        "lp_holder_count": result.get("lp_holder_count"),
       })
     else:
       goplus_summary = json.dumps({})
 
-    inference = await _run_agent_b_inference(token_name, contract_address, goplus_summary)
+    inference = await _run_agent_b_inference(token_name, contract_address, goplus_summary, dex_context)
     score = int(inference.get("score", 0) or 0)
     reason = inference.get("reason") or ""
     synthesis_id = insert_synthesis_result(queue_id, score, reason)
@@ -270,8 +319,36 @@ async def process_task(task: dict[str, Any]) -> None:
     except Exception:
       pass
 
-    if score >= MAX_SCORE_FOR_AUTO and await _rpc_health_ok(_build_rpc_provider()):
-      amount_usd = min(float(inference.get("amount_usd", 0) or 0), 2.0)
+        # Low score (but a *successful* analysis) is a terminal decision, NOT an
+    # error -> do not retry (saves GoPlus + LLM calls). Only genuine failures
+    # (inference errors, RPC down) should retry via the outer worker loop.
+    if score < MAX_SCORE_FOR_AUTO:
+      update_task_status(queue_id, "COMPLETED", retry=False)
+      append_audit_log(
+        "agent_b.rejected",
+        f"Score {score} < {MAX_SCORE_FOR_AUTO}; not auto-executing",
+        {"queue_id": queue_id, "score": score, "address": contract_address},
+      )
+      return
+
+    # High score -> enforce operator budget guard before auto-proposing.
+    amount_usd = min(float(inference.get("amount_usd", 0) or 0), MAX_TX_AMOUNT_USD)
+    if amount_usd <= 0:
+      update_task_status(queue_id, "COMPLETED", retry=False)
+      append_audit_log("agent_b.no_amount", "High score but amount_usd <= 0", {"queue_id": queue_id})
+      return
+
+    from database import get_daily_spend_usd
+    if get_daily_spend_usd() + amount_usd > MAX_DAILY_SPEND_USD:
+      update_task_status(queue_id, "COMPLETED", retry=False)
+      append_audit_log(
+        "agent_b.budget_exceeded",
+        f"Daily spend cap {MAX_DAILY_SPEND_USD} would be exceeded by {amount_usd}",
+        {"queue_id": queue_id, "amount_usd": amount_usd},
+      )
+      return
+
+    if await _rpc_health_ok(_build_rpc_provider()):
       proposal_id = insert_transaction_proposal(synthesis_id, amount_usd, None)
       append_audit_log(
         "agent_b.proposal_created",
@@ -294,13 +371,7 @@ async def process_task(task: dict[str, Any]) -> None:
       update_task_status(queue_id, "COMPLETED", retry=False)
       return
 
-    # Terminal FAILED state. Note: the schema CHECK constraint on
-    # scraping_queue.processing_status only permits
-    # ('PENDING','PROCESSING','COMPLETED','FAILED'), so we deliberately use
-    # 'FAILED' (not 'DONE'/'PROCESSED', which would violate the constraint).
-    # Combined with the fixed async _rpc_health_ok() above, an auto-passed task
-    # now reliably lands in 'COMPLETED' and is no longer re-locked by the
-    # worker loop (which only selects PENDING or FAILED-with-retries-remaining).
+    # RPC unhealthy -> treat as a transient failure worth retrying.
     update_task_status(queue_id, "FAILED", retry=True)
 
 
