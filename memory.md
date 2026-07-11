@@ -14,6 +14,17 @@ A2Z Agentz is an autonomous multi-agent system built for the AMD Developer Hacka
 
 The project transitioned from a generic inference stack to a fully AMD-native pipeline, with a separate Security Gatekeeper layer (Agent B) handling GoPlus risk screening and transaction validation.
 
+### Team (AMD Hackathon — Track 3: Unicorn)
+
+| Handle | GitHub | Role | Notes |
+|--------|--------|------|-------|
+| **Aditya** (axzss) | https://github.com/axzss | Backend lead (Command Center) | GitHub `GreyArch`; owns `base-tenfold` (Solidity gas-optimized deploy), `pharos-testnet-auto` (Python), `Base-Learn-Guild`. 16 public repos, joined 2023. |
+| **Aji Nur Aji** (AjiNurAji) | https://github.com/AjiNurAji | Infra / DevOps / glue | Bio "Let's Learn"; blog ajinuraji.my.id; 39 public repos (web/php/html focus: secret-message-reactjs, absenq-php-native, courselab). Fixed the Vercel login-loop. Indonesia. |
+| **Zacky Muhammad Dinata** (zmdinata) | https://github.com/zmdinata | Frontend lead (dashboard) | Info Systems student, AI Engineering interest; 16 repos (MyPortfolio, Belajar-AI-Engineering, Belajar-Data-Science). Dominant commit author on `dashboard/`. Joined 2025. |
+| **GreyArch \| 0xD** (operator) | — | Operator / on-chain demo / wallets / RPC | Owns Base wallets, RPC keys, Cloudflare tunnel. Executed real on-chain proof-of-execution (Session 28). Local git author `GreyArch`. |
+
+**Communication & workflow:** casual Indonesian ("bro"); commits must be English + NO teammate names (per operator rule). Preserve teammates' config — patch complementary areas only. Push held until operator confirms.
+
 ---
 
 ## Session 1 — 2026-06-16 — Documentation & Architecture Initialization
@@ -713,10 +724,9 @@ Completed the final hardening sprint for the AMD Developer Hackathon submission.
 Validated **real on-chain execution** end-to-end on both Base Sepolia and Base Mainnet using the production code path (`web3_async.send_proof_of_execution` / `send_native_transaction`). Discovered and fixed four real bugs that would have broken the Railway deployment. Produced the first live, verifiable mainnet transaction hash for the A2Z Agent B demo.
 
 ### Team Context (AMD Hackathon — Track 3: Unicorn)
-- **aditya** (backend) — Command Center Starlette/PostgreSQL on Railway
-- **zm** (frontend) — Next.js dashboard on Vercel
+- **Aditya** (backend) — Command Center Starlette/PostgreSQL on Railway
+- **Zaki** (frontend) — Next.js dashboard on Vercel
 - **ajinuraji** (infra) — Cloudflare/Vercel glue, login-loop fix
-- **GreyArch | 0xD** (operator) — owns the Base wallets, RPC keys, and on-chain demo
 
 ### Bugs Found & Fixed (all verified live)
 1. **web3 7.x attribute rename** — `signed.rawTransaction` → `signed.raw_transaction`. The old attribute raised `AttributeError` at broadcast. Fixed with a compatible getter (web3 7 + legacy fallback).
