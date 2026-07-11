@@ -481,6 +481,18 @@ async def send_native_transaction(
         acct = get_account()
         to = _to_checksum(to_address)
 
+        # Smart-contract guard: on Base chains a plain native value transfer
+        # to an address WITH code reverts (EIP-7611 / OP-070), wasting gas.
+        # Abort safely before signing/broadcasting. EOAs return no code.
+        if await _is_smart_contract(provider, to):
+            logger.warning(
+                "Target is a Smart Contract, skipping plain ETH transfer to avoid revert: %s",
+                to,
+            )
+            raise RuntimeError(
+                "Target is a Smart Contract, skipping plain ETH transfer to avoid revert"
+            )
+
         nonce = int(
             await provider.call("eth_getTransactionCount", [acct.address, "pending"]),
             16,
@@ -545,6 +557,23 @@ async def _estimate_eip1559_fees(provider, max_gas_price_gwei):
     return max_fee, priority
 
 
+async def _is_smart_contract(provider, address: str) -> bool:
+    """Return True if `address` holds contract bytecode.
+
+    On Base chains (EIP-7611 / OP-070) a plain native value transfer to an
+    address WITH code reverts, wasting gas. Detecting it up front lets the
+    caller abort safely (no broadcast, no gas spent). EOAs return "0x"
+    (len 2); contracts return longer bytecode.
+    """
+    try:
+        code = await provider.call("eth_getCode", [address, "latest"])
+    except Exception:
+        code = None
+    if not code:
+        code = "0x"
+    return len(code) > 2
+
+
 async def send_proof_of_execution() -> str:
     """A2Z Agent B - micro proof-of-execution transfer (live-demo receipt).
 
@@ -567,6 +596,27 @@ async def send_proof_of_execution() -> str:
     micro_eth = float(os.environ.get("MICRO_TX_ETH", "0.00001"))
     value_wei = int(micro_eth * 1e18)
     cap = float(os.environ.get("MAX_GAS_PRICE_GWEI", "0") or "0") or None
+    # Smart-contract guard: a plain ETH transfer to a contract reverts on Base
+    # (EIP-7611), burning gas for nothing. Abort safely before broadcasting.
+    _prov = MultiRpcProvider(
+        rpc_urls=[u for u in [
+            os.environ.get("BASE_SEPOLIA_RPC", ""),
+            os.environ.get("BASE_SEPOLIA_RPC_1", ""),
+            os.environ.get("BASE_SEPOLIA_RPC_2", ""),
+        ] if u],
+        chain_id=84532,
+    )
+    try:
+        if await _is_smart_contract(_prov, _to_checksum(vault)):
+            logger.warning(
+                "Target is a Smart Contract, skipping plain ETH transfer to avoid revert: %s",
+                vault,
+            )
+            raise RuntimeError(
+                "Target is a Smart Contract, skipping plain ETH transfer to avoid revert"
+            )
+    finally:
+        await _prov.close()
     return await send_native_transaction(
         vault, value_wei, chain_id=84532, max_gas_price_gwei=cap
     )
