@@ -61,7 +61,16 @@ export function createAgentSocket(handlers: WsMessageHandlers): AgentSocketContr
   const connect = () => {
     if (closed) return;
     setStatus("connecting");
-    socket = new WebSocket(buildWsUrl());
+
+    // Backend WS auth travels via Sec-WebSocket-Protocol subprotocol
+    // (browsers cannot set arbitrary handshake headers). Send the
+    // API_KEY (NEXT_PUBLIC_API_KEY) as the subprotocol; the backend
+    // also accepts a JWT. Without this the server closes with 1008 (403).
+    const wsToken = process.env.NEXT_PUBLIC_API_KEY || "";
+    const protocols = wsToken ? [wsToken] : [];
+    socket = protocols.length
+      ? new WebSocket(buildWsUrl(), protocols)
+      : new WebSocket(buildWsUrl());
 
     socket.onopen = () => {
       backoff = INITIAL_BACKOFF_MS;
