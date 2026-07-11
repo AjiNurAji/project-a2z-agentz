@@ -21,7 +21,7 @@ The project transitioned from a generic inference stack to a fully AMD-native pi
 | **Aditya** (axzss) | https://github.com/axzss | Backend lead (Command Center) | GitHub `GreyArch`; owns `base-tenfold` (Solidity gas-optimized deploy), `pharos-testnet-auto` (Python), `Base-Learn-Guild`. 16 public repos, joined 2023. |
 | **Aji Nur Aji** (AjiNurAji) | https://github.com/AjiNurAji | Infra / DevOps / glue | Bio "Let's Learn"; blog ajinuraji.my.id; 39 public repos (web/php/html focus: secret-message-reactjs, absenq-php-native, courselab). Fixed the Vercel login-loop. Indonesia. |
 | **Zacky Muhammad Dinata** (zmdinata) | https://github.com/zmdinata | Frontend lead (dashboard) | Info Systems student, AI Engineering interest; 16 repos (MyPortfolio, Belajar-AI-Engineering, Belajar-Data-Science). Dominant commit author on `dashboard/`. Joined 2025. |
-| **GreyArch \| 0xD** (operator) | — | Operator / on-chain demo / wallets / RPC | Owns Base wallets, RPC keys, Cloudflare tunnel. Executed real on-chain proof-of-execution (Session 28). Local git author `GreyArch`. |
+
 
 **Communication & workflow:** casual Indonesian ("bro"); commits must be English + NO teammate names (per operator rule). Preserve teammates' config — patch complementary areas only. Push held until operator confirms.
 
