@@ -411,3 +411,159 @@ def sign_payload(
     message = encode_defunct(text=canonical)
     signed = account.sign_message(message)
     return signed.signature.hex()
+
+
+# ---------------------------------------------------------------------------
+# Real on-chain execution (Agent B / manual trigger)
+# ---------------------------------------------------------------------------
+from eth_utils import to_checksum_address as _to_checksum  # noqa: E402
+
+
+def _usd_to_wei_real(amount_usd: float) -> int:
+    """Convert a USD amount to wei using a configured ETH price.
+
+    The placeholder `_usd_to_wei` (1 USD = 1e15 wei) is for the mock path only.
+    Real execution MUST use a real price so the vault never sends a bogus
+    amount. Operator sets ETH_USD_PRICE (e.g. "3000"); if missing we refuse
+    instead of guessing.
+    """
+    price = float(os.environ.get("ETH_USD_PRICE", "0") or "0")
+    if price <= 0:
+        raise RuntimeError("ETH_USD_PRICE not configured; refusing USD->wei conversion")
+    eth_amount = float(amount_usd) / price
+    return int(eth_amount * 1e18)
+
+
+async def send_native_transaction(
+    to_address: str,
+    value_wei: int,
+    *,
+    chain_id: int | None = None,
+    max_gas_price_gwei: float | None = None,
+) -> str:
+    """EIP-1559 (type-2) sign + broadcast of a native (ETH) transfer.
+
+    Built with explicit type-2 fields and live fee estimation (the web3
+    ``build_transaction`` + ``sign_transaction`` equivalent), not legacy
+    gasPrice. Returns the real tx hash hex.
+
+    Gas safety (the "don't be wasteful" guard):
+      * gas limit fixed to 21000 (plain native transfer - nothing cheaper)
+      * maxPriorityFeePerGas = eth_maxPriorityFeePerGas (fallback 1.5 gwei)
+      * maxFeePerGas = base_fee(eth_gasPrice) + priority, hard-capped at
+        max_gas_price_gwei so the vault never over-pays
+      * aborts if wallet balance < value + estimated gas cost (never
+        broadcasts a tx that would revert for lack of funds)
+
+    RPC selection: chain_id 84532 -> BASE_SEPOLIA_RPC / BASE_SEPOLIA_RPC_*,
+    otherwise BASE_RPC_* / BASE_RPC_4. Keeps a Sepolia tx off mainnet RPCs.
+    """
+    if not _SIGNING_AVAILABLE:
+        raise RuntimeError("eth_account not installed (on-chain sending unavailable)")
+    cid = chain_id or BASE_CHAIN_ID
+    if cid == 84532:
+        rpc_urls = [u for u in [
+            os.environ.get("BASE_SEPOLIA_RPC", ""),
+            os.environ.get("BASE_SEPOLIA_RPC_1", ""),
+            os.environ.get("BASE_SEPOLIA_RPC_2", ""),
+        ] if u]
+    else:
+        rpc_urls = [u for u in [
+            os.environ.get("BASE_RPC_1", ""),
+            os.environ.get("BASE_RPC_2", ""),
+            os.environ.get("BASE_RPC_3", ""),
+            os.environ.get("BASE_RPC_4", ""),
+        ] if u]
+    if not rpc_urls:
+        raise RuntimeError(f"No RPC endpoints configured for chain_id={cid}")
+    provider = MultiRpcProvider(rpc_urls=rpc_urls, chain_id=cid)
+    try:
+        acct = get_account()
+        to = _to_checksum(to_address)
+
+        nonce = int(
+            await provider.call("eth_getTransactionCount", [acct.address, "pending"]),
+            16,
+        )
+        max_fee, max_priority = await _estimate_eip1559_fees(provider, max_gas_price_gwei)
+        gas_limit = 21000
+        estimated_gas_cost = max_fee * gas_limit
+
+        balance = await provider.eth_get_balance(acct.address)
+        if balance < value_wei + estimated_gas_cost:
+            raise RuntimeError(
+                f"Insufficient balance: have {balance / 1e18:.6f} ETH, need "
+                f"{(value_wei + estimated_gas_cost) / 1e18:.6f} ETH (value + gas)"
+            )
+
+        tx = {
+            "type": 2,
+            "nonce": nonce,
+            "to": to,
+            "value": value_wei,
+            "gas": gas_limit,
+            "maxFeePerGas": max_fee,
+            "maxPriorityFeePerGas": max_priority,
+            "chainId": cid,
+        }
+        signed = acct.sign_transaction(tx)
+        raw = (
+            signed.rawTransaction.hex()
+            if isinstance(signed.rawTransaction, (bytes, bytearray))
+            else signed.rawTransaction
+        )
+        tx_hash = await provider.call("eth_sendRawTransaction", [raw])
+        logger.info(
+            "on-chain send ok: chain=%s type=2 to=%s value_wei=%d maxFee=%d priority=%d hash=%s",
+            cid, to, value_wei, max_fee, max_priority, tx_hash,
+        )
+        return tx_hash
+    finally:
+        await provider.close()
+
+
+async def _estimate_eip1559_fees(provider, max_gas_price_gwei):
+    """Return (maxFeePerGas, maxPriorityFeePerGas) in wei for a type-2 tx."""
+    try:
+        priority = int(await provider.call("eth_maxPriorityFeePerGas", []), 16)
+    except Exception:
+        priority = int(1.5 * 1e9)
+    if priority <= 0:
+        priority = int(1.5 * 1e9)
+    try:
+        base_fee = int(await provider.call("eth_gasPrice", []), 16)
+    except Exception:
+        base_fee = int(1.0 * 1e9)
+    max_fee = base_fee + priority
+    if max_gas_price_gwei:
+        cap = int(max_gas_price_gwei * 1e9)
+        max_fee = min(max_fee, cap)
+        priority = min(priority, cap)
+    return max_fee, priority
+
+
+async def send_proof_of_execution() -> str:
+    """A2Z Agent B - micro proof-of-execution transfer (live-demo receipt).
+
+    Sends a tiny fixed amount of native ETH (MICRO_TX_ETH, default 0.00001)
+    to the operator's VAULT_ADDRESS EXCLUSIVELY on Base Sepolia (chain 84532).
+    This is the on-chain "I actually executed" receipt for judges: a valid
+    TxHash on sepolia.basescan.org, no token liquidity needed, negligible gas.
+
+    Requires: VAULT_ADDRESS (resolved 0x, not a .eth name - raw RPC cannot
+    resolve ENS), MICRO_TX_ETH optional, MAX_GAS_PRICE_GWEI optional cap.
+    """
+    vault = os.environ.get("VAULT_ADDRESS", "").strip()
+    if not vault:
+        raise RuntimeError("VAULT_ADDRESS not set; cannot send proof-of-execution")
+    if vault.lower().endswith(".eth"):
+        raise RuntimeError(
+            "VAULT_ADDRESS must be the resolved 0x address (raw RPC cannot "
+            "resolve ENS names). Resolve your .eth name to its address first."
+        )
+    micro_eth = float(os.environ.get("MICRO_TX_ETH", "0.00001"))
+    value_wei = int(micro_eth * 1e18)
+    cap = float(os.environ.get("MAX_GAS_PRICE_GWEI", "0") or "0") or None
+    return await send_native_transaction(
+        vault, value_wei, chain_id=84532, max_gas_price_gwei=cap
+    )

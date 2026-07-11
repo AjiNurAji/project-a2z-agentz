@@ -696,6 +696,22 @@ def insert_transaction_proposal(synthesis_id: int, amount_usd: float, gnosis_saf
         return None
 
 
+def update_proposal_hash(proposal_id: int, tx_hash: str) -> bool:
+    """Persist the REAL on-chain tx hash onto a transaction proposal."""
+    query = """
+    UPDATE transaction_proposals
+    SET gnosis_safe_tx_hash = %s, status = 'EXECUTED', updated_at = CURRENT_TIMESTAMP
+    WHERE id = %s;
+    """
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (tx_hash, proposal_id))
+        return True
+    except psycopg2.Error as exc:
+        logger.error('update_proposal_hash failed: %s', exc)
+        return False
+
+
 def append_audit_log(event_type: str, description: str, metadata: dict | None = None) -> None:
     query = """
     INSERT INTO audit_log (event_type, description, metadata)

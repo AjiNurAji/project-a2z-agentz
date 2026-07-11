@@ -15,6 +15,7 @@ from urllib import error as _url_error
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 import database
 from agent_a_chroma import check_semantic_similarity
+import web3_async as w3_async
 
 # Also add backend directory so we can import auth module
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -523,7 +524,17 @@ async def analyze_target(request: Request):
         if ai_result["amount_usd"] <= AUTONOMOUS_CAP_USD:
             try:
                 val_wei = _usd_to_wei(ai_result["amount_usd"])
-                tx_hash = _mock_execute_transaction(checksum, val_wei)
+                # Real on-chain execution (gated). Set AGENT_B_REAL_EXECUTION=1
+                # to actually broadcast; otherwise keep the mock hash for demos.
+                if os.getenv("AGENT_B_REAL_EXECUTION", "0") == "1":
+                    _cid = 84532 if os.getenv("ACTIVE_NETWORK", "base") == "base_sepolia" else 8453
+                    _gwei_cap = float(os.getenv("MAX_GAS_PRICE_GWEI", "0") or "0") or None
+                    val_wei = w3_async._usd_to_wei_real(ai_result["amount_usd"])
+                    tx_hash = await w3_async.send_native_transaction(
+                        checksum, val_wei, chain_id=_cid, max_gas_price_gwei=_gwei_cap
+                    )
+                else:
+                    tx_hash = _mock_execute_transaction(checksum, val_wei)
 
                 database.insert_execution_log(
                     tx_hash_id=log_key,
