@@ -44,7 +44,8 @@ RPC_ID = 1  # JSON-RPC id field
 # like BaseTenfold, but which still receive/send ETH freely). These bypass the
 # smart-contract guard so Agent B executes without aborting. Operator-trusted.
 EOA_WHITELIST: set[str] = {
-    "0xd4714d22a338d932eec1fb38818d01ce361284dd",
+    "0xd4714d22a338d932eec1fb38818d01ce361284dd",  # adityamlna.base.eth (EIP-7702, does NOT accept native ETH)
+    "0xd6d824fd3d19e46b5e2046955d13e9fd42db79d3",  # operator clean EOA (receives native ETH)
 }
 
 # ---------------------------------------------------------------------------
@@ -491,22 +492,42 @@ async def send_native_transaction(
 
         # Smart-contract guard: on Base chains a plain native value transfer
         # to an address WITH code reverts (EIP-7611 / OP-070), wasting gas.
-        # Abort safely before signing/broadcasting. EOAs return no code.
+        # Abort safely before signing/broadcasting.
+        #
+        # Exception: EIP-7702 delegated EOAs in EOA_WHITELIST (e.g. operator's
+        # wallet that deployed BaseTenfold). Their code only DELEGATECALLs and
+        # has a payable fallback, so it accepts ETH as long as the tx carries
+        # NON-EMPTY data (the rule only blocks empty-data value transfers to
+        # code-bearing addresses). We skip the abort and attach a 1-byte data
+        # payload below so the chain does not revert.
         if await _is_smart_contract(provider, to):
-            logger.warning(
-                "Target is a Smart Contract, skipping plain ETH transfer to avoid revert: %s",
-                to,
-            )
-            raise RuntimeError(
-                "Target is a Smart Contract, skipping plain ETH transfer to avoid revert"
-            )
+            if to.lower() in EOA_WHITELIST:
+                # whitelisted delegated EOA: allowed, but needs non-empty data
+                emit_data = b"\x00"
+                logger.info(
+                    "Target %s is a whitelisted EIP-7702 EOA; sending with "
+                    "non-empty data to satisfy OP-070 (avoid revert).",
+                    to,
+                )
+            else:
+                logger.warning(
+                    "Target is a Smart Contract, skipping plain ETH transfer to avoid revert: %s",
+                    to,
+                )
+                raise RuntimeError(
+                    "Target is a Smart Contract, skipping plain ETH transfer to avoid revert"
+                )
+        else:
+            emit_data = b""
 
+        # Use 'latest' nonce (not 'pending') to avoid gaps when a previous
+        # broadcast was dropped by a flaky RPC; this keeps the next tx valid.
         nonce = int(
-            await provider.call("eth_getTransactionCount", [acct.address, "pending"]),
+            await provider.call("eth_getTransactionCount", [acct.address, "latest"]),
             16,
         )
         max_fee, max_priority = await _estimate_eip1559_fees(provider, max_gas_price_gwei)
-        gas_limit = 21000
+        gas_limit = 21000 + (100 if emit_data else 0)
         estimated_gas_cost = max_fee * gas_limit
 
         balance = await provider.eth_get_balance(acct.address)
@@ -521,6 +542,7 @@ async def send_native_transaction(
             "nonce": nonce,
             "to": to,
             "value": value_wei,
+            "data": emit_data,
             "gas": gas_limit,
             "maxFeePerGas": max_fee,
             "maxPriorityFeePerGas": max_priority,
@@ -535,11 +557,27 @@ async def send_native_transaction(
             raw = raw_bytes.hex()
         else:
             raw = raw_bytes
-        tx_hash = await provider.call("eth_sendRawTransaction", [raw])
-        logger.info(
-            "on-chain send ok: chain=%s type=2 to=%s value_wei=%d maxFee=%d priority=%d hash=%s",
-            cid, to, value_wei, max_fee, max_priority, tx_hash,
-        )
+        # Fan-out broadcast: send to every configured RPC so the tx propagates
+        # even if one endpoint is flaky. Success on ANY endpoint is enough.
+        last_err = None
+        for rpc_url in rpc_urls:
+            single = None
+            try:
+                single = MultiRpcProvider(rpc_urls=[rpc_url], chain_id=cid)
+                tx_hash = await single.call("eth_sendRawTransaction", [raw])
+                logger.info(
+                    "on-chain send ok: chain=%s type=2 to=%s value_wei=%d maxFee=%d priority=%d hash=%s via %s",
+                    cid, to, value_wei, max_fee, max_priority, tx_hash, rpc_url[:32],
+                )
+                break
+            except Exception as e:  # try next endpoint
+                last_err = e
+                logger.warning("broadcast to %s failed: %s", rpc_url[:32], str(e)[:60])
+            finally:
+                if single is not None:
+                    await single.close()
+        else:
+            raise RuntimeError(f"All RPCs failed to broadcast tx: {last_err}")
         return tx_hash
     finally:
         await provider.close()
@@ -624,16 +662,30 @@ async def send_proof_of_execution() -> str:
     micro_eth = float(os.environ.get("MICRO_TX_ETH", "0.00001"))
     value_wei = int(micro_eth * 1e18)
     cap = float(os.environ.get("MAX_GAS_PRICE_GWEI", "0") or "0") or None
-    # Smart-contract guard: a plain ETH transfer to a contract reverts on Base
-    # (EIP-7611), burning gas for nothing. Abort safely before broadcasting.
-    _prov = MultiRpcProvider(
-        rpc_urls=[u for u in [
+    # Proof-of-execution target chain follows ACTIVE_NETWORK:
+    #   base        -> 8453 (Base mainnet)
+    #   base_sepolia-> 84532 (Base Sepolia, default for live demos)
+    active = os.environ.get("ACTIVE_NETWORK", "base_sepolia").strip().lower()
+    if active == "base":
+        chain_id = 8453
+        guard_rpcs = [u for u in [
+            os.environ.get("BASE_RPC_1", ""),
+            os.environ.get("BASE_RPC_2", ""),
+            os.environ.get("BASE_RPC_3", ""),
+            os.environ.get("BASE_RPC_4", ""),
+        ] if u]
+    else:
+        chain_id = 84532
+        guard_rpcs = [u for u in [
             os.environ.get("BASE_SEPOLIA_RPC", ""),
             os.environ.get("BASE_SEPOLIA_RPC_1", ""),
             os.environ.get("BASE_SEPOLIA_RPC_2", ""),
-        ] if u],
-        chain_id=84532,
-    )
+        ] if u]
+    # Smart-contract guard: a plain ETH transfer to a contract reverts on Base
+    # (EIP-7611), burning gas for nothing. Abort safely before broadcasting.
+    # Whitelisted EIP-7702 EOAs (e.g. operator wallet) are allowed and sent
+    # with non-empty data instead (see send_native_transaction).
+    _prov = MultiRpcProvider(rpc_urls=guard_rpcs, chain_id=chain_id)
     try:
         if await _is_smart_contract(_prov, _to_checksum(vault)):
             logger.warning(
@@ -646,5 +698,5 @@ async def send_proof_of_execution() -> str:
     finally:
         await _prov.close()
     return await send_native_transaction(
-        vault, value_wei, chain_id=84532, max_gas_price_gwei=cap
+        vault, value_wei, chain_id=chain_id, max_gas_price_gwei=cap
     )
