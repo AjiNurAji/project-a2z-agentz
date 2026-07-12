@@ -9,6 +9,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import time
 from typing import Any
 
@@ -168,8 +169,7 @@ async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_
     temperature = float(os.getenv("AGENT_B_TEMPERATURE", "0.1"))
     max_tokens = int(os.getenv("AGENT_B_MAX_TOKENS", "1024"))
     prompt = (
-        "You are Agent B (The Vault Gatekeeper), a strict anti-rug security validator on Base Network. "
-        "Evaluate this token for honeypot / scam / rug-pull risk using the provided GoPlus security report and market data.\n"
+        "You are Agent B (The Vault Gatekeeper), a strict anti-rug security validator on Base Network.\n"
         f"Token: {token_name}\n"
         f"Address: {contract_address}\n"
         f"GoPlus: {goplus_summary}\n"
@@ -177,9 +177,9 @@ async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_
     if dex_context:
         prompt += f"Market: {dex_context}\n"
     prompt += (
-        "\nRespond with ONLY a valid JSON object, no prose, no markdown fences. Schema:\n"
+        "\nOutput ONLY a single JSON object and NOTHING ELSE. No prose, no explanation, no markdown.\n"
         '{"score": <int 0-100>, "category": <one of defi|nft|social|gaming|infrastructure|airdrop|other>, '
-        '"reason": <string <=200 chars>, "amount_usd": <float 0.00-2.00>, "model": "<model_id>"}\n\n'
+        '"reason": <string <=200 chars>, "amount_usd": <float 0.00-2.00>, "model": "<model_id>"}\n'
         "Rules:\n"
         "- score>=85 AND no honeypot/tax/ownership red flags -> approve (amount_usd up to 2.00)\n"
         "- ANY honeypot flag, buy/sell tax >10%, or ownership-not-renounced risk -> score<=20, reject (amount_usd=0)\n"
@@ -225,20 +225,43 @@ async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_
     if not content:
         _code = getattr(resp, "status_code", "?")
         return {"score": 0, "reason": f"http {_code}", "amount_usd": 0.0, "model": model_id, "latency_ms": _latency}
-    try:
-        parsed = json.loads(content)
-        if isinstance(parsed, dict):
-            return {
-                "score": int(parsed.get("score", 0) or 0),
-                "reason": str(parsed.get("reason", "")),
-                "amount_usd": float(parsed.get("amount_usd", 0) or 0),
-                "category": str(parsed.get("category", "unknown")),
-                "model": str(parsed.get("model", model_id)),
-                "latency_ms": _latency,
-            }
-    except Exception:
-        pass
-    return {"score": 0, "reason": content[:200], "amount_usd": 0.0, "model": model_id}
+    # Some models wrap JSON in explanatory prose. Extract the first balanced
+    # {...} object rather than json.loads() on the whole (often non-JSON) text.
+    parsed = None
+    _candidate = content.strip()
+    if _candidate.startswith("{"):
+        try:
+            parsed = json.loads(_candidate)
+        except Exception:
+            parsed = None
+    if parsed is None:
+        # Non-greedy match of the JSON object that actually carries our
+        # schema (starts with "score"), so stray {} in prose is ignored.
+        _m = re.search(r'\{\s*"score"\s*:.*?\}', _candidate, re.DOTALL)
+        if _m:
+            try:
+                parsed = json.loads(_m.group(0))
+            except Exception:
+                parsed = None
+    # Also handle ```json ... ``` fences
+    if parsed is None:
+        _m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", _candidate, re.DOTALL)
+        if _m:
+            try:
+                parsed = json.loads(_m.group(1))
+            except Exception:
+                parsed = None
+    if isinstance(parsed, dict):
+        return {
+            "score": int(parsed.get("score", 0) or 0),
+            "reason": str(parsed.get("reason", ""))[:200],
+            "amount_usd": float(parsed.get("amount_usd", 0) or 0),
+            "category": str(parsed.get("category", "unknown")),
+            "model": str(parsed.get("model", model_id)),
+            "latency_ms": _latency,
+        }
+    # Final fallback: keep raw text so logs show what the model actually said.
+    return {"score": 0, "reason": content[:200], "amount_usd": 0.0, "model": model_id, "latency_ms": _latency}
 
 
 async def process_task(task: dict[str, Any]) -> None:
