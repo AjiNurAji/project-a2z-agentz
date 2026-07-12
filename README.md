@@ -14,7 +14,7 @@ A2Z Agentz splits responsibility between two autonomous agents ("two houses") th
 │                                                 │      │                                                │
 │  • OSINT scraper (DexScreener + Neynar)        │ ───▶ │  • Pulls scored targets from scraping_queue     │
 │  • LLM scoring + category + reasoning          │      │  • GoPlus token-security gate (rug/pull check)  │
-│  • LLM: Qwen2.5-72B-Instruct-AWQ               │      │  • LLM: DeepSeek-V4-Flash via Fireworks AI       │
+│  • LLM: Llama-3.1-8B-Instruct-AWQ              │      │  • LLM: DeepSeek-V4-Flash via Fireworks AI       │
 │  • Hardware: AMD Instinct™ MI300X (ROCm vLLM)  │      │  • Hardware: Fireworks cloud (DeepSeek V4 Flash) │
 │  • Exposed as OpenAI-compatible /v1 endpoint    │      │  • Signs + broadcasts native transfers on Base   │
 └─────────────────────────────────────────────┘      └──────────────────────────────────────────┘
@@ -37,7 +37,7 @@ A2Z Agentz splits responsibility between two autonomous agents ("two houses") th
 Every inference round-trip is traced with an explicit log marker for jury verification:
 ```
 [AMD MI300X COMPUTE] Executing payload to ROCm vLLM endpoint=... model=Qwen/Qwen2.5-72B-Instruct-AWQ
-[AMD MI300X COMPUTE] vLLM returned | model=Qwen/Qwen2.5-72B-Instruct-AWQ latency=XXXms score=YY
+[AMD MI300X COMPUTE] vLLM returned | model=Qwen/Llama-3.1-8B-Instruct-AWQlatency=XXXms score=YY
 ```
 
 ---
@@ -62,7 +62,7 @@ All Agent A inference is executed on **AMD Instinct™ GPUs** through the ROCm s
 
 | Layer | Technology |
 |---|---|
-| AI Inference (House A) | vLLM on ROCm, Qwen2.5-72B-Instruct-AWQ |
+| AI Inference (House A) | vLLM on ROCm, Llama-3.1-8B-Instruct-AWQ|
 | AI Inference (House B) | Fireworks AI, DeepSeek-V4-Flash |
 | Backend | Python 3.12, Starlette / FastAPI, APScheduler |
 | Database | PostgreSQL 15 (FIFO queues, `SKIP LOCKED`) |

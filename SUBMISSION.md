@@ -44,7 +44,7 @@ A2Z Agentz is architected to **prove AMD compute usage beyond doubt**:
 
 1. AMD Jupyter terminal showing the vLLM launch command and `rocm-smi` output.
 2. Cloudflare tunnel URL resolving to the AMD instance.
-3. Backend log showing `AI endpoint OK | model=Qwen/Qwen2.5-72B-Instruct-AWQ latency=XXXms`.
+3. Backend log showing `AI endpoint OK | model=Qwen/Llama-3.1-8B-Instruct-AWQlatency=XXXms`.
 4. Dashboard view with live logs + transaction result.
 
 ## 🚨 Disqualification Guardrails

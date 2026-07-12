@@ -9,7 +9,7 @@ This document records the project's change history chronologically, capturing fi
 A2Z Agentz is an autonomous multi-agent system built for the AMD Developer Hackathon (Track 3: Unicorn). The architecture follows a split-model design:
 
 - **Command Center (VPS):** Starlette backend, PostgreSQL, Web3 RPC, auth, dashboard
-- **AI Brain (AMD GPU Server):** vLLM on ROCm serving Qwen/Qwen2.5-72B-Instruct-AWQ via OpenAI-compatible API
+- **AI Brain (AMD GPU Server):** vLLM on ROCm serving Qwen/Llama-3.1-8B-Instruct-AWQvia OpenAI-compatible API
 - **Bridge:** Cloudflare Quick Tunnel exposing the AMD inference endpoint to the Command Center
 
 The project transitioned from a generic inference stack to a fully AMD-native pipeline, with a separate Security Gatekeeper layer (Agent B) handling GoPlus risk screening and transaction validation.
@@ -671,7 +671,7 @@ Completed the final hardening sprint for the AMD Developer Hackathon submission.
 - Authored `TEAM_ROADMAP.md` — Phase-gated execution plan for aditya, zm, ajinuraji
 - Updated `SUBMISSION.md` — Removed legacy NVIDIA/CUDA negative examples (kept vLLM on ROCm only)
 - Updated `docs/01-architecture.md` — Added explicit "Active Lane Separation" section documenting:
-  - Lane 1: Active Inference Engine (Agent A → Qwen/Qwen2.5-72B-Instruct-AWQ on AMD MI300X via ROCm)
+  - Lane 1: Active Inference Engine (Agent A → Qwen/Llama-3.1-8B-Instruct-AWQon AMD MI300X via ROCm)
   - Lane 2: Active Security Gatekeeper (Agent B → GoPlus + Fireworks AI Llama 3.1 8B backup)
 
 #### 5. Code Quality Standards

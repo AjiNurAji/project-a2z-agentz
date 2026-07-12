@@ -16,7 +16,7 @@ Agent A inference runs **100% on the AMD stack** — not a generic Qwen/Qwen2.5-
 | Layer | Tooling |
 |---|---|
 | **Fine-tuning Platform** | **AMD AI Workbench** (no-code GUI, ROCm-backed) |
-| **Base Model** | Qwen/Qwen2.5-72B-Instruct-AWQ (pre-trained) |
+| **Base Model** | Qwen/Llama-3.1-8B-Instruct-AWQ(pre-trained) |
 | **Fine-tune Method** | LoRA / QLoRA adapter on a Web3 sentiment dataset |
 | **Deployment Format** | **AMD Inference Microservice (vLLM)** — containerized |
 | **Serving Engine** | **vLLM** on AMD Instinct MI300X (ROCm backend) |
@@ -25,7 +25,7 @@ Agent A inference runs **100% on the AMD stack** — not a generic Qwen/Qwen2.5-
 ### Fine-Tune Flow
 
 1. **Dataset Curation**: Collect ~5,000–10,000 examples (Farcaster casts, on-chain announcements) labeled with sentiment (positive / neutral / negative) plus legit / scam labels.
-2. **AMD AI Workbench**: Import dataset → select Qwen/Qwen2.5-72B-Instruct-AWQ base → set hyperparameters (LoRA rank, learning rate) → launch the training job on AMD Instinct MI300X (allocated through AMD Developer Cloud credits).
+2. **AMD AI Workbench**: Import dataset → select Qwen/Llama-3.1-8B-Instruct-AWQbase → set hyperparameters (LoRA rank, learning rate) → launch the training job on AMD Instinct MI300X (allocated through AMD Developer Cloud credits).
 3. **Export Weights**: Export the training result as a LoRA adapter or full weights (`.safetensors` format).
 4. **Wrap for vLLM**: Build a new **AMD Inference Microservice** that loads the weights, tokenizer, and config. This vLLM service is what gets served.
 
@@ -48,7 +48,7 @@ To keep the LLM from hallucinating, Agent A never decides 100% generatively:
 
 ## 4. AMD Performance Advantage
 
-Compared with running a generic Qwen/Qwen2.5-72B-Instruct-AWQ on CPU or non-ROCm GPU hardware:
+Compared with running a generic Qwen/Llama-3.1-8B-Instruct-AWQon CPU or non-ROCm GPU hardware:
 - **Throughput**: vLLM on MI300X delivers > 2,000 tokens/s for batch inference — enough to process 50+ projects in parallel per cron tick.
 - **Latency (TTFT)**: < 100ms time-to-first-token on a single request (critical for real-time UX in the Dashboard).
 - **Cost**: $100 in AMD Developer Cloud credits equals roughly 50 hours of MI300X inference — enough for about 6 weeks of operation (longer than the 4-week hackathon window).

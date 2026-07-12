@@ -83,7 +83,7 @@ graph TD
 ## AMD Pipeline Flow (Core)
 
 ```
-Base Qwen/Qwen2.5-72B-Instruct-AWQ (HuggingFace)
+Base Qwen/Llama-3.1-8B-Instruct-AWQ(HuggingFace)
  │
  ▼
 [AMD AI Workbench — fine-tune on Web3 sentiment dataset]
@@ -201,7 +201,7 @@ Pattern: **Streaming SSR** via the Next.js App Router — simulated real-time da
 ### Lane 1 — Active Inference Engine (Agent A)
 - **Role**: Sentiment analysis and opportunity scoring
 - **Runtime**: vLLM on ROCm / AMD Instinct MI300X
-- **Model**: Qwen/Qwen2.5-72B-Instruct-AWQ (via AMD vLLM)
+- **Model**: Qwen/Llama-3.1-8B-Instruct-AWQ(via AMD vLLM)
 - **Entrypoint**: `AGENT_A_ENDPOINT=https://[tunnel].trycloudflare.com/v1`
 
 ### Lane 2 — Active Security Gatekeeper (Agent B)
