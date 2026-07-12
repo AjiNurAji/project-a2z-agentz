@@ -42,7 +42,7 @@
 
 ### Use Cases
 
-1. **Fine-tuning LLMs** — Llama, DeepSeek, Mistral, Qwen via PyTorch + ROCm. HuggingFace Optimum-AMD provides optimized training pipelines.
+1. **Fine-tuning LLMs** — Llama, DeepSeek, Mistral, Llama via PyTorch + ROCm. HuggingFace Optimum-AMD provides optimized training pipelines.
 2. **Large Model Inference** — 192GB HBM3 easily handles 70B+ models on a single GPU without model parallelism.
 3. **Benchmarking & Prototyping** — test AMD workloads before moving on-prem.
 4. **Hackathon Development** — credits for AMD-sponsored hackathons on lablab.ai.
@@ -59,7 +59,7 @@
 - Choose image: **vLLM Quick Start**
 - Choose plan: MI300X
 - Wait roughly 3 minutes for the Droplet to initialize
-- Result: an **OpenAI-compatible API endpoint** running Llama/Qwen model
+- Result: an **OpenAI-compatible API endpoint** running Llama/Llama model
 
 **Step 3: Call the API**
 
@@ -72,7 +72,7 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
- model="Qwen/Qwen2.5-1.5B-Instruct",
+ model="Llama/Llama2.5-1.5B-Instruct",
  messages=[{"role": "user", "content": "Hello from AMD!"}],
 )
 
@@ -349,7 +349,7 @@ The **AMD AI Developer Program** is a **free** program for building, optimizing,
 ```
 [Web3 sentiment dataset]
  |
-[AMD AI Workbench GUI] -> Fine-tune Qwen/Llama-3.1-8B-Instruct-AWQ-> vLLM-served Web3 scorer
+[AMD AI Workbench GUI] -> Fine-tune Llama/Llama-3.1-8B-Instruct-AWQ-> vLLM-served Web3 scorer
  |
 [vLLM-served weights (.safetensors)]
  |
@@ -376,7 +376,7 @@ The **AMD AI Developer Program** is a **free** program for building, optimizing,
 | Training | AMD AI Workbench | [academy.amd.com](https://academy.amd.com) |
 | Deployment | AMD Inference Microservice (AIM) | [AIM blog](https://rocm.blogs.amd.com/) |
 | Serving | vLLM | [vLLM on AMD](https://rocm.blogs.amd.com/software-tools-optimization/disaggregation/README.html) |
-| Base model | Qwen/Llama-3.1-8B-Instruct-AWQ| HuggingFace |
+| Base model | Llama/Llama-3.1-8B-Instruct-AWQ| HuggingFace |
 | Fine-tune dataset | Custom Web3 sentiment | Internal |
 
 ### 4-Week Hackathon Cost Estimate

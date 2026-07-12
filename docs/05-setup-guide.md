@@ -41,12 +41,12 @@ Access AMD AI Workbench from the AMD Developer Cloud console. This is the no-cod
 # 5. Export the result as a vLLM model server
 ```
 
-Output from this step: a **Qwen/Qwen2.5-72B-Instruct-AWQ** container image ready to serve.
+Output from this step: a **Llama/Llama2.5-72B-Instruct-AWQ** container image ready to serve.
 
 ## Step 3: Start vLLM on the AMD GPU Server
 
 ```bash
-# Deploy Qwen/Llama-3.1-8B-Instruct-AWQvia vLLM on AMD Developer Cloud
+# Deploy Llama/Llama-3.1-8B-Instruct-AWQvia vLLM on AMD Developer Cloud
 # (vLLM is the AMD-recommended serving framework for ROCm)
 
 docker run -d \

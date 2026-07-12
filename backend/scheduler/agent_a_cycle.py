@@ -64,7 +64,7 @@ NEYNAR_CAST_LIMIT = int(os.getenv("AGENT_A_NEYNAR_LIMIT", "3"))
 NEYNAR_MAX_RETRIES = int(os.getenv("NEYNAR_MAX_RETRIES", "2"))
 NEYNAR_BACKOFF_SECONDS = float(os.getenv("NEYNAR_RETRY_BACKOFF_SECONDS", "5"))
 DEFAULT_USER_ID = int(os.getenv("AGENT_A_DEFAULT_USER_ID", "1"))
-# LLM brain for Agent A (Qwen on AMD via Cloudflare tunnel). Falls back to the
+# LLM brain for Agent A (Llama on AMD via Cloudflare tunnel). Falls back to the
 # generic AI_MODEL env if AGENT_A_MODEL is not set. Empty endpoint -> mock.
 AI_MODEL = os.getenv("AGENT_A_MODEL", os.getenv("AI_MODEL", ""))
 AGENT_A_LLM_THRESHOLD = int(os.getenv("AGENT_A_LLM_THRESHOLD", "85"))
@@ -329,7 +329,7 @@ async def run_cycle() -> None:
             }
 
             # ---- Opsi 2 (A2Z Agent-to-Agent): Agent A LLM extraction + sentiment score ----
-            # Agent A calls the AMD GPU brain (Qwen via Cloudflare tunnel) to extract
+            # Agent A calls the AMD GPU brain (Llama via Cloudflare tunnel) to extract
             # a structured verdict from the DexScreener + Farcaster signal, then passes
             # that judgment to Agent B as an enriched payload. Soft-fails to mock so a
             # GPU/tunnel outage never blocks the scout cycle.

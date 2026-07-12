@@ -18,13 +18,13 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 export const metadata: Metadata = {
   title: "A2Z Agent — Autonomous Web3 Scavenger Dashboard",
   description:
-    "Multi-agent AI dashboard for autonomous airdrop discovery and Agent-to-Agent payments on Base Network, powered by AMD Instinct MI300X and AIM-tuned Qwen/Qwen2.5-72B-Instruct-AWQ.",
+    "Multi-agent AI dashboard for autonomous airdrop discovery and Agent-to-Agent payments on Base Network, powered by AMD Instinct MI300X and AIM-tuned Llama/Llama2.5-72B-Instruct-AWQ.",
   metadataBase: new URL("https://a2z-agent.vercel.app"),
   keywords: ["web3", "ai agent", "airdrop", "base network", "autonomous"],
   openGraph: {
     title: "A2Z Agent — Autonomous Web3 Scavenger Dashboard",
     description:
-      "Multi-agent AI dashboard for autonomous airdrop discovery and Agent-to-Agent payments on Base Network, powered by AMD Instinct MI300X and AIM-tuned Qwen/Qwen2.5-72B-Instruct-AWQ.",
+      "Multi-agent AI dashboard for autonomous airdrop discovery and Agent-to-Agent payments on Base Network, powered by AMD Instinct MI300X and AIM-tuned Llama/Llama2.5-72B-Instruct-AWQ.",
     url: "https://a2z-agent.vercel.app",
     siteName: "A2Z Agent",
     type: "website",
@@ -41,7 +41,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "A2Z Agent — Autonomous Web3 Scavenger Dashboard",
     description:
-      "Multi-agent AI dashboard for autonomous airdrop discovery and Agent-to-Agent payments on Base Network, powered by AMD Instinct MI300X and AIM-tuned Qwen/Qwen2.5-72B-Instruct-AWQ.",
+      "Multi-agent AI dashboard for autonomous airdrop discovery and Agent-to-Agent payments on Base Network, powered by AMD Instinct MI300X and AIM-tuned Llama/Llama2.5-72B-Instruct-AWQ.",
     images: ["/opengraph-image"],
   },
 };

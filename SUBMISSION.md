@@ -22,7 +22,7 @@
 A2Z Agentz is architected to **prove AMD compute usage beyond doubt**:
 
 1. **Inference runs on AMD silicon only.** 
- The AI Brain is a dedicated AMD GPU server (AMD AI Developer Program instance) running **vLLM on ROCm** with Qwen/Qwen2.5-72B-Instruct-AWQ.
+ The AI Brain is a dedicated AMD GPU server (AMD AI Developer Program instance) running **vLLM on ROCm** with Llama/Llama2.5-72B-Instruct-AWQ.
 
 2. **Serving stack is AMD-native.** 
  No OpenAI API key is used for production inference. The model is served from a local AMD GPU process and exposed via an OpenAI-compatible API.
@@ -44,7 +44,7 @@ A2Z Agentz is architected to **prove AMD compute usage beyond doubt**:
 
 1. AMD Jupyter terminal showing the vLLM launch command and `rocm-smi` output.
 2. Cloudflare tunnel URL resolving to the AMD instance.
-3. Backend log showing `AI endpoint OK | model=Qwen/Llama-3.1-8B-Instruct-AWQlatency=XXXms`.
+3. Backend log showing `AI endpoint OK | model=Llama/Llama-3.1-8B-Instruct-AWQlatency=XXXms`.
 4. Dashboard view with live logs + transaction result.
 
 ## 🚨 Disqualification Guardrails
