@@ -384,10 +384,26 @@ async def run_cycle() -> None:
             "Agent A cycle done: queued=%s dropped=%s scanned=%s",
             queued, dropped, len(tokens),
         )
+        await manager.broadcast(json.dumps({
+            "type": "AGENT_LOG",
+            "data": {
+                "sender": "agent_a",
+                "content": f"Cycle complete: scanned {len(tokens)} tokens, queued {queued}, dropped {dropped}.",
+                "metadata": {"scanned": len(tokens), "queued": queued, "dropped": dropped},
+            },
+        }))
 
 
 async def main() -> None:
     logger.info("Agent A producer starting")
+    await manager.broadcast(json.dumps({
+        "type": "AGENT_LOG",
+        "data": {
+            "sender": "agent_a",
+            "content": "Agent A (Scout) online. Scanning Base network for opportunities...",
+            "metadata": {"online": True},
+        },
+    }))
     await run_cycle()
 
 

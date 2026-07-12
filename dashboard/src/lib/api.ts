@@ -37,6 +37,14 @@ export async function apiFetch<T = unknown>(
   if (JUDGE_TOKEN && !headers["X-Judge-Token"]) {
     headers["X-Judge-Token"] = JUDGE_TOKEN;
   }
+  // Forward the JWT stored in localStorage (set after login/register) so
+  // cross-site auth works without relying on flaky third-party cookies.
+  if (typeof window !== "undefined") {
+    const stored = window.localStorage.getItem("a2z-token");
+    if (stored && !headers["Authorization"]) {
+      headers["Authorization"] = `Bearer ${stored}`;
+    }
+  }
   const res = await fetch(url, {
     ...options,
     credentials: "include",

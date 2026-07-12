@@ -434,6 +434,14 @@ async def worker_loop(poll_interval: float = 2.0) -> None:
 
   ensure_pipeline_tables()
   logger.info("Agent B worker starting cycle")
+  await manager.broadcast(json.dumps({
+      "type": "AGENT_LOG",
+      "data": {
+          "sender": "agent_b",
+          "content": "Agent B (Vault) online. Monitoring execution queue...",
+          "metadata": {"online": True},
+      },
+  }))
   while True:
     task = fetch_and_lock_pending_task(limit=1)
     if task is None:

@@ -9,10 +9,13 @@ export interface User {
 }
 
 export async function login(email: string, password: string): Promise<User> {
-  const data = await apiFetch<{ user: User }>("/api/auth/login", {
+  const data = await apiFetch<{ user: User; token: string }>("/api/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
+  if (data.token && typeof window !== "undefined") {
+    localStorage.setItem("a2z-token", data.token);
+  }
   return data.user;
 }
 
@@ -21,7 +24,7 @@ export async function register(
   password: string,
   walletAddress?: string
 ): Promise<User> {
-  const data = await apiFetch<{ user: User }>("/api/auth/register", {
+  const data = await apiFetch<{ user: User; token: string }>("/api/auth/register", {
     method: "POST",
     body: JSON.stringify({
       email,
@@ -29,6 +32,9 @@ export async function register(
       ...(walletAddress ? { wallet_address: walletAddress } : {}),
     }),
   });
+  if (data.token && typeof window !== "undefined") {
+    localStorage.setItem("a2z-token", data.token);
+  }
   return data.user;
 }
 

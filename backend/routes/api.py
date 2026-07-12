@@ -41,7 +41,14 @@ def check_auth(request: Request) -> bool:
     if api_key and api_key == API_KEY:
         return True
 
-    token = request.cookies.get("a2z-token")
+    # Accept bearer token from Authorization header (dashboard stores the
+    # JWT in localStorage and forwards it here; cross-site cookies are flaky).
+    auth_header = request.headers.get("Authorization", "")
+    bearer = ""
+    if auth_header.lower().startswith("bearer "):
+        bearer = auth_header[7:].strip()
+
+    token = bearer or request.cookies.get("a2z-token")
     if token == "guest":
         return False
     if token and verify_access_token(token):

@@ -75,12 +75,14 @@ async def login(request: Request):
     # Generate token
     token = create_access_token({"sub": str(user["id"]), "email": user["email"]})
 
-    # Prepare response
+    # Prepare response. Send token in body too so the dashboard can store it
+    # in localStorage and forward it as an Authorization header (works across
+    # Vercel -> Railway domains where cross-site cookies are unreliable).
     user.pop("password_hash", None)
-    response = JSONResponse({"user": user})
+    response = JSONResponse({"user": user, "token": token})
 
-    # Set cookie. Cross-site (Vercel -> Railway) requires SameSite=None
-    # + Secure so the browser stores it over HTTPS.
+    # Still set the cookie (helps same-site / curl use), but the dashboard
+    # prefers the body token.
     response.set_cookie(
         key="a2z-token",
         value=token,
@@ -94,19 +96,26 @@ async def login(request: Request):
     return response
 
 async def me(request: Request):
-    token = request.cookies.get("a2z-token")
+    # Prefer Authorization header (dashboard forwards JWT from localStorage),
+    # fall back to the cookie.
+    auth_header = request.headers.get("Authorization", "")
+    token = ""
+    if auth_header.lower().startswith("bearer "):
+        token = auth_header[7:].strip()
+    if not token:
+        token = request.cookies.get("a2z-token")
     if not token:
         return JSONResponse({"error": "Not authenticated"}, status_code=401)
-    
+
     payload = verify_access_token(token)
     if not payload or "sub" not in payload:
         return JSONResponse({"error": "Invalid or expired token"}, status_code=401)
-    
+
     user_id = int(payload["sub"])
     user = database.get_user_by_id(user_id)
     if not user:
         return JSONResponse({"error": "User not found"}, status_code=401)
-    
+
     return JSONResponse({"user": user})
 
 async def logout(request: Request):
