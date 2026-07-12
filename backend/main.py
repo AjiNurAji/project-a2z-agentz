@@ -43,16 +43,13 @@ async def lifespan(app: Starlette):
         start_scheduler()
         task = asyncio.create_task(poll_and_broadcast())
         # Agent B runs as a dedicated daemon (continuous queue poll) so it
-        # never hits APScheduler's max_instances cap. We run it in a worker
-        # thread via run_in_executor: run_agent_b_daemon calls asyncio.run()
-        # internally to own its own event loop (worker_loop uses
-        # manager.broadcast on the main loop), so it must NOT share the
-        # server's event loop. run_in_executor schedules the sync entrypoint
-        # immediately (no await needed), unlike asyncio.to_thread() whose
-        # result must be awaited.
-        from scheduler.agent_runner import run_agent_b_daemon
-        loop = asyncio.get_event_loop()
-        agent_b_task = loop.run_in_executor(None, run_agent_b_daemon)
+        # never hits APScheduler's max_instances cap. worker_loop is a pure
+        # coroutine (await poll + await process_task + await broadcast) so it
+        # runs directly on the server's event loop via create_task -- no
+        # thread / asyncio.run wrapper needed. This is the reliable way to
+        # start a long-lived background loop in a Starlette lifespan.
+        from scheduler.agent_b_cycle import worker_loop
+        agent_b_task = asyncio.create_task(worker_loop(poll_interval=2.0))
         # Self-heal the system/owner user (id=1) so Agent A's enqueue_target
         # FK (scraping_queue_user_fk) doesn't fail on fresh Railway databases.
         database.ensure_system_user()
@@ -77,14 +74,7 @@ async def lifespan(app: Starlette):
         print("Shutting down A2Z Agentz Backend...")
         stop_scheduler()
         task.cancel()
-        try:
-            agent_b_task.cancel()
-        except AttributeError:
-            # agent_b_task is a coroutine/future from asyncio.to_thread;
-            # cancel() may not exist, ignore on shutdown.
-            pass
-        except Exception:
-            pass
+        agent_b_task.cancel()
         return
     yield
 
