@@ -9,6 +9,12 @@ const PUBLIC_PATHS = ["/", "/login", "/register"];
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get(COOKIE_NAME)?.value;
+  // The dashboard sends the server API key on every request (NEXT_PUBLIC_API_KEY).
+  // Accept it as a lightweight auth signal so the middleware does not bounce
+  // users back to /login when the cross-site JWT cookie is unavailable.
+  const apiKey = request.headers.get("X-API-Key");
+  const expectedKey = process.env.NEXT_PUBLIC_API_KEY || "";
+  const hasAuth = Boolean(token) || (Boolean(apiKey) && Boolean(expectedKey) && apiKey === expectedKey);
 
   const isPublic = PUBLIC_PATHS.includes(pathname);
   const isAuthPage = pathname === "/login" || pathname === "/register";
@@ -24,14 +30,14 @@ export function proxy(request: NextRequest) {
   }
 
   // Unauthenticated user trying to access protected route → redirect to login
-  if (!token && !isPublic && !isAuthPage) {
+  if (!hasAuth && !isPublic && !isAuthPage) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
   // Authenticated user on auth pages → redirect to dashboard
-  if (token && isAuthPage) {
+  if (hasAuth && isAuthPage) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
