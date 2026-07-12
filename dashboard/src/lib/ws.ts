@@ -6,6 +6,8 @@ export interface RawTransaction {
   amount_usd: number;
   status: string;
   created_at: string;
+  project_name?: string;
+  reason?: string;
 }
 
 export interface AgentLogPayload {
