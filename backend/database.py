@@ -618,7 +618,11 @@ def enqueue_target(user_id: int, source: str, project_name: str, target_address:
     INSERT INTO scraping_queue
     (user_id, source, project_name, target_address, data_payload, processing_status)
     VALUES (%s, %s, %s, %s, %s, 'PENDING')
-    ON CONFLICT (target_address) DO NOTHING
+    ON CONFLICT (target_address)
+    DO UPDATE SET
+        processing_status = 'PENDING',
+        data_payload = EXCLUDED.data_payload,
+        updated_at = CURRENT_TIMESTAMP
     RETURNING id;
     """
     try:
