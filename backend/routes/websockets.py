@@ -104,14 +104,29 @@ class WSEndpoint(WebSocketEndpoint):
         allowed_origins = [
             o.strip() for o in os.getenv("FRONTEND_ORIGIN", "").split(",") if o.strip()
         ]
-        if (
-            origin
-            and ".trycloudflare.com" not in origin
-            and "localhost" not in origin
-            and origin not in allowed_origins
-        ):
+        origin_allowed = (
+            not origin
+            or ".trycloudflare.com" in origin
+            or "localhost" in origin
+            or origin in allowed_origins
+        )
+        if not origin_allowed:
             await websocket.close(code=1008)
             return
+
+        # Browsers require CORS headers on the WS upgrade response or they
+        # silently close the socket (curl/python ignore this). Echo the
+        # requesting origin and allow credentials so the Vercel dashboard can
+        # open the socket cross-site.
+        cors_headers = [
+            (b"access-control-allow-origin", origin.encode() or b"*"),
+            (b"access-control-allow-credentials", b"true"),
+            (b"access-control-allow-methods", b"GET, OPTIONS"),
+            (b"access-control-allow-headers", b"*"),
+        ]
+        existing = list(websocket.scope.get("headers", []))
+        existing.extend(cors_headers)
+        websocket.scope["headers"] = existing
 
         # Sec-WebSocket-Protocol may contain several comma/space separated
         # tokens; the client passes exactly one (the token). Accept the first

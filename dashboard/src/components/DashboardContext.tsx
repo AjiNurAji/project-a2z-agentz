@@ -199,21 +199,17 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [agentBStatus, setAgentBStatus] = useState<AgentStatus>("online");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [approvalQueue, setApprovalQueue] = useState<ApprovalItem[]>([]);
-  const [logs, setLogs] = useState<LogEntry[]>([
-    { id: genId(), timestamp: new Date(), level: "INFO", message: "A2Z Dashboard initialized. Connecting to agents..." },
-    { id: genId(), timestamp: new Date(), level: "SUCCESS", message: "Agent A (Scout) connected. vLLM/ROCm server online." },
-    { id: genId(), timestamp: new Date(), level: "SUCCESS", message: "Agent B (Vault) connected. KMS handshake successful." },
-  ]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
   const [vectorMemory, setVectorMemory] = useState<VectorMemoryItem[]>([]);
   const [gasHistory, setGasHistory] = useState<GasDataPoint[]>([]);
   const [tvlHistory, setTvlHistory] = useState<TvlDataPoint[]>([]);
   const [successHistory, setSuccessHistory] = useState<SuccessDataPoint[]>([]);
   const [kpiMetrics, setKpiMetrics] = useState<KpiMetrics>({
-    totalTvlAnalyzed: 42800000,
+    totalTvlAnalyzed: 0,
     successRate: 0,
     totalTransactions: 0,
     gasSavedUsd: 0,
-    projectsScanned: 1247,
+    projectsScanned: 0,
     activeAlerts: 0,
   });
   const [config, setConfig] = useState<DashboardConfig>(DEFAULT_CONFIG);
