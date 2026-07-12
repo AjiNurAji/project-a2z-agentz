@@ -162,13 +162,23 @@ async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_
     temperature = float(os.getenv("AGENT_B_TEMPERATURE", "0.1"))
     max_tokens = int(os.getenv("AGENT_B_MAX_TOKENS", "1024"))
     prompt = (
-        "You are Agent B (The Vault Gatekeeper). Evaluate this Base token for honeypot/rug risk."
-        f" Token: {token_name} Address: {contract_address} GoPlus: {goplus_summary}"
+        "You are Agent B (The Vault Gatekeeper), a strict anti-rug security validator on Base Network. "
+        "Evaluate this token for honeypot / scam / rug-pull risk using the provided GoPlus security report and market data.\n"
+        f"Token: {token_name}\n"
+        f"Address: {contract_address}\n"
+        f"GoPlus: {goplus_summary}\n"
     )
     if dex_context:
-        prompt += f" Market: {dex_context}"
+        prompt += f"Market: {dex_context}\n"
     prompt += (
-        " Return JSON with keys: score (0-100), reason, amount_usd (<=2), category, model."
+        "\nRespond with ONLY a valid JSON object, no prose, no markdown fences. Schema:\n"
+        '{"score": <int 0-100>, "category": <one of defi|nft|social|gaming|infrastructure|airdrop|other>, '
+        '"reason": <string <=200 chars>, "amount_usd": <float 0.00-2.00>, "model": "<model_id>"}\n\n'
+        "Rules:\n"
+        "- score>=85 AND no honeypot/tax/ownership red flags -> approve (amount_usd up to 2.00)\n"
+        "- ANY honeypot flag, buy/sell tax >10%, or ownership-not-renounced risk -> score<=20, reject (amount_usd=0)\n"
+        "- reason MUST cite specific GoPlus evidence (e.g. \"is_honeypot: true\", \"buy_tax: X%\")\n"
+        "- Do NOT approve if security signals are unknown or suspicious."
     )
     # Dynamic model discovery: prefer the actual model id reported by the
     # server itself. Falls back to AGENT_B_MODEL on any failure (timeout,

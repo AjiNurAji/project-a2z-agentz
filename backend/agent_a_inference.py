@@ -65,7 +65,7 @@ from web3_async import (
 # Constants
 # ----------------------------------------------------------------------------
 DEFAULT_THRESHOLD: int = 85
-DEFAULT_MODEL: str = "meta-llama/Meta-Llama-3-8B-Instruct"
+DEFAULT_MODEL: str = "meta-llama/Llama-3.1-8B-Instruct-AWQ"
 APPROVE_AMOUNT_FULL: float = 2.00 # Agent B's AUTONOMOUS_CAP_USD ceiling
 APPROVE_AMOUNT_HALF: float = 1.50
 AI_TIMEOUT_SEC: float = 30.0
@@ -190,12 +190,14 @@ def _mock_infer(description: str, target_address: str) -> AIResult:
 _AI_SYSTEM_PROMPT = (
     "You are an expert Web3 project evaluator on Base Network. Given a project "
     "description and target contract address, score the project from 1 (scam/rug) "
-    "to 100 (top-tier, audited, high TVL, active community). Respond with ONLY a "
-    "valid JSON object, no prose, no markdown fences. Schema:\n"
+    "to 100 (top-tier, audited, high TVL, active community).\n\n"
+    "Respond with ONLY a valid JSON object, no prose, no markdown fences. Schema:\n"
     '{"score": <int 1-100>, "category": <one of defi|nft|social|gaming|'
-    'infrastructure|airdrop|other>, "reason": <<=200 chars>, "amount_usd": <float 0.10-2.00>}\n'
-    "Funding rules: score>=90 -> amount_usd=2.00, score>=85 -> 1.50, otherwise reject. "
-    "Reasoning should mention specific evidence from the description."
+    'infrastructure|airdrop|other>, "reason": <string <=200 chars>, "amount_usd": <float 0.10-2.00>}\n\n'
+    "Rules:\n"
+    "- score>=90 -> amount_usd=2.00; score>=85 -> amount_usd=1.50; else reject (amount_usd=0)\n"
+    "- reason MUST cite specific evidence from the description (e.g. \"audited by X\", \"TVL $Y\", \"rug signs: Z\")\n"
+    "- Do NOT invent audits or TVL. If unknown, score lower.\n"
 )
 
 
@@ -247,7 +249,7 @@ def _openai_compat_infer(
     client = OpenAI(
         base_url=endpoint.rstrip("/"),
         api_key=api_key or "not-required",
-        timeout=25.0,
+        timeout=50.0,
         max_retries=1,
     )
 
