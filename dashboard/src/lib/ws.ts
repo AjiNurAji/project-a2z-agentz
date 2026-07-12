@@ -11,6 +11,9 @@ export interface RawTransaction {
 export interface AgentLogPayload {
   sender: "agent_a" | "agent_b" | "system";
   content: string;
+  log: {
+    data: any;
+  }
   metadata?: {
     txHash?: string;
     score?: number;
