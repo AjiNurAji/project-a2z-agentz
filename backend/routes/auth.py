@@ -79,15 +79,16 @@ async def login(request: Request):
     user.pop("password_hash", None)
     response = JSONResponse({"user": user})
 
-    # Set cookie
+    # Set cookie. Cross-site (Vercel -> Railway) requires SameSite=None
+    # + Secure so the browser stores it over HTTPS.
     response.set_cookie(
         key="a2z-token",
         value=token,
         httponly=True,
         path="/",
         max_age=604800, # 7 days
-        samesite="lax",
-        secure=False # Set to True if HTTPS
+        samesite="none",
+        secure=True
     )
 
     return response
@@ -110,14 +111,15 @@ async def me(request: Request):
 
 async def logout(request: Request):
     response = JSONResponse({"ok": True})
+    # Clear cookie on logout (SameSite=None+Secure to match login)
     response.set_cookie(
         key="a2z-token",
         value="",
         httponly=True,
         path="/",
         max_age=0,
-        samesite="lax",
-        secure=False
+        samesite="none",
+        secure=True
     )
     return response
 

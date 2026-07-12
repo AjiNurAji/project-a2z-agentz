@@ -104,8 +104,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser({ id: 999, email: "judge@a2z.demo", wallet_address: "0xDemoWallet999" });
     if (typeof window !== "undefined") {
       localStorage.setItem("a2z-guest-session", "1");
-      // Set dummy token so it passes middleware if enabled
-      document.cookie = "a2z-token=guest; path=/";
+      // Set dummy token so it passes middleware if enabled.
+      // SameSite=None+Secure required for cross-site (Vercel -> Railway).
+      document.cookie = "a2z-token=guest; path=/; SameSite=None; Secure";
     }
     router.push("/dashboard");
   }, [router]);
