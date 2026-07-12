@@ -46,10 +46,13 @@ async def lifespan(app: Starlette):
         # never hits APScheduler's max_instances cap. worker_loop is a pure
         # coroutine (await poll + await process_task + await broadcast) so it
         # runs directly on the server's event loop via create_task -- no
-        # thread / asyncio.run wrapper needed. This is the reliable way to
-        # start a long-lived background loop in a Starlette lifespan.
+        # thread / asyncio.run wrapper needed.
         from scheduler.agent_b_cycle import worker_loop
-        agent_b_task = asyncio.create_task(worker_loop(poll_interval=2.0))
+        try:
+            agent_b_task = asyncio.create_task(worker_loop(poll_interval=2.0))
+            print("[STARTUP] Agent B daemon task created:", agent_b_task)
+        except Exception as exc:
+            print(f"[STARTUP-ERROR] Agent B daemon failed to start: {exc}")
         # Self-heal the system/owner user (id=1) so Agent A's enqueue_target
         # FK (scraping_queue_user_fk) doesn't fail on fresh Railway databases.
         database.ensure_system_user()

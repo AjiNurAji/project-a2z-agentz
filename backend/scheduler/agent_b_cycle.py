@@ -452,6 +452,7 @@ async def process_task(task: dict[str, Any]) -> None:
 
 
 async def worker_loop(poll_interval: float = 2.0) -> None:
+  logger.info("[AGENT_B_DAEMON] worker_loop entered")
   from database import get_system_config
   if get_system_config("circuit_breaker", "active") == "paused":
     logger.info("Circuit breaker is paused. Agent B skipping cycle.")
