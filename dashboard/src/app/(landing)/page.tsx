@@ -275,7 +275,7 @@ function LandingContent() {
         <div className="flex flex-wrap justify-center lg:justify-end items-center gap-2 md:gap-3 w-full lg:w-auto">
           <span className="px-2 md:px-2.5 py-1 rounded border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]" style={{ background: "color-mix(in srgb, var(--color-neutral-secondary-strong) 50%, transparent)" }}>AIM (AMD Inference Microservice)</span>
           <span className="px-2 md:px-2.5 py-1 rounded border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]" style={{ background: "color-mix(in srgb, var(--color-neutral-secondary-strong) 50%, transparent)" }}>ROCm 6.x</span>
-          <span className="px-2 md:px-2.5 py-1 rounded border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]" style={{ background: "color-mix(in srgb, var(--color-neutral-secondary-strong) 50%, transparent)" }}>SGLang Server</span>
+          <span className="px-2 md:px-2.5 py-1 rounded border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]" style={{ background: "color-mix(in srgb, var(--color-neutral-secondary-strong) 50%, transparent)" }}>vLLM on ROCm</span>
           <span className="px-2 md:px-2.5 py-1 rounded border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]" style={{ background: "color-mix(in srgb, var(--color-neutral-secondary-strong) 50%, transparent)" }}>LangGraph Python</span>
           <span className="px-2 md:px-2.5 py-1 rounded border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]" style={{ background: "color-mix(in srgb, var(--color-neutral-secondary-strong) 50%, transparent)" }}>ChromaDB</span>
         </div>

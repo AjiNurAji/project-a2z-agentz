@@ -418,7 +418,7 @@ async def process_task(task: dict[str, Any]) -> None:
             "data": {
               "sender": "agent_b",
               "content": f"Score {score} >= {MAX_SCORE_FOR_AUTO}. Auto-executing proposal for {token_name}. Amount: ${amount_usd} | Tx: {tx_hash}",
-              "metadata": {"amountUsd": amount_usd, "projectName": token_name, "txHash": tx_hash}
+              "metadata": {"amountUsd": amount_usd, "projectName": token_name, "txHash": tx_hash, "score": score}
             }
           })
         )
