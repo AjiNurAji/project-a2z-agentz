@@ -62,12 +62,7 @@ export function createAgentSocket(handlers: WsMessageHandlers): AgentSocketContr
     if (closed) return;
     setStatus("connecting");
 
-    // WS auth travels via Sec-WebSocket-Protocol (browsers cannot set
-    // arbitrary handshake headers). Send NEXT_PUBLIC_API_KEY so the
-    // Railway backend accepts the handshake; fall back to no subprotocol.
-    const wsToken = process.env.NEXT_PUBLIC_API_KEY || "";
-    const protocols = wsToken ? [wsToken] : [];
-    socket = protocols.length ? new WebSocket(buildWsUrl(), protocols) : new WebSocket(buildWsUrl());
+    socket = new WebSocket(buildWsUrl());
 
     socket.onopen = () => {
       backoff = INITIAL_BACKOFF_MS;
