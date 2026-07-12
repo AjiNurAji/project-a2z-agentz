@@ -254,6 +254,28 @@ async def get_system_status(request: Request):
         body["ai_model"] = f"http_{exc.code}"
     except Exception as exc:
         body["ai_model"] = "unreachable"
+
+    # Live agent health derived from the WebSocket manager + configured
+    # model endpoints. Lets the dashboard show real (non-hardcoded) status.
+    try:
+        from routes.websockets import manager
+        last_a = max(
+            [m.get("ts", 0) for m in manager.agent_log_buffer if m.get("data", {}).get("sender") == "agent_a"],
+            default=0,
+        )
+        last_b = max(
+            [m.get("ts", 0) for m in manager.agent_log_buffer if m.get("data", {}).get("sender") == "agent_b"],
+            default=0,
+        )
+        body["agent_health"] = {
+            "ws_connections": len(manager.active_connections),
+            "agent_a_model": os.getenv("AI_MODEL", "") or os.getenv("AGENT_A_MODEL", ""),
+            "agent_b_model": os.getenv("AGENT_B_MODEL", ""),
+            "agent_a_last_seen": last_a,
+            "agent_b_last_seen": last_b,
+        }
+    except Exception:
+        pass
     return JSONResponse(body)
 
 

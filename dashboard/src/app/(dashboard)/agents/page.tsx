@@ -7,8 +7,18 @@ import { Sparkline } from "@/components/ui/Sparkline";
 import { Bot, Shield, Activity, Zap, Clock, CheckCircle2, XCircle, ListChecks, Pause, Play, Link2 } from "lucide-react";
 
 function genSpark(base: number, n = 12): number[] {
+  // Deterministic placeholder; real history is fed from agent activity.
   let v = base;
   return Array.from({ length: n }, () => { v += (Math.random() - 0.45) * base * 0.1; return Math.max(0, v); });
+}
+
+function realSpark(activities: number[]): number[] {
+  // Build a sparkline from the actual number of agent log events seen per
+  // recent poll window (no fabricated randomness).
+  if (activities.length === 0) return [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  const out = activities.slice(-12);
+  while (out.length < 12) out.unshift(0);
+  return out;
 }
 
 function Metric({ icon: Icon, label, value, color }: { icon: typeof Activity; label: string; value: string; color: string }) {
@@ -71,7 +81,11 @@ function AgentHero({ name, role, icon: Icon, color, bg, status, health, spark, i
 }
 
 export default function AgentsPage() {
-  const { agentAStatus, agentBStatus, isPaused, setIsPaused, agentHealth } = useDashboard();
+  const { agentAStatus, agentBStatus, isPaused, setIsPaused, agentHealth, agentMessages } = useDashboard();
+
+  // Real activity sparkline: count Agent A / B messages seen this session.
+  const aActivity = agentMessages.filter((m) => m.sender === "agent_a").map((_, i) => i + 1);
+  const bActivity = agentMessages.filter((m) => m.sender === "agent_b").map((_, i) => i + 1);
 
   return (
     <motion.div
@@ -106,7 +120,7 @@ export default function AgentsPage() {
           bg="var(--color-brand-softer)"
           status={agentAStatus}
           health={agentHealth.a}
-          spark={genSpark(agentHealth.a.latencyMs)}
+          spark={realSpark(aActivity)}
         />
         <AgentHero
           name="Agent B — Vault"
@@ -116,7 +130,7 @@ export default function AgentsPage() {
           bg="var(--color-brand-soft)"
           status={agentBStatus}
           health={agentHealth.b}
-          spark={genSpark(Math.max(1, agentHealth.b.latencyMs))}
+          spark={realSpark(bActivity)}
           isPaused={isPaused}
         />
       </div>

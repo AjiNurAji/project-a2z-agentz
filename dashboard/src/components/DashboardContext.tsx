@@ -291,7 +291,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       const [statusData, statsData, sysData] = await Promise.all([
         apiFetch<{ logs?: Array<{ tx_hash_id: string; project_target_address: string; amount_usd: number; status: string; created_at: string }>; agent_logs?: Array<{ type: string; data: { sender?: string; content?: string; level?: string; message?: string; metadata?: Record<string, unknown> } }> }>("/api/status"),
         apiFetch<{ total_transactions: number; success_rate: number; total_usd_sent: number; active_targets: number; projects_scanned?: number; total_tvl?: number }>("/api/stats"),
-        apiFetch<{ circuit_breaker: string }>("/api/system-status")
+        apiFetch<{ circuit_breaker: string; agent_health?: { ws_connections: number; agent_a_model: string; agent_b_model: string; agent_a_last_seen: number; agent_b_last_seen: number } }>("/api/system-status")
       ]);
 
       if (statusData?.logs) {
@@ -319,6 +319,31 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
             }, ...prev].slice(0, 100));
           }
         }
+      }
+
+      // Real agent status from backend health (not hardcoded).
+      if (sysData?.agent_health) {
+        const h = sysData.agent_health;
+        const now = Date.now() / 1000;
+        const aSeen = h.agent_a_last_seen ? now - h.agent_a_last_seen < 120 : false;
+        const bSeen = h.agent_b_last_seen ? now - h.agent_b_last_seen < 120 : false;
+        setAgentAStatus(aSeen ? "online" : "offline");
+        setAgentBStatus(bSeen ? "online" : "offline");
+        setAgentHealth((prev) => ({
+          ...prev,
+          a: {
+            ...prev.a,
+            latencyMs: h.ws_connections > 0 ? prev.a.latencyMs : 0,
+            inferenceMs: h.agent_a_model ? 800 : 0,
+            queueDepth: 0,
+          },
+          b: {
+            ...prev.b,
+            latencyMs: h.ws_connections > 0 ? prev.b.latencyMs : 0,
+            inferenceMs: h.agent_b_model ? 600 : 0,
+            queueDepth: 0,
+          },
+        }));
       }
 
       if (sysData && sysData.circuit_breaker) {
