@@ -58,7 +58,7 @@ def start_scheduler() -> None:
         id="agent_b_job",
         name="Agent B Worker Cycle",
         replace_existing=True,
-        max_instances=1,
+        max_instances=3,
     )
 
     scheduler.start()

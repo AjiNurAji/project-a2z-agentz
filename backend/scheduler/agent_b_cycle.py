@@ -457,22 +457,26 @@ async def worker_loop(poll_interval: float = 2.0) -> None:
           "metadata": {"online": True},
       },
   }))
+  # Bounded batch: drain all currently-pending tasks, then RETURN so the
+  # APScheduler job completes. BackgroundScheduler uses max_instances=1, so an
+  # infinite loop here would block every subsequent cycle ("maximum number of
+  # running instances reached"). Agent A re-enqueues tokens (ON CONFLICT DO
+  # UPDATE -> PENDING) so the next scheduled tick picks up fresh scans.
+  processed = 0
   while True:
     task = fetch_and_lock_pending_task(limit=1)
     if task is None:
-      # Keep the worker alive so tokens Agent A enqueues LATER (after this
-      # tick) are still picked up. Breaking here killed the worker on the
-      # first empty poll, leaving the queue stuck in PENDING forever.
-      await asyncio.sleep(poll_interval)
-      continue
+      break
     try:
       await process_task(task)
+      processed += 1
     except Exception as exc:
       logger.error("Agent B task failed: %s", exc, exc_info=True)
       queue_id = task.get("id") if isinstance(task, dict) else getattr(task, "id", None)
       if queue_id is not None:
         update_task_status(queue_id, "FAILED", retry=True)
         append_audit_log("agent_b.error", str(exc), {"queue_id": queue_id})
+  logger.info("Agent B worker cycle done: processed=%s", processed)
 
 
 async def main() -> None:
