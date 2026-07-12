@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM --platform=linux/amd64 python:3.12-slim
 
 RUN apt-get update && apt-get install -y \
     build-essential \
@@ -8,9 +8,7 @@ WORKDIR /app
 
 # Copy requirements first for layer caching
 COPY requirements.txt .
-
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --timeout 60 -r requirements.txt
 
 # Copy entire backend app
 COPY . .

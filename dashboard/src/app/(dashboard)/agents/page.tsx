@@ -76,6 +76,21 @@ function AgentHero({ name, role, icon: Icon, color, bg, status, health, spark, i
         <Metric icon={XCircle} label="Failed" value={health.failCount.toString()} color="var(--color-fg-danger)" />
         <Metric icon={ListChecks} label="Queue" value={health.queueDepth.toString()} color="var(--color-fg-brand-strong)" />
       </div>
+
+      {health.gpu && (
+        <div className="rounded-xl p-4 space-y-3" style={{ background: "var(--color-neutral-secondary-soft)", border: `1px solid var(--color-border-soft)` }}>
+          <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--color-fg-purple)" }}>
+            AMD MI300X GPU · {health.gpu.source}
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <Metric icon={Activity} label="GPU Util" value={`${health.gpu.gpuCacheUsagePct}%`} color="var(--color-fg-purple)" />
+            <Metric icon={Zap} label="Req Running" value={health.gpu.requestsRunning.toString()} color="var(--color-fg-purple)" />
+            <Metric icon={Clock} label="TTFT" value={`${health.gpu.timeToFirstTokenS}s`} color="var(--color-fg-warning)" />
+            <Metric icon={ListChecks} label="Tok/s (gen)" value={health.gpu.generationThroughputTokS.toString()} color="var(--color-fg-cyan)" />
+            <Metric icon={Bot} label="Tok/s (prompt)" value={health.gpu.promptThroughputTokS.toString()} color="var(--color-fg-cyan)" />
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }

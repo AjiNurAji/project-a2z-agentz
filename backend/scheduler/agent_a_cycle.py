@@ -343,12 +343,13 @@ async def run_cycle() -> None:
                     "reason": ai.reason,
                     "amount_usd": ai.amount_usd,
                     "model": ai.model,
+                    "latency_ms": ai.latency_ms,
                 }
                 payload["agent_a_passed"] = ai.score >= AGENT_A_LLM_THRESHOLD
                 append_audit_log(
                     "agent_a.llm",
-                    f"LLM score={ai.score} passed={payload['agent_a_passed']} for {address}",
-                    {"address": address, "score": ai.score, "model": ai.model},
+                    f"LLM score={ai.score} passed={payload['agent_a_passed']} latency={ai.latency_ms}ms for {address}",
+                    {"address": address, "score": ai.score, "model": ai.model, "latency_ms": ai.latency_ms},
                 )
             except Exception as exc:
                 logger.warning("Agent A LLM analysis skipped (fallback mock): %s", exc)

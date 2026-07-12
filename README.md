@@ -1,131 +1,107 @@
-# 🤖 A2Z Agentz — Autonomous A2A Payment Agent on AMD
+# A2Z Agentz — Autonomous Agent-to-Agent Web3 Payment Engine on AMD
 
-A2Z Agentz is an **autonomous multi-agent system** that identifies high-quality Web3 opportunities (DeFi / Airdrop), scores them via an LLM, and settles transactions on-chain on the **Base** network. It is built for **Track 3: Unicorn (Open Innovation)** of the AMD Developer Hackathon.
+A2Z Agentz is an **autonomous Agent-to-Agent (A2A) Web3 payment engine** that discovers high-quality on-chain opportunities, scores them with an LLM, and settles transactions on the **Base** network (L2). It is built for **Track 3: Unicorn (Open Innovation)** of the AMD Developer Hackathon, with all LLM inference offloaded to **AMD Instinct™ GPUs** via ROCm + vLLM.
 
 ---
 
-## 🏗️ Architecture & AMD Compute Layer
+## Two-House Architecture
 
-### Split Architecture Overview
-
-A2Z Agentz uses a **Split Architecture** designed explicitly to satisfy the hackathon rule that **AMD compute must be demonstrated**.
+A2Z Agentz splits responsibility between two autonomous agents ("two houses") that communicate through a PostgreSQL-backed task queue. Both houses run on the same backend, but their intelligence is sourced from **different models on different hardware**:
 
 ```
-┌─────────────────────────────────────────┐         ┌──────────────────────────────────────────┐
-│  COMMAND CENTER (Local VPS)             │         │  AI BRAIN (AMD GPU Server)               │
-│                                         │         │                                          │
-│  • Backend API (FastAPI / Starlette)    │         │  • vLLM on ROCm                          │
-│  • PostgreSQL database                   │────────▶│  • Qwen/Qwen2.5-72B-Instruct-AWQ             │
-│  • Auth routing (JWT + API key)         │  HTTPS  │  • OpenAI-compatible API                 │
-│  • Web3 RPC (Base mainnet)             │  Tunnel │  • Port 8080                             │
-│  • Dashboard / UI                       │         │                                          │
-│                                         │◀────────│  • Cloudflare Quick Tunnel (egress)     │
-└─────────────────────────────────────────┘         └──────────────────────────────────────────┘
+┌─────────────────────────────────────────────┐      ┌──────────────────────────────────────────┐
+│  HOUSE A — SCOUT (Signal Detection & Scoring) │      │  HOUSE B — VAULT (Secure On-Chain Execution) │
+│                                                 │      │                                                │
+│  • OSINT scraper (DexScreener + Neynar)        │ ───▶ │  • Pulls scored targets from scraping_queue     │
+│  • LLM scoring + category + reasoning          │      │  • GoPlus token-security gate (rug/pull check)  │
+│  • LLM: Qwen2.5-72B-Instruct-AWQ               │      │  • LLM: DeepSeek-V4-Flash via Fireworks AI       │
+│  • Hardware: AMD Instinct™ MI300X (ROCm vLLM)  │      │  • Hardware: Fireworks cloud (DeepSeek V4 Flash) │
+│  • Exposed as OpenAI-compatible /v1 endpoint    │      │  • Signs + broadcasts native transfers on Base   │
+└─────────────────────────────────────────────┘      └──────────────────────────────────────────┘
+                        │                                                  ▲
+                        └────────── PostgreSQL scraping_queue ◀──────────┘
 ```
 
-### Why split?
+### House A — Scout (AMD MI300X)
+- Scrapes live market + social signals (DexScreener liquidity/market-cap, Neynar social graph).
+- Sends the normalized description to **`Qwen/Qwen2.5-72B-Instruct-AWQ`** served by **vLLM on ROCm** on an **AMD Instinct™ MI300X** GPU.
+- Returns a strict JSON verdict: `score` (1–100), `category`, `reason`, `amount_usd`.
+- Enqueues any target scoring ≥ 70 into the `scraping_queue` for House B.
 
-- **Command Center** = stable, auditable, stateful (database, wallet, auth).
-- **AI Brain** = GPU-heavy inference only, isolated behind a secure tunnel.
+### House B — Vault (DeepSeek V4 / Fireworks)
+- Consumes pending tasks from `scraping_queue` via `SELECT ... FOR UPDATE SKIP LOCKED`.
+- Runs a **GoPlus security gate** (honeypot / mint / ownership checks) before any execution.
+- Uses **`accounts/fireworks/models/deepseek-v4-flash`** (Fireworks AI) as a strict guardrail LLM that confirms or rejects the Scout's verdict.
+- On approval, signs an ECDSA payload with the vault key and broadcasts a native transfer on **Base L2**, capped by `MAX_GAS_PRICE_GWEI` and `MICRO_TX_ETH`.
 
-This lets the team demo a deterministic, reproducible backend while the LLM calls are clearly traced back to **AMD hardware**.
+Every inference round-trip is traced with an explicit log marker for jury verification:
+```
+[AMD MI300X COMPUTE] Executing payload to ROCm vLLM endpoint=... model=Qwen/Qwen2.5-72B-Instruct-AWQ
+[AMD MI300X COMPUTE] vLLM returned | model=Qwen/Qwen2.5-72B-Instruct-AWQ latency=XXXms score=YY
+```
 
-### AI Brain stack (judges, look here)
+---
 
-> **All LLM inference is offloaded to a dedicated AMD GPU server running vLLM serving Qwen/Qwen2.5-72B-Instruct-AWQ on ROCm.**
+## AMD Compute Requirement
+
+All Agent A inference is executed on **AMD Instinct™ GPUs** through the ROCm software stack and vLLM. The AI Brain is isolated on a dedicated AMD GPU server and reached from the Command Center over a Cloudflare Quick Tunnel.
 
 | Layer | Technology |
 |---|---|
-| **Inference server** | vLLM (`vllm.entrypoints.openai.api_server`) |
-| **GPU runtime** | ROCm (AMD open compute stack) |
-| **Hardware** | AMD Instinct™ GPU (via AMD AI Developer Program portal) |
-| **Tunnel** | Cloudflare Quick Tunnel → public `*.trycloudflare.com` |
-| **Endpoint** | `https://[YOUR-TUNNEL].trycloudflare.com/v1` |
-| **API contract** | OpenAI-compatible `/v1/chat/completions` |
+| Inference server | vLLM (`vllm.entrypoints.openai.api_server`) |
+| GPU runtime | ROCm (AMD open compute stack) |
+| Hardware | AMD Instinct™ MI300X (AMD AI Developer Program portal) |
+| Tunnel | Cloudflare Quick Tunnel → `*.trycloudflare.com` |
+| API contract | OpenAI-compatible `/v1/chat/completions` |
 
-### Connection flow
-
-1. AMD Jupyter terminal runs vLLM on ROCm, bound to `127.0.0.1:8080`.
-2. A Cloudflare Quick Tunnel forwards public HTTPS → local port 8080.
-3. The Command Center sets:
-   - `AGENT_A_ENDPOINT=https://[YOUR-TUNNEL].trycloudflare.com/v1`
-   - `AGENT_B_ENDPOINT=https://[YOUR-TUNNEL].trycloudflare.com/v1` (optional, if Agent B also streams through the same brain).
-4. Every inference round-trip is logged:
-   ```
-   INFO a2z.agent_a.inference: AI endpoint OK | model=Qwen/Qwen2.5-72B-Instruct-AWQ latency=XXXms score=...
-   ```
-
-### What judges should see
-
-- `rocm-smi` output showing an active AMD GPU (VRAM, temperature, utilization).
-- Startup logs proving the OpenAI-compatible endpoint is hit over the tunnel.
-- README + Slide Deck both showing the words **vLLM**, **ROCm**, and **AMD** side by side.
+**Why AWQ 4-bit?** A single 48 GB GPU cannot hold a full-precision 72B model (~140 GB). AWQ quantization drops the 72B checkpoint to ~40 GB on VRAM while preserving reasoning quality, and FP8 KV-cache keeps long-context serving OOM-free on one node. This is a deliberate, hackathon-grade trade-off for single-node stability and low latency.
 
 ---
 
-## 🧠 Engineering Decision: AWQ 4-bit Quantization for the AI Brain
-
-**Decision:** The AI Brain serves **`Qwen/Qwen2.5-72B-Instruct-AWQ`** instead of the
-full-precision `Qwen/Qwen2.5-72B-Instruct` checkpoint.
-
-**Rationale.** A single consumer-grade GPU node exposes at most **48 GB of VRAM**.
-A full-precision (BF16/FP16) 72B-parameter model requires well over 140 GB of weights
-alone, forcing a multi-GPU shard and blowing past a single-node budget — and even a
-naively sharded layout leaves no headroom for the KV-Cache once the context window grows.
-
-To fit a **32K context** comfortably on **one 48 GB GPU** without triggering
-**Out-of-Memory (OOM)** exceptions, we apply:
-
-- **AWQ (Activation-aware Weight Quantization) — 4-bit.** Activations are preserved at
-  higher precision while weights are quantized, so the 72B model drops from ~140 GB to
-  ~40 GB on disk/VRAM while retaining the bulk of its reasoning quality.
-- **FP8 KV-Cache.** The transformer KV-Cache is stored in FP8 rather than FP16, roughly
-  halving the per-token memory cost of long context. At 32K tokens this is the difference
-  between OOM and a stable serve.
-
-**Net effect.** The quantized + FP8-KV layout fits the 72B model and a 32K context inside
-a single 48 GB VRAM envelope with margin to spare, eliminating OOM risk while keeping
-latency low for real-time Agent-A scoring over the Cloudflare tunnel.
-
-**Trade-off.** 4-bit weights trade a small amount of raw accuracy for a massive gain in
-deployability (single-node, no OOM, fast cold start) — an acceptable and deliberate
-choice for a hackathon-grade autonomous agent.
-
----
-
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 |---|---|
-| **AI Inference** | vLLM on ROCm |
-| **Backend** | Python 3.12, Starlette / FastAPI |
-| **Database** | PostgreSQL 15 (FIFO queues, SKIP LOCKED) |
-| **Web3** | web3.py, Base Mainnet RPCs, ECDSA signing |
-| **Frontend** | Next.js 16, React 19, Tailwind CSS v4, TypeScript |
-| **Deployment** | Docker Compose, Cloudflare Quick Tunnel |
+| AI Inference (House A) | vLLM on ROCm, Qwen2.5-72B-Instruct-AWQ |
+| AI Inference (House B) | Fireworks AI, DeepSeek-V4-Flash |
+| Backend | Python 3.12, Starlette / FastAPI, APScheduler |
+| Database | PostgreSQL 15 (FIFO queues, `SKIP LOCKED`) |
+| Web3 | web3.py, Base L2 RPCs, ECDSA signing |
+| Frontend | Next.js 16, React 19, Tailwind CSS v4, TypeScript |
+| Deployment | Docker (`--platform linux/amd64`), Cloudflare Quick Tunnel |
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
-cp .env.example .env   # fill real values
+cp .env.example .env   # fill in real values (no secrets committed)
 docker compose up --build
 ```
 
-Open the dashboard at http://localhost:3000.
+Open the dashboard at http://localhost:3000. The backend serves on http://localhost:8080.
+
+Required environment variables: `POSTGRES_PASSWORD`, `JWT_SECRET`, `API_KEY`, `JUDGE_TOKEN`, `AI_ENDPOINT`, `AI_API_KEY`, `AI_MODEL`, `AGENT_B_ENDPOINT`, `AGENT_B_API_KEY`, `AGENT_B_MODEL`.
 
 ---
 
-## 🔐 Security
+## Security
 
-- `POSTGRES_PASSWORD`, `JWT_SECRET`, `API_KEY`, `JUDGE_TOKEN` are **required** environment variables.
-- `POSTGRES_URI` is built dynamically from `POSTGRES_PASSWORD`.
+- `POSTGRES_PASSWORD`, `JWT_SECRET`, `API_KEY`, `JUDGE_TOKEN` are **required**.
 - Guest / unauthenticated write paths are gated behind `API_KEY`.
 - `JWT_SECRET` must be set; the backend refuses to start otherwise.
+- The vault key (`PRIVATE_KEY`) is server-only and never bundled in the frontend build.
 
 ---
 
-## 📄 License
+## Technical Disclaimer (Model Tagging)
+
+> During the AMD Lablab registration, the submission form offered only rigid, pre-defined model tags. We were **forced to select the tags "Qwen3-Coder" and "DeepSeek V3"** because those were the closest available options in the form's dropdown.
+>
+> **This does not reflect the models our system actually runs.** In production, A2Z Agentz actively uses **`Qwen/Qwen2.5-72B-Instruct-AWQ`** (House A / Scout, served on AMD MI300X via vLLM) and **`accounts/fireworks/models/deepseek-v4-flash`** (House B / Vault, via Fireworks AI). We deliberately chose these models for **stable JSON-mode output** and **ultra-low latency** under autonomous agent load — priorities that the rigid form tags could not express. All inference is verifiable through the backend logs and the `AI_ENDPOINT` / `AGENT_B_ENDPOINT` configuration.
+
+---
+
+## License
 
 MIT

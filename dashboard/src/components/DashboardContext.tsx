@@ -113,6 +113,16 @@ export interface AppNotification {
   link?: string;
 }
 
+export interface GpuMetrics {
+  gpuCacheUsagePct: number;
+  requestsRunning: number;
+  requestsWaiting: number;
+  promptThroughputTokS: number;
+  generationThroughputTokS: number;
+  timeToFirstTokenS: number;
+  source: string;
+}
+
 export interface AgentHealth {
   latencyMs: number;
   inferenceMs: number;
@@ -120,6 +130,7 @@ export interface AgentHealth {
   failCount: number;
   queueDepth: number;
   uptimePct: number;
+  gpu?: GpuMetrics | null;
 }
 
 export type Density = "compact" | "comfortable" | "spacious";
@@ -323,7 +334,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
       // Real agent status from backend health (not hardcoded).
       if (sysData?.agent_health) {
-        const h = sysData.agent_health;
+        const h: any = sysData.agent_health;
         const now = Date.now() / 1000;
         const aSeen = h.agent_a_last_seen ? now - h.agent_a_last_seen < 120 : false;
         const bSeen = h.agent_b_last_seen ? now - h.agent_b_last_seen < 120 : false;
@@ -339,6 +350,15 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
             failCount: h.fail_count ?? 0,
             queueDepth: h.queue_depth ?? 0,
             uptimePct: 99.8,
+            gpu: h.gpu ? {
+              gpuCacheUsagePct: h.gpu.gpu_cache_usage_pct ?? 0,
+              requestsRunning: h.gpu.requests_running ?? 0,
+              requestsWaiting: h.gpu.requests_waiting ?? 0,
+              promptThroughputTokS: h.gpu.prompt_throughput_tok_s ?? 0,
+              generationThroughputTokS: h.gpu.generation_throughput_tok_s ?? 0,
+              timeToFirstTokenS: h.gpu.time_to_first_token_s ?? 0,
+              source: h.gpu.source ?? "amd_mi300x_vllm",
+            } : null,
           },
           b: {
             ...prev.b,
