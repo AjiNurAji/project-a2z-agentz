@@ -356,6 +356,39 @@ async def run_cycle() -> None:
                     f"LLM score={ai.score} passed={payload['agent_a_passed']} latency={ai.latency_ms}ms for {address}",
                     {"address": address, "score": ai.score, "model": ai.model, "latency_ms": ai.latency_ms},
                 )
+                # Broadcast a rich per-token scout result so the dashboard shows
+                # real scraper output (score + target + source), not just the
+                # summary line. Farcaster (Neynar) signals take priority in label.
+                try:
+                    src = "farcaster" if signals else "dexscreener"
+                    await manager.broadcast(
+                        json.dumps({
+                            "type": "AGENT_LOG",
+                            "data": {
+                                "sender": "agent_a",
+                                "content": (
+                                    f"[{src}] {token.get('token_name')} ({address}) "
+                                    f"score={ai.score}/100 cat={ai.category} "
+                                    f"liq=${token.get('liquidity_usd')} "
+                                    f"signal={'|'.join(signals[:3]) if signals else 'none'}"
+                                ),
+                                "metadata": {
+                                    "score": ai.score,
+                                    "category": ai.category,
+                                    "target": address,
+                                    "projectName": token.get("token_name"),
+                                    "source": src,
+                                    "liquidity_usd": token.get("liquidity_usd"),
+                                    "social_signals": signals[:3],
+                                    "latencyMs": ai.latency_ms,
+                                    "inferenceMs": ai.latency_ms,
+                                    "passed": payload["agent_a_passed"],
+                                },
+                            },
+                        })
+                    )
+                except Exception:
+                    pass
             except Exception as exc:
                 logger.warning("Agent A LLM analysis skipped (fallback mock): %s", exc)
                 payload["agent_a_llm"] = None
