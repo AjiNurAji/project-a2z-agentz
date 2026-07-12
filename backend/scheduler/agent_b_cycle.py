@@ -33,7 +33,7 @@ load_dotenv()
 logger = logging.getLogger("a2z.agent_b")
 
 AGENT_B_ENDPOINT = os.getenv("AGENT_B_ENDPOINT", "")
-AGENT_B_MODEL = os.getenv("AGENT_B_MODEL", "")
+AGENT_B_MODEL = os.getenv("AGENT_B_MODEL", "accounts/fireworks/models/deepseek-v4-pro")
 AGENT_B_API_KEY = os.getenv("AGENT_B_API_KEY", "")
 # Auto-discover model id from /v1/models when pointing at an OpenAI-compatible
 # server (vLLM, TGI, etc.). Reduces the chance of "model not found" errors when
