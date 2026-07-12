@@ -42,6 +42,12 @@ async def lifespan(app: Starlette):
     else:
         start_scheduler()
         task = asyncio.create_task(poll_and_broadcast())
+        # Agent B runs as a dedicated daemon (continuous queue poll) so it
+        # never hits APScheduler's max_instances cap. Started once here.
+        from scheduler.agent_runner import run_agent_b_daemon
+        agent_b_task = asyncio.create_task(
+            asyncio.to_thread(run_agent_b_daemon)
+        )
         # Self-heal the system/owner user (id=1) so Agent A's enqueue_target
         # FK (scraping_queue_user_fk) doesn't fail on fresh Railway databases.
         database.ensure_system_user()
@@ -66,6 +72,10 @@ async def lifespan(app: Starlette):
         print("Shutting down A2Z Agentz Backend...")
         stop_scheduler()
         task.cancel()
+        try:
+            agent_b_task.cancel()
+        except Exception:
+            pass
         return
     yield
 
