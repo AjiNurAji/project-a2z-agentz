@@ -52,13 +52,13 @@ export function mapRawTxToTransaction(tx: RawTransaction): MappedTransaction {
 
   return {
     id: tx.tx_hash_id,
-    projectName: "On-Chain Target",
+    projectName: tx.project_name || "On-Chain Target",
     targetAddress: tx.project_target_address,
     amountUsd: tx.amount_usd,
     status,
     txHash: tx.tx_hash_id,
     timestamp: new Date(tx.created_at.replace(" ", "T") + "Z"),
-    reason: "Autonomous Execution",
+    reason: tx.reason || "Autonomous Execution",
     gasUsedGwei: 42,
   };
 }

@@ -47,7 +47,7 @@ BASE_RPC_1 = os.getenv("BASE_RPC_1", "")
 BASE_RPC_2 = os.getenv("BASE_RPC_2", "")
 BASE_RPC_3 = os.getenv("BASE_RPC_3", "")
 BASE_CHAIN_ID = int(os.getenv("BASE_CHAIN_ID", "8453"))
-MAX_SCORE_FOR_AUTO = int(os.getenv("AGENT_B_AUTO_SCORE_MIN", "70"))
+MAX_SCORE_FOR_AUTO = int(os.getenv("AGENT_B_AUTO_SCORE_MIN", "20"))
 DEFAULT_NETWORK_HINT = os.getenv("ACTIVE_NETWORK", "base")
 # Budget guard (env already provided by operator). Enforced before any
 # auto-execution proposal so the vault stays within operator limits.
@@ -460,7 +460,11 @@ async def worker_loop(poll_interval: float = 2.0) -> None:
   while True:
     task = fetch_and_lock_pending_task(limit=1)
     if task is None:
-      break # Exit the cycle when no more tasks
+      # Keep the worker alive so tokens Agent A enqueues LATER (after this
+      # tick) are still picked up. Breaking here killed the worker on the
+      # first empty poll, leaving the queue stuck in PENDING forever.
+      await asyncio.sleep(poll_interval)
+      continue
     try:
       await process_task(task)
     except Exception as exc:

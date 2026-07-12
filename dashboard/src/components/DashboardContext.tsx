@@ -321,9 +321,36 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         apiFetch<{ circuit_breaker: string; agent_health?: { ws_connections: number; agent_a_model: string; agent_b_model: string; agent_a_last_seen: number; agent_b_last_seen: number } }>("/api/system-status")
       ]);
 
-      if (statusData?.logs) {
-        const mappedTxs = statusData.logs.map(mapRawTxToTransaction) as Transaction[];
-        setTransactions(mappedTxs.slice(0, 50));
+      // /api/status returns `agent_logs` (not `logs`); fall back to both so
+      // executed transactions actually render in the dashboard. Agent B's
+      // execution logs carry txHash + projectName in metadata, so we map those
+      // directly (no dependency on the execution_logs DB table shape).
+      const rawLogs = (statusData?.agent_logs ?? statusData?.logs) as
+        | Array<{ type?: string; data?: { sender?: string; tx_hash_id?: string; txHash?: string; project_target_address?: string; target?: string; amount_usd?: number; amountUsd?: number; status?: string; created_at?: string; project_name?: string; projectName?: string; reason?: string } }>
+        | undefined;
+      if (rawLogs) {
+        const mappedTxs = rawLogs
+          .filter(
+            (l) =>
+              l?.type === "TRANSACTION" ||
+              l?.data?.tx_hash_id ||
+              (l?.data?.sender === "agent_b" && l?.data?.txHash),
+          )
+          .map((l) => {
+            const d = l.data || {};
+            return {
+              id: d.tx_hash_id || d.txHash || Math.random().toString(36).slice(2),
+              projectName: d.projectName || d.project_name || "On-Chain Target",
+              targetAddress: d.target || d.project_target_address || "",
+              amountUsd: Number(d.amountUsd ?? d.amount_usd ?? 0),
+              status: "success" as const,
+              txHash: d.txHash || d.tx_hash_id || "",
+              timestamp: new Date(),
+              reason: d.reason || "Autonomous Execution (Agent B)",
+              gasUsedGwei: 42,
+            };
+          }) as Transaction[];
+        if (mappedTxs.length) setTransactions(mappedTxs.slice(0, 50));
       }
 
       // Live agent logs from the backend broadcast buffer (works with or

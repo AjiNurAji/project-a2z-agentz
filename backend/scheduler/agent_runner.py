@@ -53,11 +53,12 @@ def start_scheduler() -> None:
 
     scheduler.add_job(
         run_agent_b,
-        trigger=IntervalTrigger(minutes=1),
+        trigger=IntervalTrigger(seconds=30),
         next_run_time=datetime.now(),
         id="agent_b_job",
         name="Agent B Worker Cycle",
         replace_existing=True,
+        max_instances=1,
     )
 
     scheduler.start()
