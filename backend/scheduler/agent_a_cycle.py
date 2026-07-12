@@ -90,9 +90,12 @@ def _is_valid_evm_address(address: str | None) -> bool:
     return bool(_EVM_ADDRESS_RE.match(address.strip()))
 
 
-async def _get(session: aiohttp.ClientSession, url: str, params: dict[str, Any] | None = None, timeout: int = 10) -> dict[str, Any] | None:
+async def _get(session: aiohttp.ClientSession, url: str, params: dict[str, Any] | None = None, timeout: int = 10, headers: dict[str, str] | None = None) -> dict[str, Any] | None:
+    _headers = {"accept": "application/json"}
+    if headers:
+        _headers.update(headers)
     try:
-        async with session.get(url, params=params, timeout=timeout) as resp:
+        async with session.get(url, params=params, headers=_headers, timeout=timeout) as resp:
             if resp.status == 200:
                 return await resp.json()
             logger.warning("Agent A upstream %s -> %s", url, resp.status)
@@ -188,8 +191,8 @@ async def fetch_recent_channel_casts(
         return []
     headers = {"x-api-key": NEYNAR_API_KEY, "accept": "application/json"}
     url = (
-        "https://api.neynar.com/v2/farcaster/feed/channels"
-        f"?channel_ids={channel_id}&limit={limit}"
+        "https://api.neynar.com/v2/farcaster/feed"
+        "?feed_type=filter&filter_type=channel_id&channel_id=base&limit=" + str(limit)
     )
     return await _neynar_get_casts(session, url, headers)
 
