@@ -13,7 +13,9 @@ interface Props {
 function wsLabel(status: Props["wsStatus"]) {
   if (status === "connected") return "Connected";
   if (status === "connecting") return "Connecting";
-  return "Fallback / Demo Mode";
+  // WebSocket may be blocked by browser CORS in some setups, but the
+  // dashboard still receives live agent data via /api/status polling.
+  return "Live (polling)";
 }
 
 export default function A2AIdentityReadiness({ wsStatus, user }: Props) {
