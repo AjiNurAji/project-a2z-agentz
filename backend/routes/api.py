@@ -10,6 +10,9 @@ from starlette.responses import JSONResponse
 from starlette.requests import Request
 from urllib import request as _url_request
 from urllib import error as _url_error
+import logging
+
+logger = logging.getLogger("a2z.api")
 
 # Add root directory to sys.path so we can import the existing database module
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
@@ -41,7 +44,14 @@ def check_auth(request: Request) -> bool:
     if api_key and api_key == API_KEY:
         return True
 
-    token = request.cookies.get("a2z-token")
+    # Accept bearer token from Authorization header (dashboard stores the
+    # JWT in localStorage and forwards it here; cross-site cookies are flaky).
+    auth_header = request.headers.get("Authorization", "")
+    bearer = ""
+    if auth_header.lower().startswith("bearer "):
+        bearer = auth_header[7:].strip()
+
+    token = bearer or request.cookies.get("a2z-token")
     if token == "guest":
         return False
     if token and verify_access_token(token):
@@ -212,6 +222,69 @@ async def circuit_breaker(request: Request):
         return JSONResponse({"detail": str(e)}, status_code=500)
 
 
+def _fetch_gpu_metrics() -> dict | None:
+    """Scrape live AMD GPU metrics from the vLLM /metrics endpoint (Agent A brain).
+
+    AI_ENDPOINT is e.g. https://tunnel/v1 -> metrics live at https://tunnel/metrics.
+    Parses the Prometheus exposition format for the fields the dashboard shows.
+    Returns None if AI_ENDPOINT is unset or the metrics endpoint is unreachable.
+    """
+    endpoint = os.getenv("AI_ENDPOINT", "").strip().rstrip("/")
+    if not endpoint:
+        return None
+    # https://tunnel/v1 -> https://tunnel ; then /metrics
+    base = endpoint[:-len("/v1")] if endpoint.endswith("/v1") else endpoint
+    metrics_url = f"{base}/metrics"
+    api_key = os.getenv("AI_API_KEY", "").strip()
+    headers = {"Accept": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    try:
+        req = _url_request.Request(metrics_url, headers=headers, method="GET")
+        with _url_request.urlopen(req, timeout=8) as resp:
+            text = resp.read().decode("utf-8", "ignore")
+    except Exception as exc:
+        logger.warning("GPU metrics scrape failed: %s", exc)
+        return None
+
+    out: dict[str, object] = {}
+    try:
+        for line in text.splitlines():
+            if line.startswith("#") or not line.strip():
+                continue
+            # name{labels} value
+            if "{" in line:
+                name = line.split("{", 1)[0]
+                value = line.rsplit(" ", 1)[-1]
+            else:
+                parts = line.rsplit(" ", 1)
+                if len(parts) != 2:
+                    continue
+                name, value = parts
+            try:
+                v = float(value)
+            except ValueError:
+                continue
+            if name == "vllm:gpu_cache_usage_sys":
+                out["gpu_cache_usage_pct"] = round(v * 100, 1)
+            elif name == "vllm:gpu_cache_usage_perc":
+                out["gpu_cache_usage_pct"] = round(v, 1)
+            elif name == "vllm:num_requests_running":
+                out["requests_running"] = int(v)
+            elif name == "vllm:num_requests_waiting":
+                out["requests_waiting"] = int(v)
+            elif name == "vllm:avg_prompt_throughput_tok_per_s":
+                out["prompt_throughput_tok_s"] = round(v, 1)
+            elif name == "vllm:avg_generation_throughput_tok_per_s":
+                out["generation_throughput_tok_s"] = round(v, 1)
+            elif name == "vllm:time_to_first_token_seconds_sum" and v > 0:
+                out["time_to_first_token_s"] = round(v, 2)
+        out["source"] = "amd_mi300x_vllm"
+        return out
+    except Exception:
+        return None
+
+
 @require_auth
 async def get_system_status(request: Request):
     """Returns LIVE health status of components against AMD GPU tunnel."""
@@ -247,6 +320,41 @@ async def get_system_status(request: Request):
         body["ai_model"] = f"http_{exc.code}"
     except Exception as exc:
         body["ai_model"] = "unreachable"
+
+    # Live agent health derived from the WebSocket manager + configured
+    # model endpoints. Lets the dashboard show real (non-hardcoded) status.
+    try:
+        from routes.websockets import manager
+        last_a = max(
+            [m.get("ts", 0) for m in manager.agent_log_buffer if m.get("data", {}).get("sender") == "agent_a"],
+            default=0,
+        )
+        last_b = max(
+            [m.get("ts", 0) for m in manager.agent_log_buffer if m.get("data", {}).get("sender") == "agent_b"],
+            default=0,
+        )
+        m = manager.get_metrics()
+        body["agent_health"] = {
+            "ws_connections": len(manager.active_connections),
+            "agent_a_model": os.getenv("AI_MODEL", "") or os.getenv("AGENT_A_MODEL", ""),
+            "agent_b_model": os.getenv("AGENT_B_MODEL", ""),
+            "agent_a_last_seen": last_a,
+            "agent_b_last_seen": last_b,
+            "latency_ms": m["agent_a_latency_ms"] or m["agent_b_latency_ms"],
+            "inference_ms": m["agent_a_inference_ms"] or m["agent_b_inference_ms"],
+            "success_count": m["agent_a_success"] + m["agent_b_success"],
+            "fail_count": m["agent_a_failed"] + m["agent_b_failed"],
+            "queue_depth": 0,
+        }
+        # Live AMD GPU metrics scraped from the vLLM /metrics endpoint (Agent A brain).
+        try:
+            gpu = _fetch_gpu_metrics()
+            if gpu:
+                body["agent_health"]["gpu"] = gpu
+        except Exception:
+            pass
+    except Exception:
+        pass
     return JSONResponse(body)
 
 
@@ -295,7 +403,7 @@ def _call_fireworks(description: str, address: str) -> dict:
     )
 
     try:
-        with _url_request.urlopen(req, timeout=60) as resp:
+        with _url_request.urlopen(req, timeout=20) as resp:
             data = json.loads(resp.read().decode("utf-8"))
     except _url_error.HTTPError as exc:
         detail = exc.read().decode("utf-8", "ignore") if exc.fp else str(exc)
@@ -672,9 +780,22 @@ async def get_execution_status(request: Request):
                 t["created_at"] = str(t["created_at"])
             if "amount_usd" in t and t["amount_usd"] is not None:
                 t["amount_usd"] = float(t["amount_usd"])
-        return JSONResponse({"status": "ok", "logs": transactions})
+        # Live agent logs (from the in-memory broadcast buffer, so the
+        # dashboard sees Agent A/B activity even without a held WebSocket).
+        from routes.websockets import manager
+        agent_logs = manager.recent_agent_logs()
+        return JSONResponse({"status": "ok", "logs": transactions, "agent_logs": agent_logs})
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@require_auth
+async def get_gpu_metrics(request: Request):
+    """Live AMD GPU metrics (Agent A brain on vLLM)."""
+    gpu = _fetch_gpu_metrics()
+    if not gpu:
+        return JSONResponse({"gpu": None, "available": False}, status_code=200)
+    return JSONResponse({"gpu": gpu, "available": True}, status_code=200)
 
 
 routes = [
@@ -684,6 +805,7 @@ routes = [
     Route("/transactions", get_transactions, methods=["GET"]),
     Route("/circuit-breaker", circuit_breaker, methods=["POST"]),
     Route("/system-status", get_system_status, methods=["GET"]),
+    Route("/gpu-metrics", get_gpu_metrics, methods=["GET"]),
     Route("/analyze", analyze_target, methods=["POST"]),
     Route("/status", get_execution_status, methods=["GET"]),
 ]

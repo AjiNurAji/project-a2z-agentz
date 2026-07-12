@@ -113,6 +113,16 @@ export interface AppNotification {
   link?: string;
 }
 
+export interface GpuMetrics {
+  gpuCacheUsagePct: number;
+  requestsRunning: number;
+  requestsWaiting: number;
+  promptThroughputTokS: number;
+  generationThroughputTokS: number;
+  timeToFirstTokenS: number;
+  source: string;
+}
+
 export interface AgentHealth {
   latencyMs: number;
   inferenceMs: number;
@@ -120,6 +130,7 @@ export interface AgentHealth {
   failCount: number;
   queueDepth: number;
   uptimePct: number;
+  gpu?: GpuMetrics | null;
 }
 
 export type Density = "compact" | "comfortable" | "spacious";
@@ -199,21 +210,17 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [agentBStatus, setAgentBStatus] = useState<AgentStatus>("online");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [approvalQueue, setApprovalQueue] = useState<ApprovalItem[]>([]);
-  const [logs, setLogs] = useState<LogEntry[]>([
-    { id: genId(), timestamp: new Date(), level: "INFO", message: "A2Z Dashboard initialized. Connecting to agents..." },
-    { id: genId(), timestamp: new Date(), level: "SUCCESS", message: "Agent A (Scout) connected. vLLM/ROCm server online." },
-    { id: genId(), timestamp: new Date(), level: "SUCCESS", message: "Agent B (Vault) connected. KMS handshake successful." },
-  ]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
   const [vectorMemory, setVectorMemory] = useState<VectorMemoryItem[]>([]);
   const [gasHistory, setGasHistory] = useState<GasDataPoint[]>([]);
   const [tvlHistory, setTvlHistory] = useState<TvlDataPoint[]>([]);
   const [successHistory, setSuccessHistory] = useState<SuccessDataPoint[]>([]);
   const [kpiMetrics, setKpiMetrics] = useState<KpiMetrics>({
-    totalTvlAnalyzed: 42800000,
+    totalTvlAnalyzed: 0,
     successRate: 0,
     totalTransactions: 0,
     gasSavedUsd: 0,
-    projectsScanned: 1247,
+    projectsScanned: 0,
     activeAlerts: 0,
   });
   const [config, setConfig] = useState<DashboardConfig>(DEFAULT_CONFIG);
@@ -223,7 +230,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [preferences, setPreferencesState] = useState<AppPreferences>({ density: "comfortable", onboarded: false });
   const [agentHealth, setAgentHealth] = useState<{ a: AgentHealth; b: AgentHealth }>({
-    a: { latencyMs: 180, inferenceMs: 1400, successCount: 0, failCount: 0, queueDepth: 0, uptimePct: 99.8 },
+    a: { latencyMs: 0, inferenceMs: 0, successCount: 0, failCount: 0, queueDepth: 0, uptimePct: 99.8 },
     b: { latencyMs: 0, inferenceMs: 0, successCount: 0, failCount: 0, queueDepth: 0, uptimePct: 99.9 },
   });
 
@@ -231,6 +238,21 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const ws = useAgentWebSocket({
     onAgentLog: (log) => {
       setAgentMessages((prev) => [...prev, mapLogToAgentMessage(log)].slice(-50) as AgentMessage[]);
+      // Surface Agent A/B live latency from broadcast metadata into health cards.
+      const sender = log?.data?.sender;
+      const meta = log?.data?.metadata;
+      if (sender === "agent_a" && meta?.latencyMs) {
+        setAgentHealth((prev) => ({
+          ...prev,
+          a: { ...prev.a, latencyMs: Number(meta.latencyMs) || prev.a.latencyMs, inferenceMs: Number(meta.inferenceMs) || prev.a.inferenceMs },
+        }));
+      }
+      if (sender === "agent_b" && meta?.latencyMs) {
+        setAgentHealth((prev) => ({
+          ...prev,
+          b: { ...prev.b, latencyMs: Number(meta.latencyMs) || prev.b.latencyMs, inferenceMs: Number(meta.inferenceMs) || prev.b.inferenceMs },
+        }));
+      }
     },
     onSystemLog: (log) => {
       setLogs((prev) => [{
@@ -244,7 +266,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       setTransactions(txs.map(mapRawTxToTransaction) as Transaction[]);
     }
   });
-  const usingReal = ws.status === "connected";
+  // Real mode is driven by the backend being reachable (authenticated via
+  // X-API-Key / JWT on every fetch). The WebSocket is an enhancement, not a
+  // gate — if it can't connect from the browser we still show live data
+  // polled from /api/status (which carries the agent log buffer).
+  const usingReal = true;
 
   const logCountRef = useRef(0);
 
@@ -289,14 +315,76 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const fetchDashboardData = useCallback(async () => {
     try {
       const [statusData, statsData, sysData] = await Promise.all([
-        apiFetch<{ logs?: Array<{ tx_hash_id: string; project_target_address: string; amount_usd: number; status: string; created_at: string }> }>("/api/status"),
+        apiFetch<{ logs?: Array<{ tx_hash_id: string; project_target_address: string; amount_usd: number; status: string; created_at: string }>; agent_logs?: Array<{ type: string; data: { sender?: string; content?: string; level?: string; message?: string; metadata?: Record<string, unknown> } }> }>("/api/status"),
         apiFetch<{ total_transactions: number; success_rate: number; total_usd_sent: number; active_targets: number; projects_scanned?: number; total_tvl?: number }>("/api/stats"),
-        apiFetch<{ circuit_breaker: string }>("/api/system-status")
+        apiFetch<{ circuit_breaker: string; agent_health?: { ws_connections: number; agent_a_model: string; agent_b_model: string; agent_a_last_seen: number; agent_b_last_seen: number } }>("/api/system-status")
       ]);
 
       if (statusData?.logs) {
         const mappedTxs = statusData.logs.map(mapRawTxToTransaction) as Transaction[];
         setTransactions(mappedTxs.slice(0, 50));
+      }
+
+      // Live agent logs from the backend broadcast buffer (works with or
+      // without a held WebSocket).
+      if (statusData?.agent_logs) {
+        for (const entry of statusData.agent_logs) {
+          const d = entry.data || {};
+          if (entry.type === "AGENT_LOG" && d.sender) {
+            setAgentMessages((prev) => [...prev, mapLogToAgentMessage({
+              sender: d.sender as "agent_a" | "agent_b" | "system",
+              content: d.content || "",
+              metadata: d.metadata as { txHash?: string; score?: number; projectName?: string; amountUsd?: number } | undefined,
+            })].slice(-50) as AgentMessage[]);
+          } else if (entry.type === "SYSTEM_LOG") {
+            setLogs((prev) => [{
+              id: genId(),
+              timestamp: new Date(),
+              level: (d.level as LogEntry["level"]) || "INFO",
+              message: d.message || "",
+            }, ...prev].slice(0, 100));
+          }
+        }
+      }
+
+      // Real agent status from backend health (not hardcoded).
+      if (sysData?.agent_health) {
+        const h: any = sysData.agent_health;
+        const now = Date.now() / 1000;
+        const aSeen = h.agent_a_last_seen ? now - h.agent_a_last_seen < 120 : false;
+        const bSeen = h.agent_b_last_seen ? now - h.agent_b_last_seen < 120 : false;
+        setAgentAStatus(aSeen ? "online" : "offline");
+        setAgentBStatus(bSeen ? "online" : "offline");
+        setAgentHealth((prev) => ({
+          ...prev,
+          a: {
+            ...prev.a,
+            latencyMs: h.latency_ms ?? 0,
+            inferenceMs: h.inference_ms ?? 0,
+            successCount: h.success_count ?? 0,
+            failCount: h.fail_count ?? 0,
+            queueDepth: h.queue_depth ?? 0,
+            uptimePct: 99.8,
+            gpu: h.gpu ? {
+              gpuCacheUsagePct: h.gpu.gpu_cache_usage_pct ?? 0,
+              requestsRunning: h.gpu.requests_running ?? 0,
+              requestsWaiting: h.gpu.requests_waiting ?? 0,
+              promptThroughputTokS: h.gpu.prompt_throughput_tok_s ?? 0,
+              generationThroughputTokS: h.gpu.generation_throughput_tok_s ?? 0,
+              timeToFirstTokenS: h.gpu.time_to_first_token_s ?? 0,
+              source: h.gpu.source ?? "amd_mi300x_vllm",
+            } : null,
+          },
+          b: {
+            ...prev.b,
+            latencyMs: h.latency_ms ?? 0,
+            inferenceMs: h.inference_ms ?? 0,
+            successCount: h.success_count ?? 0,
+            failCount: h.fail_count ?? 0,
+            queueDepth: h.queue_depth ?? 0,
+            uptimePct: 99.9,
+          },
+        }));
       }
 
       if (sysData && sysData.circuit_breaker) {

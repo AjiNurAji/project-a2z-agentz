@@ -669,7 +669,7 @@ Completed the final hardening sprint for the AMD Developer Hackathon submission.
 
 #### 4. Documentation Finalization
 - Authored `TEAM_ROADMAP.md` — Phase-gated execution plan for aditya, zm, ajinuraji
-- Updated `SUBMISSION.md` — Removed legacy NVIDIA/CUDA/SGLang negative examples
+- Updated `SUBMISSION.md` — Removed legacy NVIDIA/CUDA negative examples (kept vLLM on ROCm only)
 - Updated `docs/01-architecture.md` — Added explicit "Active Lane Separation" section documenting:
   - Lane 1: Active Inference Engine (Agent A → Qwen/Qwen2.5-72B-Instruct-AWQ on AMD MI300X via ROCm)
   - Lane 2: Active Security Gatekeeper (Agent B → GoPlus + Fireworks AI Llama 3.1 8B backup)
@@ -702,8 +702,7 @@ Completed the final hardening sprint for the AMD Developer Hackathon submission.
 | Frontend Dashboard | ✅ Connected | Real-time WebSocket logs, mock fallback available |
 
 ### Legacy Cleanup Confirmation
-- **No NVIDIA references** in active submission docs (`README.md`, `SUBMISSION.md`, `PRD.md`, `TEAM_ROADMAP.md`)
-- **No SGLang references** in active submission docs
+- **No NVIDIA references** in active submission docs (`README.md`, `SUBMISSION.md`, `PRD.md`, `TEAM_ROADMAP.md`) — AMD ROCm + vLLM only
 - **No hardcoded credentials** in committed files (`.env` is gitignored; `.env.example` uses placeholders only)
 - **No Fireworks AI** as primary inference path — documented clearly as Security Gatekeeper backup only
 

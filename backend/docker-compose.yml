@@ -22,6 +22,7 @@ services:
 
   backend:
     build: .
+    platform: linux/amd64
     container_name: a2z_backend
     restart: always
     ports:

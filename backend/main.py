@@ -7,6 +7,12 @@ import asyncio
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT / ".env", override=False)
@@ -39,6 +45,23 @@ async def lifespan(app: Starlette):
         # Self-heal the system/owner user (id=1) so Agent A's enqueue_target
         # FK (scraping_queue_user_fk) doesn't fail on fresh Railway databases.
         database.ensure_system_user()
+        # Startup guard: warn (not crash) if real execution is enabled but the
+        # required secrets/RPCs are missing, so failures aren't silent.
+        if os.getenv("AGENT_B_REAL_EXECUTION", "0") == "1":
+            _missing = []
+            if not os.getenv("VAULT_ADDRESS"):
+                _missing.append("VAULT_ADDRESS")
+            if not os.getenv("PRIVATE_KEY"):
+                _missing.append("PRIVATE_KEY")
+            _net = os.getenv("ACTIVE_NETWORK", "base").strip().lower()
+            if _net == "base_sepolia":
+                if not any(os.getenv(k) for k in ("BASE_SEPOLIA_RPC", "BASE_SEPOLIA_RPC_1", "BASE_SEPOLIA_RPC_2")):
+                    _missing.append("BASE_SEPOLIA_RPC_*")
+            else:
+                if not any(os.getenv(k) for k in ("BASE_RPC_1", "BASE_RPC_2", "BASE_RPC_3", "BASE_RPC_4")):
+                    _missing.append("BASE_RPC_*")
+            if _missing:
+                print(f"[WARN] AGENT_B_REAL_EXECUTION=1 but missing: {', '.join(_missing)}")
         yield
         print("Shutting down A2Z Agentz Backend...")
         stop_scheduler()

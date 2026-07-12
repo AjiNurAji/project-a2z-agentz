@@ -90,9 +90,12 @@ def _is_valid_evm_address(address: str | None) -> bool:
     return bool(_EVM_ADDRESS_RE.match(address.strip()))
 
 
-async def _get(session: aiohttp.ClientSession, url: str, params: dict[str, Any] | None = None, timeout: int = 10) -> dict[str, Any] | None:
+async def _get(session: aiohttp.ClientSession, url: str, params: dict[str, Any] | None = None, timeout: int = 10, headers: dict[str, str] | None = None) -> dict[str, Any] | None:
+    _headers = {"accept": "application/json"}
+    if headers:
+        _headers.update(headers)
     try:
-        async with session.get(url, params=params, timeout=timeout) as resp:
+        async with session.get(url, params=params, headers=_headers, timeout=timeout) as resp:
             if resp.status == 200:
                 return await resp.json()
             logger.warning("Agent A upstream %s -> %s", url, resp.status)
@@ -188,8 +191,8 @@ async def fetch_recent_channel_casts(
         return []
     headers = {"x-api-key": NEYNAR_API_KEY, "accept": "application/json"}
     url = (
-        "https://api.neynar.com/v2/farcaster/feed/channels"
-        f"?channel_ids={channel_id}&limit={limit}"
+        "https://api.neynar.com/v2/farcaster/feed"
+        "?feed_type=filter&filter_type=channel_id&channel_id=base&limit=" + str(limit)
     )
     return await _neynar_get_casts(session, url, headers)
 
@@ -289,6 +292,7 @@ async def run_cycle() -> None:
         queued = 0
         dropped = 0
         searched_tokens = 0
+        last_latency_ms = 0
         for token in tokens:
             address = token.get("contract_address", "")
             # Strict EVM gatekeeper: never ever queue non-EVM addresses.
@@ -343,12 +347,14 @@ async def run_cycle() -> None:
                     "reason": ai.reason,
                     "amount_usd": ai.amount_usd,
                     "model": ai.model,
+                    "latency_ms": ai.latency_ms,
                 }
                 payload["agent_a_passed"] = ai.score >= AGENT_A_LLM_THRESHOLD
+                last_latency_ms = ai.latency_ms
                 append_audit_log(
                     "agent_a.llm",
-                    f"LLM score={ai.score} passed={payload['agent_a_passed']} for {address}",
-                    {"address": address, "score": ai.score, "model": ai.model},
+                    f"LLM score={ai.score} passed={payload['agent_a_passed']} latency={ai.latency_ms}ms for {address}",
+                    {"address": address, "score": ai.score, "model": ai.model, "latency_ms": ai.latency_ms},
                 )
             except Exception as exc:
                 logger.warning("Agent A LLM analysis skipped (fallback mock): %s", exc)
@@ -384,10 +390,26 @@ async def run_cycle() -> None:
             "Agent A cycle done: queued=%s dropped=%s scanned=%s",
             queued, dropped, len(tokens),
         )
+        await manager.broadcast(json.dumps({
+            "type": "AGENT_LOG",
+            "data": {
+                "sender": "agent_a",
+                "content": f"Cycle complete: scanned {len(tokens)} tokens, queued {queued}, dropped {dropped}.",
+                "metadata": {"scanned": len(tokens), "queued": queued, "dropped": dropped, "latencyMs": last_latency_ms, "inferenceMs": last_latency_ms},
+            },
+        }))
 
 
 async def main() -> None:
     logger.info("Agent A producer starting")
+    await manager.broadcast(json.dumps({
+        "type": "AGENT_LOG",
+        "data": {
+            "sender": "agent_a",
+            "content": "Agent A (Scout) online. Scanning Base network for opportunities...",
+            "metadata": {"online": True},
+        },
+    }))
     await run_cycle()
 
 

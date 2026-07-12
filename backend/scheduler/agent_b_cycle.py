@@ -9,6 +9,7 @@ import asyncio
 import json
 import logging
 import os
+import time
 from typing import Any
 
 import aiohttp
@@ -46,7 +47,7 @@ BASE_RPC_1 = os.getenv("BASE_RPC_1", "")
 BASE_RPC_2 = os.getenv("BASE_RPC_2", "")
 BASE_RPC_3 = os.getenv("BASE_RPC_3", "")
 BASE_CHAIN_ID = int(os.getenv("BASE_CHAIN_ID", "8453"))
-MAX_SCORE_FOR_AUTO = int(os.getenv("AGENT_B_AUTO_SCORE_MIN", "85"))
+MAX_SCORE_FOR_AUTO = int(os.getenv("AGENT_B_AUTO_SCORE_MIN", "70"))
 DEFAULT_NETWORK_HINT = os.getenv("ACTIVE_NETWORK", "base")
 # Budget guard (env already provided by operator). Enforced before any
 # auto-execution proposal so the vault stays within operator limits.
@@ -157,7 +158,7 @@ async def _check_goplus(session: aiohttp.ClientSession, token_address: str) -> d
 
 async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_summary: str, dex_context: str = "") -> dict[str, Any]:
     if not AGENT_B_API_KEY or not AGENT_B_ENDPOINT or not AGENT_B_MODEL:
-        return {"score": 0, "reason": "missing agent b config", "amount_usd": 0.0, "model": "bypass"}
+        return {"score": 0, "reason": "missing agent b config", "amount_usd": 0.0, "model": "bypass", "latency_ms": 0}
     temperature = float(os.getenv("AGENT_B_TEMPERATURE", "0.1"))
     max_tokens = int(os.getenv("AGENT_B_MAX_TOKENS", "1024"))
     prompt = (
@@ -187,7 +188,8 @@ async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_
         except Exception as exc:
             logger.debug("Agent B auto-discovery skipped: %s", exc)
 
-    client = AsyncOpenAI(base_url=AGENT_B_ENDPOINT, api_key=AGENT_B_API_KEY)
+    client = AsyncOpenAI(base_url=AGENT_B_ENDPOINT, api_key=AGENT_B_API_KEY, timeout=25.0, max_retries=1)
+    _t0 = time.time()
     try:
         resp = await client.chat.completions.create(
             model=model_id,
@@ -200,11 +202,13 @@ async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_
         )
     except Exception as exc:
         logger.warning("Agent B inference failed: %s", exc)
-        return {"score": 0, "reason": f"inference_failed: {exc}", "amount_usd": 0.0, "model": model_id}
+        return {"score": 0, "reason": f"inference_failed: {exc}", "amount_usd": 0.0, "model": model_id, "latency_ms": int((time.time() - _t0) * 1000)}
 
+    _latency = int((time.time() - _t0) * 1000)
     content = resp.choices[0].message.content if resp.choices else ""
     if not content:
-        return {"score": 0, "reason": f"http {resp.status_code}", "amount_usd": 0.0, "model": model_id}
+        _code = getattr(resp, "status_code", "?")
+        return {"score": 0, "reason": f"http {_code}", "amount_usd": 0.0, "model": model_id, "latency_ms": _latency}
     try:
         parsed = json.loads(content)
         if isinstance(parsed, dict):
@@ -214,6 +218,7 @@ async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_
                 "amount_usd": float(parsed.get("amount_usd", 0) or 0),
                 "category": str(parsed.get("category", "unknown")),
                 "model": str(parsed.get("model", model_id)),
+                "latency_ms": _latency,
             }
     except Exception:
         pass
@@ -320,7 +325,7 @@ async def process_task(task: dict[str, Any]) -> None:
           "data": {
             "sender": "agent_b",
             "content": f"Analyzed {token_name} ({contract_address}). Score: {score}/100. Reason: {reason}",
-            "metadata": {"score": score, "projectName": token_name}
+            "metadata": {"score": score, "projectName": token_name, "latencyMs": inference.get("latency_ms")}
           }
         })
       )
@@ -413,7 +418,7 @@ async def process_task(task: dict[str, Any]) -> None:
             "data": {
               "sender": "agent_b",
               "content": f"Score {score} >= {MAX_SCORE_FOR_AUTO}. Auto-executing proposal for {token_name}. Amount: ${amount_usd} | Tx: {tx_hash}",
-              "metadata": {"amountUsd": amount_usd, "projectName": token_name, "txHash": tx_hash}
+              "metadata": {"amountUsd": amount_usd, "projectName": token_name, "txHash": tx_hash, "score": score}
             }
           })
         )
@@ -434,6 +439,14 @@ async def worker_loop(poll_interval: float = 2.0) -> None:
 
   ensure_pipeline_tables()
   logger.info("Agent B worker starting cycle")
+  await manager.broadcast(json.dumps({
+      "type": "AGENT_LOG",
+      "data": {
+          "sender": "agent_b",
+          "content": "Agent B (Vault) online. Monitoring execution queue...",
+          "metadata": {"online": True},
+      },
+  }))
   while True:
     task = fetch_and_lock_pending_task(limit=1)
     if task is None:

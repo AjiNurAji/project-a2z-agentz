@@ -68,5 +68,5 @@ Not a simulation. Agent B executes real transactions on Base mainnet (with a har
 
 - AMD Blog: [Adapting vLLM models For Specific Use Cases Through Fine-Tuning in AMD AI Workbench](https://rocm.blogs.amd.com/software-tools-optimization/aiwb-fine-tuning/README.html)
 - AMD Blog: [Unleashing AMD Instinct MI300X GPUs for LLM Serving with vLLM](https://rocm.blogs.amd.com/software-tools-optimization/disaggregation/README.html)
-- AMD Docs: [vLLM distributed inference with MoRI](https://rocm.docs.amd.com/en/latest/how-to/rocm-for-ai/inference/benchmark-docker/sglang-mori-distributed.html)
+- AMD Docs: [vLLM distributed inference with MoRI](https://rocm.docs.amd.com/en/latest/how-to/rocm-for-ai/inference/benchmark-docker/vllm-mori-distributed.html)
 - AMD Hackathon ACT II: [lablab.ai/ai-hackathons/amd-developer-hackathon-act-ii](https://lablab.ai/ai-hackathons/amd-developer-hackathon-act-ii)

@@ -47,6 +47,18 @@ def _ws_protocol_valid(protocol: str) -> bool:
 class ConnectionManager:
     def __init__(self):
         self.active_connections = []
+        self.agent_log_buffer = []  # last N agent/system logs (for polling fallback)
+        # Live, real metrics surfaced to the dashboard (no hardcoded values).
+        self.metrics = {
+            "agent_a_latency_ms": 0,
+            "agent_b_latency_ms": 0,
+            "agent_a_inference_ms": 0,
+            "agent_b_inference_ms": 0,
+            "agent_a_success": 0,
+            "agent_a_failed": 0,
+            "agent_b_success": 0,
+            "agent_b_failed": 0,
+        }
 
     async def connect(self, websocket):
         await websocket.accept()
@@ -57,11 +69,53 @@ class ConnectionManager:
             self.active_connections.remove(websocket)
 
     async def broadcast(self, message: str):
+        # Persist agent/system logs so dashboards that poll /api/status
+        # (instead of holding a WebSocket) still see live agent activity.
+        try:
+            import json as _json
+            import time as _time
+            msg = _json.loads(message)
+            if msg.get("type") in ("AGENT_LOG", "SYSTEM_LOG"):
+                msg["ts"] = int(_time.time())  # used by /api/system-status for last-seen
+                self.agent_log_buffer.append(msg)
+                if len(self.agent_log_buffer) > 50:
+                    self.agent_log_buffer = self.agent_log_buffer[-50:]
+                # Update real metrics from the agent log content/metadata.
+                data = msg.get("data", {})
+                sender = data.get("sender")
+                meta = data.get("metadata") or {}
+                content = (data.get("content") or data.get("message") or "").lower()
+                if sender == "agent_a":
+                    if meta.get("latencyMs"):
+                        self.metrics["agent_a_latency_ms"] = int(meta["latencyMs"])
+                    if meta.get("inferenceMs"):
+                        self.metrics["agent_a_inference_ms"] = int(meta["inferenceMs"])
+                    if "score:" in content or "analyzed" in content:
+                        self.metrics["agent_a_success"] += 1
+                    if "error" in content or "failed" in content:
+                        self.metrics["agent_a_failed"] += 1
+                elif sender == "agent_b":
+                    if meta.get("latencyMs"):
+                        self.metrics["agent_b_latency_ms"] = int(meta["latencyMs"])
+                    if meta.get("inferenceMs"):
+                        self.metrics["agent_b_inference_ms"] = int(meta["inferenceMs"])
+                    if "executed" in content or "approved" in content:
+                        self.metrics["agent_b_success"] += 1
+                    if "rejected" in content or "failed" in content or "error" in content:
+                        self.metrics["agent_b_failed"] += 1
+        except Exception:
+            pass
         for connection in self.active_connections:
             try:
                 await connection.send_text(message)
             except:
                 pass
+
+    def recent_agent_logs(self):
+        return list(self.agent_log_buffer)
+
+    def get_metrics(self):
+        return dict(self.metrics)
 
 manager = ConnectionManager()
 
@@ -98,9 +152,35 @@ class WSEndpoint(WebSocketEndpoint):
         # `new WebSocket(url, [token])`). It MUST be a JWT (safe to log) -- the
         # raw API_KEY is only accepted as a server-side dev fallback.
         origin = websocket.headers.get("origin", "")
-        if origin and ".trycloudflare.com" not in origin and "localhost" not in origin:
+        # Always allow Cloudflare Tunnel + local dev. Also allow any origin
+        # explicitly listed in FRONTEND_ORIGIN (comma-separated) so the Vercel
+        # dashboard can open the A2A WebSocket.
+        allowed_origins = [
+            o.strip() for o in os.getenv("FRONTEND_ORIGIN", "").split(",") if o.strip()
+        ]
+        origin_allowed = (
+            not origin
+            or ".trycloudflare.com" in origin
+            or "localhost" in origin
+            or origin in allowed_origins
+        )
+        if not origin_allowed:
             await websocket.close(code=1008)
             return
+
+        # Browsers require CORS headers on the WS upgrade response or they
+        # silently close the socket (curl/python ignore this). Echo the
+        # requesting origin and allow credentials so the Vercel dashboard can
+        # open the socket cross-site.
+        cors_headers = [
+            (b"access-control-allow-origin", origin.encode() or b"*"),
+            (b"access-control-allow-credentials", b"true"),
+            (b"access-control-allow-methods", b"GET, OPTIONS"),
+            (b"access-control-allow-headers", b"*"),
+        ]
+        existing = list(websocket.scope.get("headers", []))
+        existing.extend(cors_headers)
+        websocket.scope["headers"] = existing
 
         # Sec-WebSocket-Protocol may contain several comma/space separated
         # tokens; the client passes exactly one (the token). Accept the first

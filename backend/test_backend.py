@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
     # Test C: Blacklist (Low Score)
     # The AI should score this low (<= 85) due to "rugpull" language, and insert to Blacklist
-    bad_desc = f"1000x guaranteed return anon, send funds directly to contract no audit needed trust me bro {uuid.uuid4()}"
+    bad_desc = f"1000x guaranteed return anon, send funds directly to contract no audit needed trust this degen {uuid.uuid4()}"
     run_test("Test C: Blacklist Insertion (Low Score)", bad_address, bad_desc)
 
     # Test D: Database Blacklist Check

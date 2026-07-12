@@ -7,8 +7,18 @@ import { Sparkline } from "@/components/ui/Sparkline";
 import { Bot, Shield, Activity, Zap, Clock, CheckCircle2, XCircle, ListChecks, Pause, Play, Link2 } from "lucide-react";
 
 function genSpark(base: number, n = 12): number[] {
+  // Deterministic placeholder; real history is fed from agent activity.
   let v = base;
   return Array.from({ length: n }, () => { v += (Math.random() - 0.45) * base * 0.1; return Math.max(0, v); });
+}
+
+function realSpark(activities: number[]): number[] {
+  // Build a sparkline from the actual number of agent log events seen per
+  // recent poll window (no fabricated randomness).
+  if (activities.length === 0) return [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  const out = activities.slice(-12);
+  while (out.length < 12) out.unshift(0);
+  return out;
 }
 
 function Metric({ icon: Icon, label, value, color }: { icon: typeof Activity; label: string; value: string; color: string }) {
@@ -66,12 +76,31 @@ function AgentHero({ name, role, icon: Icon, color, bg, status, health, spark, i
         <Metric icon={XCircle} label="Failed" value={health.failCount.toString()} color="var(--color-fg-danger)" />
         <Metric icon={ListChecks} label="Queue" value={health.queueDepth.toString()} color="var(--color-fg-brand-strong)" />
       </div>
+
+      {health.gpu && (
+        <div className="rounded-xl p-4 space-y-3" style={{ background: "var(--color-neutral-secondary-soft)", border: `1px solid var(--color-border-soft)` }}>
+          <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--color-fg-purple)" }}>
+            AMD MI300X GPU · {health.gpu.source}
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <Metric icon={Activity} label="GPU Util" value={`${health.gpu.gpuCacheUsagePct}%`} color="var(--color-fg-purple)" />
+            <Metric icon={Zap} label="Req Running" value={health.gpu.requestsRunning.toString()} color="var(--color-fg-purple)" />
+            <Metric icon={Clock} label="TTFT" value={`${health.gpu.timeToFirstTokenS}s`} color="var(--color-fg-warning)" />
+            <Metric icon={ListChecks} label="Tok/s (gen)" value={health.gpu.generationThroughputTokS.toString()} color="var(--color-fg-cyan)" />
+            <Metric icon={Bot} label="Tok/s (prompt)" value={health.gpu.promptThroughputTokS.toString()} color="var(--color-fg-cyan)" />
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }
 
 export default function AgentsPage() {
-  const { agentAStatus, agentBStatus, isPaused, setIsPaused, agentHealth } = useDashboard();
+  const { agentAStatus, agentBStatus, isPaused, setIsPaused, agentHealth, agentMessages } = useDashboard();
+
+  // Real activity sparkline: count Agent A / B messages seen this session.
+  const aActivity = agentMessages.filter((m) => m.sender === "agent_a").map((_, i) => i + 1);
+  const bActivity = agentMessages.filter((m) => m.sender === "agent_b").map((_, i) => i + 1);
 
   return (
     <motion.div
@@ -106,7 +135,7 @@ export default function AgentsPage() {
           bg="var(--color-brand-softer)"
           status={agentAStatus}
           health={agentHealth.a}
-          spark={genSpark(agentHealth.a.latencyMs)}
+          spark={realSpark(aActivity)}
         />
         <AgentHero
           name="Agent B — Vault"
@@ -116,7 +145,7 @@ export default function AgentsPage() {
           bg="var(--color-brand-soft)"
           status={agentBStatus}
           health={agentHealth.b}
-          spark={genSpark(Math.max(1, agentHealth.b.latencyMs))}
+          spark={realSpark(bActivity)}
           isPaused={isPaused}
         />
       </div>

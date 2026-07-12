@@ -12,6 +12,8 @@ import database
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from auth import hash_password, verify_password, create_access_token, verify_access_token
 
+API_KEY = os.getenv("API_KEY", "")
+
 def validate_email(email):
     return re.match(r"[^@]+@[^@]+\.[^@]+", email)
 
@@ -75,49 +77,68 @@ async def login(request: Request):
     # Generate token
     token = create_access_token({"sub": str(user["id"]), "email": user["email"]})
 
-    # Prepare response
+    # Prepare response. Send token in body too so the dashboard can store it
+    # in localStorage and forward it as an Authorization header (works across
+    # Vercel -> Railway domains where cross-site cookies are unreliable).
     user.pop("password_hash", None)
-    response = JSONResponse({"user": user})
+    response = JSONResponse({"user": user, "token": token})
 
-    # Set cookie
+    # Still set the cookie (helps same-site / curl use), but the dashboard
+    # prefers the body token.
     response.set_cookie(
         key="a2z-token",
         value=token,
         httponly=True,
         path="/",
         max_age=604800, # 7 days
-        samesite="lax",
-        secure=False # Set to True if HTTPS
+        samesite="none",
+        secure=True
     )
 
     return response
 
 async def me(request: Request):
-    token = request.cookies.get("a2z-token")
+    # Prefer Authorization header (dashboard forwards JWT from localStorage),
+    # fall back to the cookie, then to the server-side API key (the dashboard
+    # already sends X-API-Key on every request, so this keeps /me working
+    # even when the JWT is not present in localStorage).
+    auth_header = request.headers.get("Authorization", "")
+    token = ""
+    if auth_header.lower().startswith("bearer "):
+        token = auth_header[7:].strip()
     if not token:
-        return JSONResponse({"error": "Not authenticated"}, status_code=401)
-    
-    payload = verify_access_token(token)
-    if not payload or "sub" not in payload:
-        return JSONResponse({"error": "Invalid or expired token"}, status_code=401)
-    
-    user_id = int(payload["sub"])
-    user = database.get_user_by_id(user_id)
-    if not user:
-        return JSONResponse({"error": "User not found"}, status_code=401)
-    
-    return JSONResponse({"user": user})
+        token = request.cookies.get("a2z-token")
+
+    if token and token != "guest":
+        payload = verify_access_token(token)
+        if payload and "sub" in payload:
+            user_id = int(payload["sub"])
+            user = database.get_user_by_id(user_id)
+            if user:
+                return JSONResponse({"user": user})
+
+    # Fallback: server-side API key (dev/demo). Never accepts the raw guest
+    # cookie as a real user.
+    api_key = request.headers.get("X-API-Key")
+    if api_key and api_key == API_KEY:
+        # Return the system/demo user so the dashboard can render.
+        user = database.get_user_by_id(1)
+        if user:
+            return JSONResponse({"user": user})
+
+    return JSONResponse({"error": "Not authenticated"}, status_code=401)
 
 async def logout(request: Request):
     response = JSONResponse({"ok": True})
+    # Clear cookie on logout (SameSite=None+Secure to match login)
     response.set_cookie(
         key="a2z-token",
         value="",
         httponly=True,
         path="/",
         max_age=0,
-        samesite="lax",
-        secure=False
+        samesite="none",
+        secure=True
     )
     return response
 
