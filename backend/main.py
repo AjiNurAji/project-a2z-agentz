@@ -43,11 +43,16 @@ async def lifespan(app: Starlette):
         start_scheduler()
         task = asyncio.create_task(poll_and_broadcast())
         # Agent B runs as a dedicated daemon (continuous queue poll) so it
-        # never hits APScheduler's max_instances cap. Started once here in a
-        # worker thread (it calls asyncio.run() internally, so it must NOT be
-        # wrapped in create_task -- that would schedule a future, not run it).
+        # never hits APScheduler's max_instances cap. We run it in a worker
+        # thread via run_in_executor: run_agent_b_daemon calls asyncio.run()
+        # internally to own its own event loop (worker_loop uses
+        # manager.broadcast on the main loop), so it must NOT share the
+        # server's event loop. run_in_executor schedules the sync entrypoint
+        # immediately (no await needed), unlike asyncio.to_thread() whose
+        # result must be awaited.
         from scheduler.agent_runner import run_agent_b_daemon
-        agent_b_task = asyncio.to_thread(run_agent_b_daemon)
+        loop = asyncio.get_event_loop()
+        agent_b_task = loop.run_in_executor(None, run_agent_b_daemon)
         # Self-heal the system/owner user (id=1) so Agent A's enqueue_target
         # FK (scraping_queue_user_fk) doesn't fail on fresh Railway databases.
         database.ensure_system_user()
