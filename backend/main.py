@@ -246,9 +246,21 @@ frontend_origin = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
 # often live on a different host than localhost). When allow_credentials is
 # True Starlette forbids "*", so we expand the env into an explicit list.
 allow_origins = [o.strip() for o in frontend_origin.split(",") if o.strip()]
-# In debug mode, also allow any origin so local/dev dashboards just work.
-if os.getenv("DEBUG", "false").lower() == "true":
-    allow_origins = ["*"]
+# Always allow the known Vercel dashboard host so judges can open the live
+# demo without a CORS block. Add more hosts via FRONTEND_ORIGIN (comma list).
+_known_hosts = [
+    "https://project-a2z-agentz-m7ojk8ih3-axzss-projects.vercel.app",
+    "https://project-a2z-agentz-gamma.vercel.app",
+]
+for _h in _known_hosts:
+    if _h not in allow_origins:
+        allow_origins.append(_h)
+# SECURITY: never fall back to "*" + allow_credentials. A wildcard origin with
+# credentials enabled makes the API readable/off-loadable from ANY website
+# (reflected-origin CSRF / cross-origin data theft). DEBUG may relax logging
+# but MUST NOT relax CORS. If FRONTEND_ORIGIN is empty we keep the explicit
+# localhost default above rather than opening up to "*".
+assert allow_origins, "FRONTEND_ORIGIN must list at least one explicit origin"
 
 middleware = [
     Middleware(CORSMiddleware, allow_origins=allow_origins, allow_methods=["*"], allow_headers=["*"], allow_credentials=True)
