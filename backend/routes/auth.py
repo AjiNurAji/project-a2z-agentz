@@ -12,6 +12,8 @@ import database
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from auth import hash_password, verify_password, create_access_token, verify_access_token
 
+API_KEY = os.getenv("API_KEY", "")
+
 def validate_email(email):
     return re.match(r"[^@]+@[^@]+\.[^@]+", email)
 
@@ -97,26 +99,34 @@ async def login(request: Request):
 
 async def me(request: Request):
     # Prefer Authorization header (dashboard forwards JWT from localStorage),
-    # fall back to the cookie.
+    # fall back to the cookie, then to the server-side API key (the dashboard
+    # already sends X-API-Key on every request, so this keeps /me working
+    # even when the JWT is not present in localStorage).
     auth_header = request.headers.get("Authorization", "")
     token = ""
     if auth_header.lower().startswith("bearer "):
         token = auth_header[7:].strip()
     if not token:
         token = request.cookies.get("a2z-token")
-    if not token:
-        return JSONResponse({"error": "Not authenticated"}, status_code=401)
 
-    payload = verify_access_token(token)
-    if not payload or "sub" not in payload:
-        return JSONResponse({"error": "Invalid or expired token"}, status_code=401)
+    if token and token != "guest":
+        payload = verify_access_token(token)
+        if payload and "sub" in payload:
+            user_id = int(payload["sub"])
+            user = database.get_user_by_id(user_id)
+            if user:
+                return JSONResponse({"user": user})
 
-    user_id = int(payload["sub"])
-    user = database.get_user_by_id(user_id)
-    if not user:
-        return JSONResponse({"error": "User not found"}, status_code=401)
+    # Fallback: server-side API key (dev/demo). Never accepts the raw guest
+    # cookie as a real user.
+    api_key = request.headers.get("X-API-Key")
+    if api_key and api_key == API_KEY:
+        # Return the system/demo user so the dashboard can render.
+        user = database.get_user_by_id(1)
+        if user:
+            return JSONResponse({"user": user})
 
-    return JSONResponse({"user": user})
+    return JSONResponse({"error": "Not authenticated"}, status_code=401)
 
 async def logout(request: Request):
     response = JSONResponse({"ok": True})
