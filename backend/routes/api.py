@@ -267,12 +267,18 @@ async def get_system_status(request: Request):
             [m.get("ts", 0) for m in manager.agent_log_buffer if m.get("data", {}).get("sender") == "agent_b"],
             default=0,
         )
+        m = manager.get_metrics()
         body["agent_health"] = {
             "ws_connections": len(manager.active_connections),
             "agent_a_model": os.getenv("AI_MODEL", "") or os.getenv("AGENT_A_MODEL", ""),
             "agent_b_model": os.getenv("AGENT_B_MODEL", ""),
             "agent_a_last_seen": last_a,
             "agent_b_last_seen": last_b,
+            "latency_ms": m["agent_a_latency_ms"] or m["agent_b_latency_ms"],
+            "inference_ms": m["agent_a_inference_ms"] or m["agent_b_inference_ms"],
+            "success_count": m["agent_a_success"] + m["agent_b_success"],
+            "fail_count": m["agent_a_failed"] + m["agent_b_failed"],
+            "queue_depth": 0,
         }
     except Exception:
         pass

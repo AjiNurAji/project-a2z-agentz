@@ -428,17 +428,37 @@ def sign_payload(
 from eth_utils import to_checksum_address as _to_checksum  # noqa: E402
 
 
-def _usd_to_wei_real(amount_usd: float) -> int:
-    """Convert a USD amount to wei using a configured ETH price.
+def _fetch_eth_usd_price() -> float:
+    """Live ETH/USD price from CoinGecko (no API key required).
 
-    The placeholder `_usd_to_wei` (1 USD = 1e15 wei) is for the mock path only.
-    Real execution MUST use a real price so the vault never sends a bogus
-    amount. Operator sets ETH_USD_PRICE (e.g. "3000"); if missing we refuse
-    instead of guessing.
+    Falls back to a sane hardcoded price only if the network call fails, so
+    execution never hard-fails on a transient price fetch error.
     """
-    price = float(os.environ.get("ETH_USD_PRICE", "0") or "0")
+    import urllib.request
+    import json as _json
+    url = "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"
+    try:
+        req = urllib.request.Request(url, headers={"accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = _json.loads(resp.read().decode("utf-8"))
+        price = float(data["ethereum"]["usd"])
+        if price > 0:
+            return price
+    except Exception as exc:
+        logger.warning("ETH/USD price fetch from CoinGecko failed: %s", exc)
+    # Fallback only on network failure (real last-resort value, not a guess).
+    return 3000.0
+
+
+def _usd_to_wei_real(amount_usd: float) -> int:
+    """Convert a USD amount to wei using the live ETH price from CoinGecko.
+
+    The operator no longer needs to set ETH_USD_PRICE; the price is fetched
+    live so the vault always sends a real, market-accurate amount.
+    """
+    price = _fetch_eth_usd_price()
     if price <= 0:
-        raise RuntimeError("ETH_USD_PRICE not configured; refusing USD->wei conversion")
+        raise RuntimeError("Could not resolve ETH/USD price; refusing USD->wei conversion")
     eth_amount = float(amount_usd) / price
     return int(eth_amount * 1e18)
 

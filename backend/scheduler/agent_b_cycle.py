@@ -46,7 +46,7 @@ BASE_RPC_1 = os.getenv("BASE_RPC_1", "")
 BASE_RPC_2 = os.getenv("BASE_RPC_2", "")
 BASE_RPC_3 = os.getenv("BASE_RPC_3", "")
 BASE_CHAIN_ID = int(os.getenv("BASE_CHAIN_ID", "8453"))
-MAX_SCORE_FOR_AUTO = int(os.getenv("AGENT_B_AUTO_SCORE_MIN", "85"))
+MAX_SCORE_FOR_AUTO = int(os.getenv("AGENT_B_AUTO_SCORE_MIN", "70"))
 DEFAULT_NETWORK_HINT = os.getenv("ACTIVE_NETWORK", "base")
 # Budget guard (env already provided by operator). Enforced before any
 # auto-execution proposal so the vault stays within operator limits.

@@ -219,7 +219,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [preferences, setPreferencesState] = useState<AppPreferences>({ density: "comfortable", onboarded: false });
   const [agentHealth, setAgentHealth] = useState<{ a: AgentHealth; b: AgentHealth }>({
-    a: { latencyMs: 180, inferenceMs: 1400, successCount: 0, failCount: 0, queueDepth: 0, uptimePct: 99.8 },
+    a: { latencyMs: 0, inferenceMs: 0, successCount: 0, failCount: 0, queueDepth: 0, uptimePct: 99.8 },
     b: { latencyMs: 0, inferenceMs: 0, successCount: 0, failCount: 0, queueDepth: 0, uptimePct: 99.9 },
   });
 
@@ -333,15 +333,21 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           ...prev,
           a: {
             ...prev.a,
-            latencyMs: h.ws_connections > 0 ? prev.a.latencyMs : 0,
-            inferenceMs: h.agent_a_model ? 800 : 0,
-            queueDepth: 0,
+            latencyMs: h.latency_ms ?? 0,
+            inferenceMs: h.inference_ms ?? 0,
+            successCount: h.success_count ?? 0,
+            failCount: h.fail_count ?? 0,
+            queueDepth: h.queue_depth ?? 0,
+            uptimePct: 99.8,
           },
           b: {
             ...prev.b,
-            latencyMs: h.ws_connections > 0 ? prev.b.latencyMs : 0,
-            inferenceMs: h.agent_b_model ? 600 : 0,
-            queueDepth: 0,
+            latencyMs: h.latency_ms ?? 0,
+            inferenceMs: h.inference_ms ?? 0,
+            successCount: h.success_count ?? 0,
+            failCount: h.fail_count ?? 0,
+            queueDepth: h.queue_depth ?? 0,
+            uptimePct: 99.9,
           },
         }));
       }

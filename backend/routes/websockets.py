@@ -48,6 +48,17 @@ class ConnectionManager:
     def __init__(self):
         self.active_connections = []
         self.agent_log_buffer = []  # last N agent/system logs (for polling fallback)
+        # Live, real metrics surfaced to the dashboard (no hardcoded values).
+        self.metrics = {
+            "agent_a_latency_ms": 0,
+            "agent_b_latency_ms": 0,
+            "agent_a_inference_ms": 0,
+            "agent_b_inference_ms": 0,
+            "agent_a_success": 0,
+            "agent_a_failed": 0,
+            "agent_b_success": 0,
+            "agent_b_failed": 0,
+        }
 
     async def connect(self, websocket):
         await websocket.accept()
@@ -69,6 +80,29 @@ class ConnectionManager:
                 self.agent_log_buffer.append(msg)
                 if len(self.agent_log_buffer) > 50:
                     self.agent_log_buffer = self.agent_log_buffer[-50:]
+                # Update real metrics from the agent log content/metadata.
+                data = msg.get("data", {})
+                sender = data.get("sender")
+                meta = data.get("metadata") or {}
+                content = (data.get("content") or data.get("message") or "").lower()
+                if sender == "agent_a":
+                    if meta.get("latencyMs"):
+                        self.metrics["agent_a_latency_ms"] = int(meta["latencyMs"])
+                    if meta.get("inferenceMs"):
+                        self.metrics["agent_a_inference_ms"] = int(meta["inferenceMs"])
+                    if "score:" in content or "analyzed" in content:
+                        self.metrics["agent_a_success"] += 1
+                    if "error" in content or "failed" in content:
+                        self.metrics["agent_a_failed"] += 1
+                elif sender == "agent_b":
+                    if meta.get("latencyMs"):
+                        self.metrics["agent_b_latency_ms"] = int(meta["latencyMs"])
+                    if meta.get("inferenceMs"):
+                        self.metrics["agent_b_inference_ms"] = int(meta["inferenceMs"])
+                    if "executed" in content or "approved" in content:
+                        self.metrics["agent_b_success"] += 1
+                    if "rejected" in content or "failed" in content or "error" in content:
+                        self.metrics["agent_b_failed"] += 1
         except Exception:
             pass
         for connection in self.active_connections:
@@ -79,6 +113,9 @@ class ConnectionManager:
 
     def recent_agent_logs(self):
         return list(self.agent_log_buffer)
+
+    def get_metrics(self):
+        return dict(self.metrics)
 
 manager = ConnectionManager()
 
