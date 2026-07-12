@@ -161,7 +161,7 @@ function LandingContent() {
                 </div>
                 <h3 className="text-sm font-semibold text-[var(--color-heading)]">Transaction Vault</h3>
                 <p className="text-[11px] text-[var(--color-body-subtle)] leading-relaxed">
-                  Signs ECDSA payloads from Scout. Uses Deepseek-V4-Flash via Fireworks AI as a strict guardrail before broadcasting secure transfers on Base.
+                  Signs ECDSA payloads from Scout. Uses DeepSeek-V4-Pro via Fireworks AI as a strict guardrail before broadcasting secure transfers on Base.
                 </p>
               </div>
             </div>
