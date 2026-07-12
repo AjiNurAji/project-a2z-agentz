@@ -47,6 +47,7 @@ def _ws_protocol_valid(protocol: str) -> bool:
 class ConnectionManager:
     def __init__(self):
         self.active_connections = []
+        self.agent_log_buffer = []  # last N agent/system logs (for polling fallback)
 
     async def connect(self, websocket):
         await websocket.accept()
@@ -57,11 +58,25 @@ class ConnectionManager:
             self.active_connections.remove(websocket)
 
     async def broadcast(self, message: str):
+        # Persist agent/system logs so dashboards that poll /api/status
+        # (instead of holding a WebSocket) still see live agent activity.
+        try:
+            import json as _json
+            msg = _json.loads(message)
+            if msg.get("type") in ("AGENT_LOG", "SYSTEM_LOG"):
+                self.agent_log_buffer.append(msg)
+                if len(self.agent_log_buffer) > 50:
+                    self.agent_log_buffer = self.agent_log_buffer[-50:]
+        except Exception:
+            pass
         for connection in self.active_connections:
             try:
                 await connection.send_text(message)
             except:
                 pass
+
+    def recent_agent_logs(self):
+        return list(self.agent_log_buffer)
 
 manager = ConnectionManager()
 

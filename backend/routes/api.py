@@ -679,7 +679,11 @@ async def get_execution_status(request: Request):
                 t["created_at"] = str(t["created_at"])
             if "amount_usd" in t and t["amount_usd"] is not None:
                 t["amount_usd"] = float(t["amount_usd"])
-        return JSONResponse({"status": "ok", "logs": transactions})
+        # Live agent logs (from the in-memory broadcast buffer, so the
+        # dashboard sees Agent A/B activity even without a held WebSocket).
+        from routes.websockets import manager
+        agent_logs = manager.recent_agent_logs()
+        return JSONResponse({"status": "ok", "logs": transactions, "agent_logs": agent_logs})
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 

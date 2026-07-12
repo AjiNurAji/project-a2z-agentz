@@ -240,7 +240,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       setTransactions(txs.map(mapRawTxToTransaction) as Transaction[]);
     }
   });
-  const usingReal = ws.status === "connected";
+  // Real mode is driven by the backend being reachable (authenticated via
+  // X-API-Key / JWT on every fetch). The WebSocket is an enhancement, not a
+  // gate — if it can't connect from the browser we still show live data
+  // polled from /api/status (which carries the agent log buffer).
+  const usingReal = true;
 
   const logCountRef = useRef(0);
 
@@ -285,7 +289,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const fetchDashboardData = useCallback(async () => {
     try {
       const [statusData, statsData, sysData] = await Promise.all([
-        apiFetch<{ logs?: Array<{ tx_hash_id: string; project_target_address: string; amount_usd: number; status: string; created_at: string }> }>("/api/status"),
+        apiFetch<{ logs?: Array<{ tx_hash_id: string; project_target_address: string; amount_usd: number; status: string; created_at: string }>; agent_logs?: Array<{ type: string; data: { sender?: string; content?: string; level?: string; message?: string; metadata?: Record<string, unknown> } }> }>("/api/status"),
         apiFetch<{ total_transactions: number; success_rate: number; total_usd_sent: number; active_targets: number; projects_scanned?: number; total_tvl?: number }>("/api/stats"),
         apiFetch<{ circuit_breaker: string }>("/api/system-status")
       ]);
@@ -293,6 +297,28 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       if (statusData?.logs) {
         const mappedTxs = statusData.logs.map(mapRawTxToTransaction) as Transaction[];
         setTransactions(mappedTxs.slice(0, 50));
+      }
+
+      // Live agent logs from the backend broadcast buffer (works with or
+      // without a held WebSocket).
+      if (statusData?.agent_logs) {
+        for (const entry of statusData.agent_logs) {
+          const d = entry.data || {};
+          if (entry.type === "AGENT_LOG" && d.sender) {
+            setAgentMessages((prev) => [...prev, mapLogToAgentMessage({
+              sender: d.sender as "agent_a" | "agent_b" | "system",
+              content: d.content || "",
+              metadata: d.metadata as { txHash?: string; score?: number; projectName?: string; amountUsd?: number } | undefined,
+            })].slice(-50) as AgentMessage[]);
+          } else if (entry.type === "SYSTEM_LOG") {
+            setLogs((prev) => [{
+              id: genId(),
+              timestamp: new Date(),
+              level: (d.level as LogEntry["level"]) || "INFO",
+              message: d.message || "",
+            }, ...prev].slice(0, 100));
+          }
+        }
       }
 
       if (sysData && sysData.circuit_breaker) {
