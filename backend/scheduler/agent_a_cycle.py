@@ -289,6 +289,7 @@ async def run_cycle() -> None:
         queued = 0
         dropped = 0
         searched_tokens = 0
+        last_latency_ms = 0
         for token in tokens:
             address = token.get("contract_address", "")
             # Strict EVM gatekeeper: never ever queue non-EVM addresses.
@@ -346,6 +347,7 @@ async def run_cycle() -> None:
                     "latency_ms": ai.latency_ms,
                 }
                 payload["agent_a_passed"] = ai.score >= AGENT_A_LLM_THRESHOLD
+                last_latency_ms = ai.latency_ms
                 append_audit_log(
                     "agent_a.llm",
                     f"LLM score={ai.score} passed={payload['agent_a_passed']} latency={ai.latency_ms}ms for {address}",
@@ -390,7 +392,7 @@ async def run_cycle() -> None:
             "data": {
                 "sender": "agent_a",
                 "content": f"Cycle complete: scanned {len(tokens)} tokens, queued {queued}, dropped {dropped}.",
-                "metadata": {"scanned": len(tokens), "queued": queued, "dropped": dropped},
+                "metadata": {"scanned": len(tokens), "queued": queued, "dropped": dropped, "latencyMs": last_latency_ms, "inferenceMs": last_latency_ms},
             },
         }))
 

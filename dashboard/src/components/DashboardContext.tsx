@@ -238,6 +238,21 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const ws = useAgentWebSocket({
     onAgentLog: (log) => {
       setAgentMessages((prev) => [...prev, mapLogToAgentMessage(log)].slice(-50) as AgentMessage[]);
+      // Surface Agent A/B live latency from broadcast metadata into health cards.
+      const sender = log?.data?.sender;
+      const meta = log?.data?.metadata;
+      if (sender === "agent_a" && meta?.latencyMs) {
+        setAgentHealth((prev) => ({
+          ...prev,
+          a: { ...prev.a, latencyMs: Number(meta.latencyMs) || prev.a.latencyMs, inferenceMs: Number(meta.inferenceMs) || prev.a.inferenceMs },
+        }));
+      }
+      if (sender === "agent_b" && meta?.latencyMs) {
+        setAgentHealth((prev) => ({
+          ...prev,
+          b: { ...prev.b, latencyMs: Number(meta.latencyMs) || prev.b.latencyMs, inferenceMs: Number(meta.inferenceMs) || prev.b.inferenceMs },
+        }));
+      }
     },
     onSystemLog: (log) => {
       setLogs((prev) => [{
