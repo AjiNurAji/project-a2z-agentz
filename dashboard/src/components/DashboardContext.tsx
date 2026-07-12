@@ -239,8 +239,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     onAgentLog: (log) => {
       setAgentMessages((prev) => [...prev, mapLogToAgentMessage(log)].slice(-50) as AgentMessage[]);
       // Surface Agent A/B live latency from broadcast metadata into health cards.
-      const sender = log?.data?.sender;
-      const meta = log?.data?.metadata;
+      
+      const sender = log.sender!;
+      const meta = log.metadata!;
       if (sender === "agent_a" && meta?.latencyMs) {
         setAgentHealth((prev) => ({
           ...prev,
