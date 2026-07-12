@@ -98,7 +98,18 @@ class WSEndpoint(WebSocketEndpoint):
         # `new WebSocket(url, [token])`). It MUST be a JWT (safe to log) -- the
         # raw API_KEY is only accepted as a server-side dev fallback.
         origin = websocket.headers.get("origin", "")
-        if origin and ".trycloudflare.com" not in origin and "localhost" not in origin:
+        # Always allow Cloudflare Tunnel + local dev. Also allow any origin
+        # explicitly listed in FRONTEND_ORIGIN (comma-separated) so the Vercel
+        # dashboard can open the A2A WebSocket.
+        allowed_origins = [
+            o.strip() for o in os.getenv("FRONTEND_ORIGIN", "").split(",") if o.strip()
+        ]
+        if (
+            origin
+            and ".trycloudflare.com" not in origin
+            and "localhost" not in origin
+            and origin not in allowed_origins
+        ):
             await websocket.close(code=1008)
             return
 
