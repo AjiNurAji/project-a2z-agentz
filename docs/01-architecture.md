@@ -207,6 +207,6 @@ Pattern: **Streaming SSR** via the Next.js App Router — simulated real-time da
 ### Lane 2 — Active Security Gatekeeper (Agent B)
 - **Role**: Anti-honeypot validation, risk scoring, transaction gating
 - **Primary Runtime**: GoPlus API security check (chain-native risk data)
-- **Backup Inference**: Fireworks AI Llama 3.1 8B (via `AGENT_B_ENDPOINT`)
+- **Backup Inference**: Fireworks AI DeepSeek-V4-Pro (via `AGENT_B_ENDPOINT`)
 - **Key Mapping**: `FIREWORKS_API_KEY` is aliased to `AGENT_B_API_KEY` in backend code
 - **Failure Mode**: If GoPlus returns 404, task is marked `FAILED` with no DB insert

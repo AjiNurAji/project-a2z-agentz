@@ -14,8 +14,8 @@ A2Z Agentz splits responsibility between two autonomous agents ("two houses") th
 │                                                 │      │                                                │
 │  • OSINT scraper (DexScreener + Neynar)        │ ───▶ │  • Pulls scored targets from scraping_queue     │
 │  • LLM scoring + category + reasoning          │      │  • GoPlus token-security gate (rug/pull check)  │
-│  • LLM: Llama-3.1-8B-Instruct-AWQ              │      │  • LLM: DeepSeek-V4-Flash via Fireworks AI       │
-│  • Hardware: AMD Instinct™ MI300X (ROCm vLLM)  │      │  • Hardware: Fireworks cloud (DeepSeek V4 Flash) │
+│  • LLM: Llama-3.1-8B-Instruct-AWQ              │      │  • LLM: DeepSeek-V4-Pro via Fireworks AI        │
+│  • Hardware: AMD Instinct™ MI300X (ROCm vLLM)  │      │  • Hardware: Fireworks cloud (DeepSeek V4 Pro)   │
 │  • Exposed as OpenAI-compatible /v1 endpoint    │      │  • Signs + broadcasts native transfers on Base   │
 └─────────────────────────────────────────────┘      └──────────────────────────────────────────┘
                         │                                                  ▲
@@ -28,10 +28,10 @@ A2Z Agentz splits responsibility between two autonomous agents ("two houses") th
 - Returns a strict JSON verdict: `score` (1–100), `category`, `reason`, `amount_usd`.
 - Enqueues any target scoring ≥ 70 into the `scraping_queue` for House B.
 
-### House B — Vault (DeepSeek V4 / Fireworks)
+### House B — Vault (DeepSeek V4 Pro / Fireworks)
 - Consumes pending tasks from `scraping_queue` via `SELECT ... FOR UPDATE SKIP LOCKED`.
 - Runs a **GoPlus security gate** (honeypot / mint / ownership checks) before any execution.
-- Uses **`accounts/fireworks/models/deepseek-v4-flash`** (Fireworks AI) as a strict guardrail LLM that confirms or rejects the Scout's verdict.
+- Uses **`accounts/fireworks/models/deepseek-v4-pro`** (Fireworks AI) as a strict guardrail LLM that confirms or rejects the Scout's verdict.
 - On approval, signs an ECDSA payload with the vault key and broadcasts a native transfer on **Base L2**, capped by `MAX_GAS_PRICE_GWEI` and `MICRO_TX_ETH`.
 
 Every inference round-trip is traced with an explicit log marker for jury verification:
@@ -63,7 +63,7 @@ All Agent A inference is executed on **AMD Instinct™ GPUs** through the ROCm s
 | Layer | Technology |
 |---|---|
 | AI Inference (House A) | vLLM on ROCm, Llama-3.1-8B-Instruct-AWQ|
-| AI Inference (House B) | Fireworks AI, DeepSeek-V4-Flash |
+| AI Inference (House B) | Fireworks AI, DeepSeek-V4-Pro |
 | Backend | Python 3.12, Starlette / FastAPI, APScheduler |
 | Database | PostgreSQL 15 (FIFO queues, `SKIP LOCKED`) |
 | Web3 | web3.py, Base L2 RPCs, ECDSA signing |
@@ -98,7 +98,7 @@ Required environment variables: `POSTGRES_PASSWORD`, `JWT_SECRET`, `API_KEY`, `J
 
 > During the AMD Lablab registration, the submission form offered only rigid, pre-defined model tags. We were **forced to select the tags "Llama3-Coder" and "DeepSeek V3"** because those were the closest available options in the form's dropdown.
 >
-> **This does not reflect the models our system actually runs.** In production, A2Z Agentz actively uses **`Llama/Llama2.5-72B-Instruct-AWQ`** (House A / Scout, served on AMD MI300X via vLLM) and **`accounts/fireworks/models/deepseek-v4-flash`** (House B / Vault, via Fireworks AI). We deliberately chose these models for **stable JSON-mode output** and **ultra-low latency** under autonomous agent load — priorities that the rigid form tags could not express. All inference is verifiable through the backend logs and the `AI_ENDPOINT` / `AGENT_B_ENDPOINT` configuration.
+> **This does not reflect the models our system actually runs.** In production, A2Z Agentz actively uses **`hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4`** (House A / Scout, served on AMD MI300X via vLLM) and **`accounts/fireworks/models/deepseek-v4-pro`** (House B / Vault, via Fireworks AI). We deliberately chose these models for **stable JSON-mode output** and **ultra-low latency** under autonomous agent load — priorities that the rigid form tags could not express. All inference is verifiable through the backend logs and the `AI_ENDPOINT` / `AGENT_B_ENDPOINT` configuration.
 
 ---
 

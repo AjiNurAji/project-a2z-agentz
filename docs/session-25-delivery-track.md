@@ -16,7 +16,7 @@
 | Active interpreter | `venv/bin/python` | confirmed |
 | pip | `venv/bin/pip` | confirmed |
 | AGENT_B_API_KEY | set in `.env` (value masked) | NOT checked in this session |
-| AGENT_B_MODEL | `accounts/fireworks/models/llama-v3p3-70b-instruct` | ✅ |
+| AGENT_B_MODEL | `accounts/fireworks/models/deepseek-v4-pro` | ✅ |
 | AGENT_B_ENDPOINT | `https://api.fireworks.ai/inference/v1` | ✅ |
 | BASE_SEPOLIA_RPC | configured in `.env` | NOT checked in this session |
 | GOPLUS_API_URL | `https://api.gopluslabs.io/api/v1/token_security/8453` | seen in repo search |

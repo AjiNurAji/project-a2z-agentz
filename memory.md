@@ -672,7 +672,7 @@ Completed the final hardening sprint for the AMD Developer Hackathon submission.
 - Updated `SUBMISSION.md` — Removed legacy NVIDIA/CUDA negative examples (kept vLLM on ROCm only)
 - Updated `docs/01-architecture.md` — Added explicit "Active Lane Separation" section documenting:
   - Lane 1: Active Inference Engine (Agent A → Llama/Llama-3.1-8B-Instruct-AWQon AMD MI300X via ROCm)
-  - Lane 2: Active Security Gatekeeper (Agent B → GoPlus + Fireworks AI Llama 3.1 8B backup)
+  - Lane 2: Active Security Gatekeeper (Agent B → GoPlus + Fireworks AI DeepSeek-V4-Pro)
 
 #### 5. Code Quality Standards
 - Converted `backend/scheduler/agent_b_cycle.py` to consistent 2-space indentation

@@ -31,7 +31,7 @@ if not _raw_api_key:
 API_KEY = _raw_api_key
 
 AGENT_B_ENDPOINT = os.getenv("AGENT_B_ENDPOINT", "")
-AGENT_B_MODEL = os.getenv("AGENT_B_MODEL", "")
+AGENT_B_MODEL = os.getenv("AGENT_B_MODEL", "accounts/fireworks/models/deepseek-v4-pro")
 AGENT_B_API_KEY = os.getenv("AGENT_B_API_KEY", "")
 FIREWORKS_API_KEY = AGENT_B_API_KEY
 
