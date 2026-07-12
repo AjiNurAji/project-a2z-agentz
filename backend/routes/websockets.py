@@ -62,8 +62,10 @@ class ConnectionManager:
         # (instead of holding a WebSocket) still see live agent activity.
         try:
             import json as _json
+            import time as _time
             msg = _json.loads(message)
             if msg.get("type") in ("AGENT_LOG", "SYSTEM_LOG"):
+                msg["ts"] = int(_time.time())  # used by /api/system-status for last-seen
                 self.agent_log_buffer.append(msg)
                 if len(self.agent_log_buffer) > 50:
                     self.agent_log_buffer = self.agent_log_buffer[-50:]
