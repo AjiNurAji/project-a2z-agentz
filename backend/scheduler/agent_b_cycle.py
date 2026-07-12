@@ -135,6 +135,12 @@ async def _rpc_health_ok(provider: MultiRpcProvider | None) -> bool:
 
 
 async def _check_goplus(session: aiohttp.ClientSession, token_address: str) -> dict[str, Any]:
+  # Kill-switch: when AGENT_B_SKIP_GOPLUS=true we intentionally bypass the
+  # GoPlus gate (e.g. for demos where GoPlus 404s on valid tokens and would
+  # otherwise drop every queued target). Return a permissive signal so the
+  # pipeline still reaches Agent B's LLM + execution.
+  if os.getenv("AGENT_B_SKIP_GOPLUS", "0").lower() in ("1", "true", "yes"):
+    return {"safe": True, "warning": "GoPlus skipped via AGENT_B_SKIP_GOPLUS"}
   if not GOPLUS_API_URL:
     raise RuntimeError("goplus URL not configured")
   if not GOPLUS_API_KEY:
@@ -285,15 +291,19 @@ async def process_task(task: dict[str, Any]) -> None:
       goplus_raw = await _check_goplus(session, contract_address)
     except RuntimeError as exc:
       if "HTTP 404" in str(exc) or "not found" in str(exc).lower():
-        logger.warning("GoPlus 404 for %s -- skipping synthesis for queue_id=%s", contract_address, queue_id)
-        update_task_status(queue_id, "COMPLETED", retry=False)
+        # GoPlus doesn't know this token. Do NOT drop it -- fall through with
+        # an empty (permissive) security summary so Agent B's LLM can still
+        # score + (if threshold met) execute. Only a real upstream outage
+        # (raise below) should abort the pipeline.
+        logger.warning("GoPlus 404 for %s -- continuing without security signal (queue_id=%s)", contract_address, queue_id)
         append_audit_log(
           "agent_b.goplus_404",
-          f"Token not found on GoPlus for {contract_address}",
+          f"Token not found on GoPlus for {contract_address}; proceeding",
           {"queue_id": queue_id, "address": contract_address},
         )
-        return
-      raise
+        goplus_raw = {}
+      else:
+        raise
     result = goplus_raw.get("result") if isinstance(goplus_raw, dict) else None
     if isinstance(result, dict):
       # Pass a richer signal set to the LLM: honeypot/tax basics plus the
