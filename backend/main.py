@@ -48,8 +48,13 @@ async def lifespan(app: Starlette):
         # runs directly on the server's event loop via create_task -- no
         # thread / asyncio.run wrapper needed.
         from scheduler.agent_b_cycle import worker_loop
+        async def _agent_b_daemon_wrapper():
+            try:
+                await worker_loop(poll_interval=2.0)
+            except Exception as exc:
+                logging.error("Agent B daemon crashed: %s", exc, exc_info=True)
         try:
-            agent_b_task = asyncio.create_task(worker_loop(poll_interval=2.0))
+            agent_b_task = asyncio.create_task(_agent_b_daemon_wrapper())
             print("[STARTUP] Agent B daemon task created:", agent_b_task)
         except Exception as exc:
             print(f"[STARTUP-ERROR] Agent B daemon failed to start: {exc}")

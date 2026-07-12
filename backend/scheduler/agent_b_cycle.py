@@ -38,8 +38,11 @@ AGENT_B_MODEL = os.getenv("AGENT_B_MODEL", "accounts/fireworks/models/deepseek-v
 AGENT_B_API_KEY = os.getenv("AGENT_B_API_KEY", "")
 # Auto-discover model id from /v1/models when pointing at an OpenAI-compatible
 # server (vLLM, TGI, etc.). Reduces the chance of "model not found" errors when
-# the upstream server changes model IDs. Default: ON. Set to "0" to disable.
-AGENT_B_MODEL_AUTO_DISCOVER = os.getenv("AGENT_B_MODEL_AUTO_DISCOVER", "1") == "1"
+# the upstream server changes model IDs. Default: OFF -- use AGENT_B_MODEL
+# as-is. The auto-discover previously picked the FIRST model in the server's
+# list (e.g. a non-inference model), causing 404s. Keep it OFF unless you run
+# a self-hosted vLLM that only exposes one model id.
+AGENT_B_MODEL_AUTO_DISCOVER = os.getenv("AGENT_B_MODEL_AUTO_DISCOVER", "0") == "1"
 # Cap so we never call /v1/models in a hot inference loop.
 AGENT_B_MODEL_DISCOVER_TIMEOUT = float(os.getenv("AGENT_B_MODEL_DISCOVER_TIMEOUT", "10"))
 GOPLUS_API_URL = os.getenv("GOPLUS_API_URL", "")
