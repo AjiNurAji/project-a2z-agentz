@@ -69,18 +69,16 @@ def _strip_models_path(endpoint: str) -> str:
     return endpoint
 
 
-async def _discover_model_id(
+async def _discover_model_list(
     session: aiohttp.ClientSession, endpoint: str, api_key: str
-) -> str:
+) -> list[str]:
     """
-    Hit ``GET {endpoint}/models`` and return the first model id in the list.
+    Hit ``GET {endpoint}/models`` and return the list of model ids.
 
-    Compatible with the OpenAI / vLLM / TGI conventions. Returns "" on any
-    failure (network error, auth error, missing field) so the caller can fall
-    back to the AGENT_B_MODEL env value.
+    Returns [] on any failure so the caller falls back to AGENT_B_MODEL.
     """
     if not endpoint or not session:
-        return ""
+        return []
     base = _strip_models_path(endpoint)
     url = f"{base}/models"
     headers = {"accept": "application/json"}
@@ -95,23 +93,25 @@ async def _discover_model_id(
                     "Agent B model discovery: %s returned HTTP %s",
                     url, resp.status,
                 )
-                return ""
+                return []
             payload = await resp.json()
     except Exception as exc:
         logger.debug("Agent B model discovery failed: %s", exc)
-        return ""
+        return []
     if not isinstance(payload, dict):
-        return ""
+        return []
     data = payload.get("data", [])
     if not isinstance(data, list) or not data:
-        return ""
-    first = data[0]
-    if isinstance(first, dict):
-        model_id = first.get("id") or first.get("model") or ""
-        return str(model_id)
-    if isinstance(first, str):
-        return first
-    return ""
+        return []
+    ids: list[str] = []
+    for entry in data:
+        if isinstance(entry, dict):
+            mid = entry.get("id") or entry.get("model") or ""
+            if mid:
+                ids.append(str(mid))
+        elif isinstance(entry, str):
+            ids.append(entry)
+    return ids
 
 
 def _build_rpc_provider() -> MultiRpcProvider | None:
@@ -193,14 +193,21 @@ async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_
     if AGENT_B_MODEL_AUTO_DISCOVER:
         try:
             async with aiohttp.ClientSession() as _sess:
-                discovered = await _discover_model_id(_sess, AGENT_B_ENDPOINT, AGENT_B_API_KEY)
-            if discovered:
-                if discovered != AGENT_B_MODEL:
-                    logger.info(
-                        "Agent B model override: env=%s server_reported=%s",
-                        AGENT_B_MODEL, discovered,
-                    )
-                model_id = discovered
+                discovered_list = await _discover_model_list(_sess, AGENT_B_ENDPOINT, AGENT_B_API_KEY)
+            if discovered_list:
+                # Prefer the model explicitly set in AGENT_B_MODEL if it is
+                # actually present in the server's model list. Only fall back
+                # to the first listed model when the configured one is absent
+                # (e.g. a self-hosted vLLM that only exposes one model id).
+                if AGENT_B_MODEL and AGENT_B_MODEL in discovered_list:
+                    model_id = AGENT_B_MODEL
+                else:
+                    model_id = discovered_list[0]
+                    if AGENT_B_MODEL and AGENT_B_MODEL != model_id:
+                        logger.info(
+                            "Agent B model fallback: env=%s not in server list, using %s",
+                            AGENT_B_MODEL, model_id,
+                        )
         except Exception as exc:
             logger.debug("Agent B auto-discovery skipped: %s", exc)
 
