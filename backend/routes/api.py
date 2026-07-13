@@ -818,6 +818,19 @@ async def get_execution_status(request: Request):
 
 
 @require_auth
+async def get_holdings(request: Request):
+    """GET /holdings — Agent B vault holdings (held tokens + P&L)."""
+    held = database.fetch_held_tokens("HOLDING")
+    sold = database.fetch_held_tokens("SOLD")
+    return JSONResponse({
+        "holding": held,
+        "sold": sold,
+        "count_holding": len(held),
+        "count_sold": len(sold),
+    })
+
+
+@require_auth
 async def get_gpu_metrics(request: Request):
     """Live AMD GPU metrics (Agent A brain on vLLM)."""
     gpu = _fetch_gpu_metrics()
@@ -836,4 +849,5 @@ routes = [
     Route("/gpu-metrics", get_gpu_metrics, methods=["GET"]),
     Route("/analyze", analyze_target, methods=["POST"]),
     Route("/status", get_execution_status, methods=["GET"]),
+    Route("/holdings", get_holdings, methods=["GET"]),
 ]
