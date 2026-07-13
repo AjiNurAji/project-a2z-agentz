@@ -513,7 +513,24 @@ async def worker_loop(poll_interval: float = 2.0) -> None:
   # 'maximum number of running instances reached'. Agent A re-enqueues tokens
   # (ON CONFLICT DO UPDATE -> PENDING) so tokens that arrive later are still
   # picked up on the next poll.
+  _hb_counter = 0
   while True:
+    # Heartbeat broadcast so the dashboard shows Agent B alive even when the
+    # queue is empty. agent_b_last_seen is derived from the WS log buffer, so
+    # without a periodic broadcast it stays 0 (false "daemon down" signal).
+    _hb_counter += 1
+    if _hb_counter % 15 == 0:
+      try:
+        await manager.broadcast(json.dumps({
+          "type": "AGENT_LOG",
+          "data": {
+            "sender": "agent_b",
+            "content": "Agent B (Vault) heartbeat — monitoring execution queue.",
+            "metadata": {"online": True, "heartbeat": True},
+          },
+        }))
+      except Exception:
+        pass
     task = fetch_and_lock_pending_task(limit=1)
     if task is None:
       await asyncio.sleep(poll_interval)
