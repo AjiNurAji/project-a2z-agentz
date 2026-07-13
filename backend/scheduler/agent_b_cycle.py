@@ -536,21 +536,37 @@ async def process_task(task: dict[str, Any]) -> None:
 
 async def worker_loop(poll_interval: float = 2.0) -> None:
   logger.info("[AGENT_B_DAEMON] worker_loop entered")
-  from database import get_system_config
-  if get_system_config("circuit_breaker", "active") == "paused":
-    logger.info("Circuit breaker is paused. Agent B skipping cycle.")
-    return
+  try:
+    from database import get_system_config
+    if get_system_config("circuit_breaker", "active") == "paused":
+      logger.info("Circuit breaker is paused. Agent B skipping cycle.")
+      return
 
-  ensure_pipeline_tables()
-  logger.info("Agent B worker starting cycle")
-  await manager.broadcast(json.dumps({
-      "type": "AGENT_LOG",
-      "data": {
+    ensure_pipeline_tables()
+    logger.info("Agent B worker starting cycle")
+    await manager.broadcast(json.dumps({
+        "type": "AGENT_LOG",
+        "data": {
+            "sender": "agent_b",
+            "content": "Agent B (Vault) online. Monitoring execution queue...",
+            "metadata": {"online": True},
+        },
+    }))
+  except Exception as exc:
+    # Surface startup failure to the dashboard instead of dying silently.
+    logger.error("[AGENT_B_DAEMON] startup failed: %s", exc, exc_info=True)
+    try:
+      await manager.broadcast(json.dumps({
+        "type": "AGENT_LOG",
+        "data": {
           "sender": "agent_b",
-          "content": "Agent B (Vault) online. Monitoring execution queue...",
-          "metadata": {"online": True},
-      },
-  }))
+          "content": f"Agent B startup ERROR: {exc}",
+          "metadata": {"error": True},
+        },
+      }))
+    except Exception:
+      pass
+    return
   # Continuous poll loop. This runs as a dedicated asyncio daemon task
   # (started in main.py lifespan), NOT inside an APScheduler job, so an
   # infinite loop here is safe -- it will not trigger
