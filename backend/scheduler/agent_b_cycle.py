@@ -185,16 +185,19 @@ async def _check_goplus(session: aiohttp.ClientSession, token_address: str) -> d
     headers["X-API-KEY"] = GOPLUS_API_KEY
   try:
     async with session.get(url, headers=headers, timeout=15) as resp:
+      logger.info("GoPlus req %s -> HTTP %s", url, resp.status)
       if resp.status == 200:
         data = await resp.json()
         # GoPlus returns: {"code":1,"message":"OK","result":{<address>:{...}}}
         # result is a dict KEYED BY ADDRESS, not a flat object.
         if isinstance(data, dict) and isinstance(data.get("result"), dict):
           addr_data = data["result"].get(token_address.lower()) or data["result"].get(token_address) or next(iter(data["result"].values()), {})
+          logger.info("GoPlus OK: code=%s result_keys=%d addr_found=%s", data.get("code"), len(data["result"]), bool(addr_data))
           # Wrap so the caller's result.get("is_honeypot") logic works:
           # we return {"result": <per-address dict>} but the caller expects
           # result to BE the per-address dict. Normalize here.
           return {"result": addr_data if isinstance(addr_data, dict) else {}}
+        logger.warning("GoPlus 200 but unexpected shape: %s", str(data)[:200])
         return data  # fall through; caller handles missing result
       if resp.status == 404:
         raise RuntimeError(f"goplus token not found: HTTP 404 for {token_address}")
