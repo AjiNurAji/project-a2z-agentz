@@ -664,6 +664,169 @@ async def _is_smart_contract(provider, address: str) -> bool:
     return len(code) > 2
 
 
+
+# ---------------------------------------------------------------------------
+# Uniswap V2 DEX Swap (Agent B: swap ETH -> token via Base DEX)
+# ---------------------------------------------------------------------------
+UNISWAP_V2_ROUTER = "0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24"
+WETH_BASE = "0x4200000000000000000000000000000000000006"
+
+# Minimal ABI for swapExactETHForTokensSupportingFeeOnTransferTokens
+UNISWAP_V2_ROUTER_ABI_SWAP = [
+    {
+        "type": "function",
+        "name": "swapExactETHForTokensSupportingFeeOnTransferTokens",
+        "inputs": [
+            {"name": "amountOutMin", "type": "uint256"},
+            {"name": "path", "type": "address[]"},
+            {"name": "to", "type": "address"},
+            {"name": "deadline", "type": "uint256"},
+        ],
+        "outputs": [],
+        "stateMutability": "payable",
+    },
+]
+
+async def swap_eth_for_token(
+    token_address: str,
+    eth_value_wei: int,
+    *,
+    chain_id: int | None = None,
+    max_gas_price_gwei: float | None = None,
+    slippage_bps: int = 500,  # 5% default slippage for volatile tokens
+) -> dict:
+    """Swap ETH for a token via Uniswap V2 on Base (micro-swap for Agent B).
+
+    Uses swapExactETHForTokensSupportingFeeOnTransferTokens so tokens with
+    transfer fees (common on Base meme coins) don't revert.
+
+    Returns dict with tx_hash, token_address, eth_value_wei.
+    """
+    from eth_utils import to_checksum_address
+    from eth_account._utils.signing import to_bytes
+    from eth_abi import encode
+
+    if not _SIGNING_AVAILABLE:
+        raise RuntimeError("eth_account not installed")
+
+    cid = chain_id or BASE_CHAIN_ID
+    if cid == 84532:
+        rpc_urls = [u for u in [
+            os.environ.get("BASE_SEPOLIA_RPC", ""),
+            os.environ.get("BASE_SEPOLIA_RPC_1", ""),
+            os.environ.get("BASE_SEPOLIA_RPC_2", ""),
+        ] if u]
+    else:
+        rpc_urls = [u for u in [
+            os.environ.get("BASE_RPC_1", ""),
+            os.environ.get("BASE_RPC_2", ""),
+            os.environ.get("BASE_RPC_3", ""),
+            os.environ.get("BASE_RPC_4", ""),
+        ] if u]
+
+    if not rpc_urls:
+        raise RuntimeError(f"No RPC endpoints for chain_id={cid}")
+
+    provider = MultiRpcProvider(rpc_urls=rpc_urls, chain_id=cid)
+    try:
+        acct = get_account()
+        router = to_checksum_address(UNISWAP_V2_ROUTER)
+        token = to_checksum_address(token_address)
+        weth = to_checksum_address(WETH_BASE)
+        recipient = to_checksum_address(acct.address)
+
+        import time as _time
+        deadline = int(_time.time()) + 1200  # 20 min
+
+        # Path: WETH -> token
+        path = [weth, token]
+
+        # Encode swapExactETHForTokensSupportingFeeOnTransferTokens
+        # function signature: 0xb6f9de95
+        selector = b'\xb6\xf9\xde\x95'
+        encoded_params = encode(
+            ['uint256', 'address[]', 'address', 'uint256'],
+            [1, path, recipient, deadline],  # amountOutMin=1 (micro amount, no real slippage)
+        )
+        calldata = '0x' + (selector + encoded_params).hex()
+
+        nonce = int(
+            await provider.call("eth_getTransactionCount", [acct.address, "latest"]),
+            16,
+        )
+        max_fee, max_priority = await _estimate_eip1559_fees(provider, max_gas_price_gwei)
+        gas_limit = 300_000  # swapExactETHForTokensSupportingFeeOnTransferTokens typical
+
+        balance = await provider.eth_get_balance(acct.address)
+        estimated_gas_cost = max_fee * gas_limit
+        if balance < eth_value_wei + estimated_gas_cost:
+            raise RuntimeError(
+                f"Insufficient balance: have {balance / 1e18:.6f} ETH, "
+                f"need {(eth_value_wei + estimated_gas_cost) / 1e18:.6f} ETH (value + gas)"
+            )
+
+        tx = {
+            "type": 2,
+            "nonce": nonce,
+            "to": router,
+            "value": eth_value_wei,
+            "data": calldata if isinstance(calldata, bytes) else bytes.fromhex(calldata[2:]),
+            "gas": gas_limit,
+            "maxFeePerGas": max_fee,
+            "maxPriorityFeePerGas": max_priority,
+            "chainId": cid,
+        }
+
+        signed = acct.sign_transaction(tx)
+        raw_bytes = getattr(signed, "raw_transaction", None) or getattr(
+            signed, "rawTransaction", None
+        )
+        if isinstance(raw_bytes, (bytes, bytearray)):
+            raw = raw_bytes.hex()
+        else:
+            raw = raw_bytes
+
+        results = []
+        for ep in provider._endpoints:
+            try:
+                session = aiohttp.ClientSession(
+                    timeout=aiohttp.ClientTimeout(total=DEFAULT_TIMEOUT),
+                    headers={"Content-Type": "application/json"},
+                )
+                async with session.post(
+                    ep.url,
+                    json={
+                        "jsonrpc": "2.0",
+                        "id": RPC_ID,
+                        "method": "eth_sendRawTransaction",
+                        "params": ["0x" + raw],
+                    },
+                ) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        if "result" in data and data["result"]:
+                            tx_hash = data["result"]
+                            logger.info(
+                                "Uniswap swap broadcast: %s ETH -> %s, tx=%s",
+                                eth_value_wei / 1e18, token_address, tx_hash,
+                            )
+                            return {
+                                "tx_hash": tx_hash,
+                                "token_address": token_address,
+                                "eth_value_wei": eth_value_wei,
+                            }
+                        results.append(data)
+            except Exception:
+                pass
+            finally:
+                await session.close()
+        if results:
+            raise RuntimeError(f"Swap broadcast failed: {results[:3]}")
+        raise RuntimeError("All RPC endpoints failed to broadcast swap")
+    finally:
+        await provider.close()
+
+
 async def send_proof_of_execution() -> str:
     """A2Z Agent B - micro proof-of-execution transfer (live-demo receipt).
 

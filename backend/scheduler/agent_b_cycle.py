@@ -27,7 +27,7 @@ from database import (
     update_task_status,
 )
 from routes.websockets import manager
-from web3_async import MultiRpcProvider, send_native_transaction, send_proof_of_execution, _usd_to_wei_real
+from web3_async import MultiRpcProvider, send_native_transaction, send_proof_of_execution, _usd_to_wei_real, swap_eth_for_token
 
 load_dotenv()
 
