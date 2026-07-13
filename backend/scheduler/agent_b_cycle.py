@@ -187,7 +187,9 @@ async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_
         "- score>=85 AND no honeypot/tax/ownership red flags -> approve (amount_usd up to 2.00)\n"
         "- ANY honeypot flag, buy/sell tax >10%, or ownership-not-renounced risk -> score<=20, reject (amount_usd=0)\n"
         "- reason MUST cite specific GoPlus evidence (e.g. \"is_honeypot: true\", \"buy_tax: X%\")\n"
-        "- Do NOT approve if security signals are unknown or suspicious."
+        "- Do NOT approve if security signals are unknown or suspicious.\n"
+        "CRITICAL: Your entire response must be valid JSON starting with '{' and ending with '}'. "
+        "Do NOT write any text before or after the JSON. If you add any words, the parser fails."
     )
     # Dynamic model discovery: prefer the actual model id reported by the
     # server itself. Falls back to AGENT_B_MODEL on any failure (timeout,
