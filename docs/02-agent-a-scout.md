@@ -11,12 +11,12 @@ Agent A runs on a **1-hour Cron Job** to process batches, yet it completes an en
 
 ## 2. AMD-Native AI Implementation
 
-Agent A inference runs **100% on the AMD stack** — not a generic Llama/Llama2.5-72B-Instruct-AWQ, but a Web3-domain fine-tuned variant.
+Agent A inference runs **100% on the AMD stack** — not a generic hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4, but a Web3-domain fine-tuned variant.
 
 | Layer | Tooling |
 |---|---|
 | **Fine-tuning Platform** | **AMD AI Workbench** (no-code GUI, ROCm-backed) |
-| **Base Model** | Llama/Llama-3.1-8B-Instruct-AWQ(pre-trained) |
+| **Base Model** | hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4(pre-trained) |
 | **Fine-tune Method** | LoRA / QLoRA adapter on a Web3 sentiment dataset |
 | **Deployment Format** | **AMD Inference Microservice (vLLM)** — containerized |
 | **Serving Engine** | **vLLM** on AMD Instinct MI300X (ROCm backend) |
@@ -25,7 +25,7 @@ Agent A inference runs **100% on the AMD stack** — not a generic Llama/Llama2.
 ### Fine-Tune Flow
 
 1. **Dataset Curation**: Collect ~5,000–10,000 examples (Farcaster casts, on-chain announcements) labeled with sentiment (positive / neutral / negative) plus legit / scam labels.
-2. **AMD AI Workbench**: Import dataset → select Llama/Llama-3.1-8B-Instruct-AWQbase → set hyperparameters (LoRA rank, learning rate) → launch the training job on AMD Instinct MI300X (allocated through AMD Developer Cloud credits).
+2. **AMD AI Workbench**: Import dataset → select hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4base → set hyperparameters (LoRA rank, learning rate) → launch the training job on AMD Instinct MI300X (allocated through AMD Developer Cloud credits).
 3. **Export Weights**: Export the training result as a LoRA adapter or full weights (`.safetensors` format).
 4. **Wrap for vLLM**: Build a new **AMD Inference Microservice** that loads the weights, tokenizer, and config. This vLLM service is what gets served.
 
@@ -48,7 +48,7 @@ To keep the LLM from hallucinating, Agent A never decides 100% generatively:
 
 ## 4. AMD Performance Advantage
 
-Compared with running a generic Llama/Llama-3.1-8B-Instruct-AWQon CPU or non-ROCm GPU hardware:
+Compared with running a generic hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4on CPU or non-ROCm GPU hardware:
 - **Throughput**: vLLM on MI300X delivers > 2,000 tokens/s for batch inference — enough to process 50+ projects in parallel per cron tick.
 - **Latency (TTFT)**: < 100ms time-to-first-token on a single request (critical for real-time UX in the Dashboard).
 - **Cost**: $100 in AMD Developer Cloud credits equals roughly 50 hours of MI300X inference — enough for about 6 weeks of operation (longer than the 4-week hackathon window).

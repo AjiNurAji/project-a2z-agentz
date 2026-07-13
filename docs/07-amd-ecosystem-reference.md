@@ -72,7 +72,7 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
- model="Llama/Llama2.5-1.5B-Instruct",
+ model="hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4",
  messages=[{"role": "user", "content": "Hello from AMD!"}],
 )
 
@@ -349,7 +349,7 @@ The **AMD AI Developer Program** is a **free** program for building, optimizing,
 ```
 [Web3 sentiment dataset]
  |
-[AMD AI Workbench GUI] -> Fine-tune Llama/Llama-3.1-8B-Instruct-AWQ-> vLLM-served Web3 scorer
+[AMD AI Workbench GUI] -> Fine-tune hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4-> vLLM-served Web3 scorer
  |
 [vLLM-served weights (.safetensors)]
  |
@@ -376,7 +376,7 @@ The **AMD AI Developer Program** is a **free** program for building, optimizing,
 | Training | AMD AI Workbench | [academy.amd.com](https://academy.amd.com) |
 | Deployment | AMD Inference Microservice (AIM) | [AIM blog](https://rocm.blogs.amd.com/) |
 | Serving | vLLM | [vLLM on AMD](https://rocm.blogs.amd.com/software-tools-optimization/disaggregation/README.html) |
-| Base model | Llama/Llama-3.1-8B-Instruct-AWQ| HuggingFace |
+| Base model | hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4| HuggingFace |
 | Fine-tune dataset | Custom Web3 sentiment | Internal |
 
 ### 4-Week Hackathon Cost Estimate

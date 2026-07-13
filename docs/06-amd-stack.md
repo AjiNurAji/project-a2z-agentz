@@ -19,7 +19,7 @@ A2Z Agentz goes beyond "using an AMD GPU." It adopts an **end-to-end AMD-native 
 | Theme / Requirement | A2Z Implementation |
 |---|---|
 | **"Build AI agents on AMD GPUs in the cloud"** | ✅ Agent A (Scout) runs 100% on AMD Instinct MI300X via AMD Developer Cloud. |
-| **AMD AI Workbench** | ✅ Used to fine-tune base LLM -> vLLM-served Llama/Llama-3.1-8B-Instruct-AWQspecialized for Web3 sentiment. GUI no-code, no custom training loop. |
+| **AMD AI Workbench** | ✅ Used to fine-tune base LLM -> vLLM-served hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4specialized for Web3 sentiment. GUI no-code, no custom training loop. |
 | **vLLM model server** | ✅ Fine-tune result is wrapped as an AIM, served via a vLLM OpenAI-compatible endpoint. |
 | **vLLM on ROCm** | ✅ Serving engine for vLLM, AMD's recommendation for high-throughput inference. |
 | **Akash Systems (co-sponsor)** | 🟡 Optional: Agent A inference can later be bid out to Akash decentralized compute via X402 payment (post-hackathon). |
@@ -33,7 +33,7 @@ Most submissions use OpenAI API or HuggingFace Inference. A2Z trains and deploys
 
 ### 2. Fine-tuning as the main differentiator
 
-Most ACT II submissions will use an out-of-the-box model without fine-tuning. A2Z fine-tunes a base LLM into a Web3-sentiment vLLM-served Llama/Llama-3.1-8B-Instruct-AWQvia AMD AI Workbench. This:
+Most ACT II submissions will use an out-of-the-box model without fine-tuning. A2Z fine-tunes a base LLM into a Web3-sentiment vLLM-served hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4via AMD AI Workbench. This:
 - Uses AMD tooling that most other participants have not explored yet.
 - Improves inference accuracy for the target domain (Web3 / DeFi).
 - Is easy for judges to reproduce: dataset, hyperparameters, and training workflow are all visible in the Workbench GUI.

@@ -14,7 +14,7 @@ A2Z Agentz splits responsibility between two autonomous agents ("two houses") th
 │                                                 │      │                                                │
 │  • OSINT scraper (DexScreener + Neynar)        │ ───▶ │  • Pulls scored targets from scraping_queue     │
 │  • LLM scoring + category + reasoning          │      │  • GoPlus token-security gate (rug/pull check)  │
-│  • LLM: Llama-3.1-8B-Instruct-AWQ              │      │  • LLM: DeepSeek-V4-Pro via Fireworks AI        │
+│  • LLM: hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4 │      │  • LLM: DeepSeek-V4-Pro via Fireworks AI        │
 │  • Hardware: AMD Instinct™ MI300X (ROCm vLLM)  │      │  • Hardware: Fireworks cloud (DeepSeek V4 Pro)   │
 │  • Exposed as OpenAI-compatible /v1 endpoint    │      │  • Signs + broadcasts native transfers on Base   │
 └─────────────────────────────────────────────┘      └──────────────────────────────────────────┘
@@ -24,7 +24,7 @@ A2Z Agentz splits responsibility between two autonomous agents ("two houses") th
 
 ### House A — Scout (AMD MI300X)
 - Scrapes live market + social signals (DexScreener liquidity/market-cap, Neynar social graph).
-- Sends the normalized description to **`Llama/Llama2.5-72B-Instruct-AWQ`** served by **vLLM on ROCm** on an **AMD Instinct™ MI300X** GPU.
+- Sends the normalized description to **`hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4`** served by **vLLM on ROCm** on an **AMD Instinct™ MI300X** GPU.
 - Returns a strict JSON verdict: `score` (1–100), `category`, `reason`, `amount_usd`.
 - Enqueues any target scoring ≥ 70 into the `scraping_queue` for House B.
 
@@ -36,8 +36,8 @@ A2Z Agentz splits responsibility between two autonomous agents ("two houses") th
 
 Every inference round-trip is traced with an explicit log marker for jury verification:
 ```
-[AMD MI300X COMPUTE] Executing payload to ROCm vLLM endpoint=... model=Llama/Llama2.5-72B-Instruct-AWQ
-[AMD MI300X COMPUTE] vLLM returned | model=Llama/Llama-3.1-8B-Instruct-AWQlatency=XXXms score=YY
+[AMD MI300X COMPUTE] Executing payload to ROCm vLLM endpoint=... model=hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4
+[AMD MI300X COMPUTE] vLLM returned | model=hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4 latency=XXXms score=YY
 ```
 
 ---
@@ -62,7 +62,7 @@ All Agent A inference is executed on **AMD Instinct™ GPUs** through the ROCm s
 
 | Layer | Technology |
 |---|---|
-| AI Inference (House A) | vLLM on ROCm, Llama-3.1-8B-Instruct-AWQ|
+| AI Inference (House A) | vLLM on ROCm, hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4 |
 | AI Inference (House B) | Fireworks AI, DeepSeek-V4-Pro |
 | Backend | Python 3.12, Starlette / FastAPI, APScheduler |
 | Database | PostgreSQL 15 (FIFO queues, `SKIP LOCKED`) |
