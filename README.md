@@ -1,4 +1,4 @@
-# A2Z Agentz — AMD MI300X-Powered Autonomous Web3 Trading Engine
+# A2Z Agentz — AMD MI300X-Powered Autonomous Web3 Scavenger
 
 **AMD Instinct™ MI300X GPU + ROCm + vLLM** drives all LLM inference for this autonomous
 agent-to-agent (A2A) Web3 trading engine. Discovers tokens on **Base Network** via DexScreener,
@@ -18,7 +18,7 @@ Built for **Track 3: Unicorn (Open Innovation)** of the AMD Developer Hackathon.
 │  • DexScreener scraper (Base tokens)             │ ───▶ │  • GoPlus security gate (honeypot/tax)    │
 │  • Data-driven LLM scoring (liquidity/vol/age)   │      │  • Uniswap V2 DEX swap (ETH→token buy)     │
 │  • Red flag detection (scam/rug/honeypot)        │      │  • Take-profit sell (token→ETH at +30%)    │
-│  • Model: Llama-3.1-8B-AWQ on ROCm vLLM         │      │  • Vault holdings tracking + dashboard     │
+│  • Model: Llama-3.1-8B-Instruct-AWQ-INT4 on ROCm vLLM         │      │  • Vault holdings tracking + dashboard     │
 │  • Score ≥60 → enqueue for Agent B               │      │  • Model: DeepSeek-V4-Pro (Fireworks)      │
 └──────────────────────────────────────────────────┘      └──────────────────────────────────────────┘
                    │                                                       ▲
