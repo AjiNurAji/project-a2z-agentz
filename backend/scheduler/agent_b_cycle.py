@@ -659,6 +659,10 @@ async def process_task(task: dict[str, Any]) -> None:
                 else:
                     _cid = 8453
                     _gwei_cap = float(os.getenv("MAX_GAS_PRICE_GWEI", "0") or "0") or None
+                    # Use operator-configurable buy size (default $0.50). Set
+                    # AGENT_B_MAX_TX_USD=0.01 for micro-testing without draining
+                    # the vault.
+                    amount_usd = float(os.getenv("AGENT_B_MAX_TX_USD", "0.5"))
                     _val_wei = _usd_to_wei_real(amount_usd)
                     # BUY the token via Uniswap V2 swap (ETH -> token), NOT a
                     # plain native transfer to the token contract (which reverts
@@ -693,12 +697,16 @@ async def process_task(task: dict[str, Any]) -> None:
                 tx_hash = f"mock::{contract_address}::{int(amount_usd * 1e15)}"
         except Exception as exc:
             logger.error("Agent B real execution failed for queue_id=%s: %s", queue_id, exc)
+            # Insufficient-balance is a permanent config fault (vault empty),
+            # not a transient RPC error. Mark COMPLETED (no retry) so the queue
+            # doesn't spin forever burning cycles. Other errors retry.
+            _insufficient = "insufficient balance" in str(exc).lower()
             append_audit_log(
                 "agent_b.execution_failed",
                 f"On-chain send failed: {exc}",
-                {"queue_id": queue_id, "address": contract_address},
+                {"queue_id": queue_id, "address": contract_address, "insufficient_balance": _insufficient},
             )
-            update_task_status(queue_id, "FAILED", retry=True)
+            update_task_status(queue_id, "COMPLETED" if _insufficient else "FAILED", retry=not _insufficient)
             return
 
         try:
