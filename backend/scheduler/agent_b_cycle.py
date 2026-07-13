@@ -21,6 +21,7 @@ from database import (
     append_audit_log,
     ensure_pipeline_tables,
     fetch_and_lock_pending_task,
+    insert_execution_log,
     insert_synthesis_result,
     insert_transaction_proposal,
     update_proposal_hash,
@@ -586,9 +587,14 @@ async def process_task(task: dict[str, Any]) -> None:
                     pass
                 append_audit_log(
                     "agent_b.executed",
-                    f"Real on-chain send tx={tx_hash} amount_usd={amount_usd}",
+                    f"Real on-chain swap tx={tx_hash} amount_usd={amount_usd}",
                     {"proposal_id": proposal_id, "tx_hash": tx_hash, "network": _active},
                 )
+                # Also insert to execution_logs so /api/stats total_transactions updates
+                try:
+                    insert_execution_log(tx_hash, contract_address, amount_usd, "SUCCESS")
+                except Exception:
+                    pass
             else:
                 tx_hash = f"mock::{contract_address}::{int(amount_usd * 1e15)}"
         except Exception as exc:
