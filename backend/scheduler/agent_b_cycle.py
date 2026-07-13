@@ -151,6 +151,7 @@ def _normalize_agent_b_endpoint(endpoint: str) -> str:
 def _build_rpc_provider() -> MultiRpcProvider | None:
   urls = [u for u in [BASE_RPC_1, BASE_RPC_2, BASE_RPC_3] if u]
   if not urls:
+    logger.critical("No RPC endpoints configured (BASE_RPC_1/2/3 all empty). On-chain execution IMPOSSIBLE.")
     return None
   return MultiRpcProvider(rpc_urls=urls, chain_id=BASE_CHAIN_ID)
 
@@ -522,6 +523,17 @@ async def process_task(task: dict[str, Any]) -> None:
     daily_spend = get_daily_spend_usd()
     rpc_provider = _build_rpc_provider()
     rpc_health = False
+    if rpc_provider is None:
+        # Permanent config fault: no RPC endpoints in env. Retrying won't help.
+        # Log once and mark terminal — do NOT retry (infinite loop on same addr).
+        logger.critical("RPC provider is None (no BASE_RPC_* env vars set). Execution IMPOSSIBLE — NOT retrying.")
+        append_audit_log(
+            "agent_b.no_rpc_configured",
+            "No RPC endpoints configured in environment; on-chain execution disabled",
+            {"queue_id": queue_id, "address": contract_address, "score": score},
+        )
+        update_task_status(queue_id, "FAILED", retry=False)
+        return
     if score >= MAX_SCORE_FOR_AUTO:
         for _rpc_attempt in range(1, 4):  # up to 3 retries
             rpc_health = await _rpc_health_ok(rpc_provider)
