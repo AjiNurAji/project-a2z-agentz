@@ -693,18 +693,23 @@ async def swap_eth_for_token(
     *,
     chain_id: int | None = None,
     max_gas_price_gwei: float | None = None,
-    slippage_bps: int = 500,  # 5% default slippage for volatile tokens
+    slippage_bps: int = 1000,  # 10% default — micro-caps are volatile
 ) -> dict:
     """Swap ETH for a token via Uniswap V2 on Base (micro-swap for Agent B).
 
     Uses swapExactETHForTokensSupportingFeeOnTransferTokens so tokens with
     transfer fees (common on Base meme coins) don't revert.
 
+    SAFETY: before signing/broadcasting, we SIMULATE the swap with eth_call
+    and eth_estimateGas. If the simulation reverts (bad token, fee-on-transfer
+    that yields 0 output, slippage/liquidity issue), we DROP the tx so the
+    vault never pays gas for a guaranteed-failed broadcast.
+
     Returns dict with tx_hash, token_address, eth_value_wei.
     """
     from eth_utils import to_checksum_address
     from eth_account._utils.signing import to_bytes
-    from eth_abi import encode
+    from eth_abi import encode, decode as abi_decode
 
     if not _SIGNING_AVAILABLE:
         raise RuntimeError("eth_account not installed")
@@ -727,6 +732,9 @@ async def swap_eth_for_token(
     if not rpc_urls:
         raise RuntimeError(f"No RPC endpoints for chain_id={cid}")
 
+    # Higher slippage for micro-cap tokens (low liquidity => bigger price move)
+    slip = int(os.environ.get("AGENT_B_SWAP_SLIPPAGE_BPS", str(slippage_bps)) or slippage_bps)
+
     provider = MultiRpcProvider(rpc_urls=rpc_urls, chain_id=cid)
     try:
         acct = get_account()
@@ -741,21 +749,95 @@ async def swap_eth_for_token(
         # Path: WETH -> token
         path = [weth, token]
 
+        # --- Compute a REAL amountOutMin from on-chain quote (getAmountsOut) ---
+        # Hardcoded amountOutMin=1 previously let some swaps revert (output < 1
+        # wei) and others over-slippage. We now quote the expected output off
+        # the live reserve and apply operator slippage (default 10%, larger for
+        # micro-caps so the tx clears even with thin liquidity).
+        amount_out_min = 1
+        try:
+            quote_params = [hex(eth_value_wei), [weth, token]]
+            q = await provider.call(
+                "eth_call",
+                [
+                    {
+                        "to": router,
+                        "data": "0x0d3648bd"  # getAmountsOut(uint,path)
+                        + encode(["uint256", "address[]"], quote_params).hex(),
+                    },
+                    "latest",
+                ],
+            )
+            if q and q != "0x":
+                # getAmountsOut returns (uint256[]); decode the ABI-encoded result.
+                outs = abi_decode(["uint256[]"], bytes.fromhex(q[2:]))[0]
+                if outs and len(outs) >= 2 and outs[1] > 0:
+                    expected = outs[1]
+                    amount_out_min = max(1, int(expected * (10_000 - slip) / 10_000))
+        except Exception as exc:
+            logger.warning("swap quote (getAmountsOut) failed for %s: %s", token, exc)
+
         # Encode swapExactETHForTokensSupportingFeeOnTransferTokens
         # function signature: 0xb6f9de95
         selector = b'\xb6\xf9\xde\x95'
         encoded_params = encode(
             ['uint256', 'address[]', 'address', 'uint256'],
-            [1, path, recipient, deadline],  # amountOutMin=1 (micro amount, no real slippage)
+            [amount_out_min, path, recipient, deadline],
         )
         calldata = '0x' + (selector + encoded_params).hex()
+
+        # --- PRE-FLIGHT SIMULATION (eth_call) ---
+        # Reverts here mean the on-chain swap would fail too. We DROP the tx
+        # (raise) BEFORE signing/broadcasting so no gas is ever paid.
+        try:
+            sim = await provider.call(
+                "eth_call",
+                [
+                    {
+                        "from": acct.address,
+                        "to": router,
+                        "value": hex(eth_value_wei),
+                        "data": calldata,
+                    },
+                    "latest",
+                ],
+            )
+            if sim is None:
+                raise RuntimeError("eth_call simulation returned no result")
+        except Exception as exc:
+            raise RuntimeError(
+                f"Swap simulation (eth_call) reverted for {token}: {exc} — dropping tx, no gas spent"
+            )
+
+        # --- GAS ESTIMATION (also reverts on bad tokens) ---
+        try:
+            est = await provider.call(
+                "eth_estimateGas",
+                [
+                    {
+                        "from": acct.address,
+                        "to": router,
+                        "value": hex(eth_value_wei),
+                        "data": calldata,
+                    },
+                    "latest",
+                ],
+            )
+            gas_limit = int(est, 16)
+            # Pad 20% for mempool volatility so the broadcast doesn't run out.
+            gas_limit = int(gas_limit * 1.2)
+        except Exception as exc:
+            raise RuntimeError(
+                f"eth_estimateGas reverted for {token}: {exc} — dropping tx, no gas spent"
+            )
 
         nonce = int(
             await provider.call("eth_getTransactionCount", [acct.address, "latest"]),
             16,
         )
         max_fee, max_priority = await _estimate_eip1559_fees(provider, max_gas_price_gwei)
-        gas_limit = 300_000  # swapExactETHForTokensSupportingFeeOnTransferTokens typical
+        if gas_limit < 50_000:
+            gas_limit = 300_000  # floor: swapExactETHForTokensSupportingFeeOnTransferTokens typical
 
         balance = await provider.eth_get_balance(acct.address)
         estimated_gas_cost = max_fee * gas_limit
