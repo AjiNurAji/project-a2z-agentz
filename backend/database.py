@@ -643,11 +643,7 @@ def enqueue_target(user_id: int, source: str, project_name: str, target_address:
     INSERT INTO scraping_queue
     (user_id, source, project_name, target_address, data_payload, processing_status)
     VALUES (%s, %s, %s, %s, %s, 'PENDING')
-    ON CONFLICT (target_address)
-    DO UPDATE SET
-        processing_status = 'PENDING',
-        data_payload = EXCLUDED.data_payload,
-        updated_at = CURRENT_TIMESTAMP
+    ON CONFLICT (target_address) DO NOTHING
     RETURNING id;
     """
     try:
@@ -656,6 +652,13 @@ def enqueue_target(user_id: int, source: str, project_name: str, target_address:
             row = cur.fetchone()
             if row:
                 return row[0] if isinstance(row, (tuple, list)) else row.get('id')
+            # Conflict: row already exists. Do NOT reset its status (that would
+            # re-queue an already-PROCESSED/FAILED token and create an infinite
+            # Agent A -> Agent B loop). Just return the existing row id.
+            cur.execute("SELECT id FROM scraping_queue WHERE target_address = %s LIMIT 1;", (target_address,))
+            existing = cur.fetchone()
+            if existing:
+                return existing[0] if isinstance(existing, (tuple, list)) else existing.get('id')
             return None
     except psycopg2.Error as exc:
         logger.error('enqueue_target failed: %s', exc)

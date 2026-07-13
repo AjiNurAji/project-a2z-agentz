@@ -210,7 +210,7 @@ async def _check_goplus(session: aiohttp.ClientSession, token_address: str) -> d
 async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_summary: str, dex_context: str = "") -> dict[str, Any]:
     if not AGENT_B_API_KEY or not AGENT_B_ENDPOINT or not AGENT_B_MODEL:
         return {"score": 0, "reason": "missing agent b config", "amount_usd": 0.0, "model": "bypass", "latency_ms": 0}
-    temperature = float(os.getenv("AGENT_B_TEMPERATURE", "0.1"))
+    temperature = float(os.getenv("AGENT_B_TEMPERATURE", "0.0"))
     max_tokens = int(os.getenv("AGENT_B_MAX_TOKENS", "1024"))
     prompt = (
         "You are Agent B (The Vault Gatekeeper), a strict anti-rug security validator on Base Network.\n"
@@ -232,7 +232,8 @@ async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_
         "CRITICAL: Your entire response must be valid JSON starting with '{' and ending with '}'. "
         "Do NOT write any text before or after the JSON. If you add any words, the parser fails.\n"
         "EXAMPLE OUTPUT (emit exactly this shape, fill real values):\n"
-        '{"score": 95, "category": "defi", "reason": "no honeypot, 0% tax, open source", "amount_usd": 0.5, "model": "deepseek-v4-pro"}'
+        '{"score": 95, "category": "defi", "reason": "no honeypot, 0% tax, open source", "amount_usd": 0.5, "model": "deepseek-v4-pro"}\n'
+        "CRITICAL: DO NOT explain your reasoning before the JSON. DO NOT output any prose or markdown. OUTPUT ONLY A RAW JSON OBJECT."
     )
     # Dynamic model discovery: prefer the actual model id reported by the
     # server itself. Falls back to AGENT_B_MODEL on any failure (timeout,
@@ -284,32 +285,38 @@ async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_
     if not content:
         _code = getattr(resp, "status_code", "?")
         return {"score": 0, "reason": f"http {_code}", "amount_usd": 0.0, "model": model_id, "latency_ms": _latency}
-    # Some models wrap JSON in explanatory prose. Extract the first balanced
-    # {...} object rather than json.loads() on the whole (often non-JSON) text.
+    # Bulletproof parse: DeepSeek-V4-Pro sometimes wraps JSON in prose
+    # ("We are asked to output..."). We strip to the first balanced {...}
+    # object via regex BEFORE json.loads, and never let a parse failure
+    # crash the pipeline (falls through to score 0 with the raw text).
     parsed = None
     _candidate = content.strip()
-    if _candidate.startswith("{"):
+
+    def _try_loads(text: str):
         try:
-            parsed = json.loads(_candidate)
+            return json.loads(text)
         except Exception:
-            parsed = None
+            return None
+
+    # 1) Direct (already raw JSON)
+    if _candidate.startswith("{"):
+        parsed = _try_loads(_candidate)
+    # 2) Regex: grab the largest {...} block (handles prose-wrapped JSON)
     if parsed is None:
-        # Non-greedy match of the JSON object that actually carries our
-        # schema (starts with "score"), so stray {} in prose is ignored.
-        _m = re.search(r'\{\s*"score"\s*:.*?\}', _candidate, re.DOTALL)
+        _m = re.search(r"\{.*\}", _candidate, re.DOTALL)
         if _m:
-            try:
-                parsed = json.loads(_m.group(0))
-            except Exception:
-                parsed = None
-    # Also handle ```json ... ``` fences
+            parsed = _try_loads(_m.group(0))
+    # 3) ```json ... ``` fences
     if parsed is None:
         _m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", _candidate, re.DOTALL)
         if _m:
-            try:
-                parsed = json.loads(_m.group(1))
-            except Exception:
-                parsed = None
+            parsed = _try_loads(_m.group(1))
+    # 4) score-keyed object anywhere in prose
+    if parsed is None:
+        _m = re.search(r'\{\s*"score"\s*:.*?\}', _candidate, re.DOTALL)
+        if _m:
+            parsed = _try_loads(_m.group(0))
+
     if isinstance(parsed, dict):
         return {
             "score": int(parsed.get("score", 0) or 0),
