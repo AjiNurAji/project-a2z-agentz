@@ -187,12 +187,16 @@ export default function AgentsPage() {
                 <tr className="border-b" style={{ borderColor: "var(--color-border-soft)" }}>
                   <th className="text-left py-2 px-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--color-body-subtle)" }}>Token</th>
                   <th className="text-right py-2 px-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--color-body-subtle)" }}>Entry</th>
-                  <th className="text-right py-2 px-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--color-body-subtle)" }}>Status</th>
+                  <th className="text-right py-2 px-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--color-body-subtle)" }}>Now</th>
+                  <th className="text-right py-2 px-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--color-body-subtle)" }}>P&L</th>
                   <th className="text-right py-2 px-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--color-body-subtle)" }}>Tx</th>
                 </tr>
               </thead>
               <tbody>
-                {holding.map((t: any) => (
+                {holding.map((t: any) => {
+                  const pnlPct = Number(t.pnl_pct) || 0;
+                  const pnlColor = pnlPct >= 0 ? "var(--color-fg-success)" : "var(--color-fg-danger)";
+                  return (
                   <tr key={t.token_address} className="border-b" style={{ borderColor: "var(--color-border-soft)" }}>
                     <td className="py-2.5 px-3">
                       <div className="flex items-center gap-2">
@@ -202,13 +206,17 @@ export default function AgentsPage() {
                       <span className="text-[10px] font-mono" style={{ color: "var(--color-body-subtle)" }}>{t.token_address?.slice(0, 10)}...</span>
                     </td>
                     <td className="py-2.5 px-3 text-right tabular-nums" style={{ color: "var(--color-body)" }}>
-                      ${Number(t.entry_price_usd).toFixed(4)}
+                      ${Number(t.entry_price_usd).toFixed(6)}
                     </td>
-                    <td className="py-2.5 px-3 text-right">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
-                        style={{ background: "var(--color-success-soft)", color: "var(--color-fg-success)", border: "1px solid var(--color-border-success-subtle)" }}>
-                        <span className="w-1 h-1 rounded-full" style={{ background: "var(--color-fg-success)" }} />
-                        HOLDING
+                    <td className="py-2.5 px-3 text-right tabular-nums" style={{ color: "var(--color-body)" }}>
+                      {t.current_price_usd > 0 ? `$${Number(t.current_price_usd).toFixed(6)}` : '—'}
+                    </td>
+                    <td className="py-2.5 px-3 text-right tabular-nums">
+                      <span className="font-semibold" style={{ color: pnlColor }}>
+                        {pnlPct >= 0 ? '+' : ''}{pnlPct.toFixed(1)}%
+                      </span>
+                      <span className="text-[10px] block" style={{ color: pnlColor }}>
+                        {t.pnl_usd >= 0 ? '+' : ''}{Number(t.pnl_usd).toFixed(4)}
                       </span>
                     </td>
                     <td className="py-2.5 px-3 text-right">
@@ -219,7 +227,8 @@ export default function AgentsPage() {
                       </a>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

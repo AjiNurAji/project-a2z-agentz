@@ -819,11 +819,50 @@ async def get_execution_status(request: Request):
 
 @require_auth
 async def get_holdings(request: Request):
-    """GET /holdings — Agent B vault holdings (held tokens + P&L)."""
+    """GET /holdings — Agent B vault holdings with live P&L from DexScreener."""
+    import httpx as _httpx
     held = database.fetch_held_tokens("HOLDING")
     sold = database.fetch_held_tokens("SOLD")
+
+    # Enrich held tokens with live market price + P&L
+    enriched = []
+    for token in held:
+        addr = token.get("token_address", "")
+        entry_price = float(token.get("entry_price_usd") or 0)
+        current_price = 0.0
+        pnl_usd = 0.0
+        pnl_pct = 0.0
+
+        if addr and entry_price > 0:
+            try:
+                async with _httpx.AsyncClient(timeout=8) as client:
+                    resp = await client.get(
+                        f"https://api.dexscreener.com/latest/dex/tokens/{addr}"
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        pairs = (data.get("pairs") or []) if isinstance(data, dict) else []
+                        if pairs:
+                            current_price = float(pairs[0].get("priceUsd") or 0)
+            except Exception:
+                pass
+
+        if current_price > 0 and entry_price > 0:
+            pnl_pct = round((current_price - entry_price) / entry_price * 100, 2)
+            # Approximate P&L: entry was $0.50 worth, scale by price change
+            entry_value = 0.50  # micro trade amount
+            current_value = entry_value * (current_price / entry_price)
+            pnl_usd = round(current_value - entry_value, 4)
+
+        enriched.append({
+            **token,
+            "current_price_usd": current_price,
+            "pnl_pct": pnl_pct,
+            "pnl_usd": pnl_usd,
+        })
+
     return JSONResponse({
-        "holding": held,
+        "holding": enriched,
         "sold": sold,
         "count_holding": len(held),
         "count_sold": len(sold),
