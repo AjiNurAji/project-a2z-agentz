@@ -125,11 +125,24 @@ async def _discover_model_list(
 
 
 def _normalize_agent_b_endpoint(endpoint: str) -> str:
-    """Strip any trailing /chat/completions so the OpenAI SDK doesn't append
-    it twice (which 404s as '/v1/chat/completions/chat/completions')."""
+    """Force the canonical Fireworks base: https://api.fireworks.ai/inference/v1.
+
+    Operator confirmed the exact endpoint is
+    https://api.fireworks.ai/inference/v1/chat/completions. The OpenAI SDK
+    appends /chat/completions itself, so we strip any trailing path and
+    ALWAYS rebuild as .../inference/v1 (never bare /v1, which 404s as
+    'Path not found: /v1').
+    """
     e = (endpoint or "").rstrip("/")
-    if e.endswith("/chat/completions"):
-        e = e[: -len("/chat/completions")]
+    # Drop any trailing chat/completions or /v1 so we don't double-append.
+    for suffix in ("/chat/completions", "/v1", "/inference/v1"):
+        if e.endswith(suffix):
+            e = e[: -len(suffix)]
+    # Always rebuild the canonical Fireworks inference base.
+    if e.endswith("/inference"):
+        return e + "/v1"
+    if "api.fireworks.ai" in e:
+        return "https://api.fireworks.ai/inference/v1"
     if not e.endswith("/v1"):
         e = e + "/v1"
     return e
