@@ -292,7 +292,32 @@ async def get_system_status(request: Request):
     from urllib import request as _url_req
     from urllib import error as _url_err
     import json as _json
-    body = {"database": "healthy", "circuit_breaker": "unknown", "rpc_node": "healthy", "ai_model": "unknown", "ai_model_id": None, "ai_endpoint": None}
+    body = {"database": "unknown", "circuit_breaker": "unknown", "rpc_node": "unknown", "ai_model": "unknown", "ai_model_id": None, "ai_endpoint": None}
+    
+    # --- Real RPC health check (was hardcoded "healthy") ---
+    try:
+        from scheduler.agent_b_cycle import _build_rpc_provider, _rpc_health_ok
+        provider = _build_rpc_provider()
+        if provider is None:
+            body["rpc_node"] = "no_endpoints_configured"
+        else:
+            import asyncio as _asyncio
+            try:
+                loop = _asyncio.get_event_loop()
+            except RuntimeError:
+                loop = _asyncio.new_event_loop()
+                _asyncio.set_event_loop(loop)
+            ok = loop.run_until_complete(_rpc_health_ok(provider))
+            body["rpc_node"] = "healthy" if ok else "unhealthy"
+    except Exception as exc:
+        body["rpc_node"] = f"check_error: {exc}"
+
+    # --- Real DB health check (was hardcoded "healthy") ---
+    try:
+        database.get_system_config("circuit_breaker", "active")
+        body["database"] = "healthy"
+    except Exception as exc:
+        body["database"] = f"error: {exc}"
     try:
         cb = database.get_system_config("circuit_breaker", "active")
         body["circuit_breaker"] = cb
@@ -351,7 +376,7 @@ async def get_system_status(request: Request):
             "inference_ms": m["agent_a_inference_ms"] or m["agent_b_inference_ms"],
             "success_count": m["agent_a_success"] + m["agent_b_success"],
             "fail_count": m["agent_a_failed"] + m["agent_b_failed"],
-            "queue_depth": 0,
+            "queue_depth": database.fetch_queue_depth(),
         }
         # Live AMD GPU metrics scraped from the vLLM /metrics endpoint (Agent A brain).
         try:

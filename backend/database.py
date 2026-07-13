@@ -665,6 +665,18 @@ def enqueue_target(user_id: int, source: str, project_name: str, target_address:
         return None
 
 
+def fetch_queue_depth() -> int:
+    """Return count of PENDING tasks in scraping_queue (lightweight, no lock)."""
+    try:
+        with _get_cursor(dict_rows=False) as cur:
+            cur.execute(
+                "SELECT COUNT(*) FROM scraping_queue WHERE processing_status = 'PENDING'"
+            )
+            row = cur.fetchone()
+            return int(row[0]) if row else 0
+    except Exception:
+        return -1  # signal error to dashboard
+
 def fetch_and_lock_pending_task(limit: int = 1):
     query = """
     SELECT * FROM scraping_queue
