@@ -221,8 +221,12 @@ async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_
             model=model_id,
             temperature=temperature,
             max_tokens=max_tokens,
+            # Force JSON so the model cannot wrap its verdict in prose (which
+            # previously made json.loads() fail -> score 0 -> never executes).
+            # Fireworks / OpenAI-compatible servers honor this.
+            response_format={"type": "json_object"},
             messages=[
-                {"role": "system", "content": "Return only compact JSON."},
+                {"role": "system", "content": "Return only valid JSON, no prose."},
                 {"role": "user", "content": prompt},
             ],
         )
