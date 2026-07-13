@@ -63,7 +63,7 @@ DEFAULT_USER_ID = int(os.getenv("AGENT_A_DEFAULT_USER_ID", "1"))
 # LLM brain for Agent A (Llama on AMD via Cloudflare tunnel). Falls back to the
 # generic AI_MODEL env if AGENT_A_MODEL is not set. Empty endpoint -> mock.
 AI_MODEL = os.getenv("AGENT_A_MODEL", os.getenv("AI_MODEL", ""))
-AGENT_A_LLM_THRESHOLD = int(os.getenv("AGENT_A_LLM_THRESHOLD", "85"))
+AGENT_A_LLM_THRESHOLD = int(os.getenv("AGENT_A_LLM_THRESHOLD", "60"))  # >= 60 = eligible
 
 # --- Strict Alpha Filter thresholds ---
 MIN_LIQUIDITY_USD = float(os.getenv("AGENT_A_MIN_LIQUIDITY_USD", "5000"))

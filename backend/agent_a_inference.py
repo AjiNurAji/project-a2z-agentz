@@ -64,7 +64,7 @@ from web3_async import (
 # ----------------------------------------------------------------------------
 # Constants
 # ----------------------------------------------------------------------------
-DEFAULT_THRESHOLD: int = 85
+DEFAULT_THRESHOLD: int = 60  # Agent A pass threshold (score >= 60 → eligible)
 DEFAULT_MODEL: str = "meta-llama/Llama-3.1-8B-Instruct-AWQ"
 APPROVE_AMOUNT_FULL: float = 2.00 # Agent B's AUTONOMOUS_CAP_USD ceiling
 APPROVE_AMOUNT_HALF: float = 1.50
@@ -120,84 +120,154 @@ _MOCK_NEGATIVE = re.compile(
 
 
 def _mock_infer(description: str, target_address: str) -> AIResult:
-    """
-    Deterministic mock: same (description, address) -> same score every time.
-    Uses hash(address) as RNG seed so signed payloads stay reproducible
-    across cron runs (Agent B's idempotency depends on this).
+    """Data-driven mock: parses DEX_ALPHA_SIGNAL fields for scoring.
+
+    Same (description, address) → same score every time (hash-seeded RNG).
+    Uses real DexScreener data from the content string instead of keyword heuristics.
     """
     t0 = time.time()
     text = _safestr(description or target_address)
     seed = int(hashlib.sha256(text.encode("utf-8")).hexdigest()[:8], 16)
     rng = random.Random(seed)
 
-    base = 55
-    # Substantive descriptions earn more credit
-    base += min(len(text) // 40, 15)
-    # Keyword weighting
-    pos = len(_MOCK_POSITIVE.findall(text))
-    neg = len(_MOCK_NEGATIVE.findall(text))
-    base += pos * 6
-    base -= neg * 18
-    # Mild deterministic jitter so different projects don't all cluster
-    base += rng.randint(-4, 4)
-    score = max(1, min(100, base))
+    # Parse DEX_ALPHA_SIGNAL fields
+    import re as _re
+    liq_match = _re.search(r"Liquidity USD:\s*\$?([\d,.]+)", text)
+    vol_match = _re.search(r"24h Volume USD:\s*\$?([\d,.]+)", text)
+    price_match = _re.search(r"Price USD:\s*\$?([\d,.]+)", text)
+    age_match = _re.search(r"Pair Age:\s*(\S+)", text)
 
-    # Category heuristic
-    low = text.lower()
-    if any(k in low for k in ("swap", "lend", "borrow", "liquidity", "tvl", "ve(", "gauge", "incentive")):
-        category = "defi"
-    elif any(k in low for k in ("nft", "mint", "collectible", "art")):
-        category = "nft"
-    elif any(k in low for k in ("social", "graph", "cast", "farcaster")):
-        category = "social"
-    elif any(k in low for k in ("game", "gaming", "play")):
-        category = "gaming"
-    elif any(k in low for k in ("bridge", "oracle", "infra", "rpc", "node")):
-        category = "infrastructure"
-    elif any(k in low for k in ("airdrop", "claim", "reward", "distribution")):
-        category = "airdrop"
-    else:
-        category = "other"
+    liq = float(liq_match.group(1).replace(",", "")) if liq_match else 0
+    vol = float(vol_match.group(1).replace(",", "")) if vol_match else 0
+    age_str = age_match.group(1) if age_match else "unknown"
 
-    # Amount scales with confidence
-    if score >= 90:
+    # Base score + liquidity tier
+    score = 30
+    if liq > 500_000:     score += 25
+    elif liq > 200_000:   score += 15
+    elif liq > 50_000:    score += 10
+    elif liq < 10_000 and liq > 0: score -= 20
+
+    # Volume = community activity
+    if vol > 100_000:     score += 15
+    elif vol > 10_000:    score += 5
+    elif vol < 1_000 and vol > 0: score -= 10
+
+    # Pair age
+    try:
+        age_val = float(_re.sub(r"[^0-9.]", "", age_str.split()[0]) if age_str else "0")
+        if "hour" in age_str or "min" in age_str:
+            age_hours = age_val / 3600 if "sec" not in age_str else age_val / 3600
+            if age_hours < 1:   score -= 15
+            elif age_hours < 24: score += 0
+        elif "day" in age_str:
+            if age_val > 7:     score += 10
+            else:               score += 5
+        elif "month" in age_str or "year" in age_str:
+            score += 10
+    except Exception:
+        pass  # unknown age → neutral
+
+    # Red flags: dead token, rug signals
+    red_flags = 0
+    text_lower = text.lower()
+    for kw in ("scam", "rug", "honeypot", "guaranteed", "100x", "pump", "moon"):
+        if kw in text_lower:
+            red_flags += 1
+            score -= 15
+
+    # Cap at 40 if red flags present
+    if red_flags > 0:
+        score = min(score, 40)
+    # Cap at 20 if scam keywords
+    if any(kw in text_lower for kw in ("scam", "rug pull", "honeypot")):
+        score = min(score, 20)
+
+    # If literally no data → low score
+    if liq == 0 and vol == 0:
+        score = max(1, score - 10)
+
+    # Mild jitter
+    score += rng.randint(-3, 3)
+    score = max(1, min(100, score))
+
+    # Category
+    category = _mock_category(text_lower)
+
+    # Amount: score >= 85 + strong liq/vol = full, score >= 60 = micro
+    if score >= 85 and liq > 200_000 and vol > 10_000:
         amount_usd = APPROVE_AMOUNT_FULL
-    elif score >= DEFAULT_THRESHOLD:
-        amount_usd = APPROVE_AMOUNT_HALF
+    elif score >= 60 and liq > 50_000:
+        amount_usd = 0.50
+    elif score >= 60:
+        amount_usd = 0.50
     else:
         amount_usd = 0.0
 
-    if neg > 0:
-        reason = f"red-flag keyword detected ({neg}x); rejecting"
-    elif pos >= 2:
-        reason = f"{category}: {pos} positive signals, substantive description"
-    elif pos == 1:
-        reason = f"{category}: 1 positive signal, marginal viability"
-    else:
-        reason = f"{category}: no strong positive or negative signals"
+    reason = _mock_reason(score, liq, vol, age_str, red_flags, category)
 
     return AIResult(
-        score=score,
-        category=category,
-        reason=reason[:200],
-        amount_usd=amount_usd,
-        model="mock-llama3-8b",
+        score=score, category=category, reason=reason[:200],
+        amount_usd=amount_usd, model="mock-llama3-8b",
         latency_ms=int((time.time() - t0) * 1000),
     )
 
 
+def _mock_category(text_lower: str) -> str:
+    if any(k in text_lower for k in ("swap", "lend", "borrow", "liquidity", "tvl", "ve(", "gauge")):
+        return "defi"
+    if any(k in text_lower for k in ("nft", "mint", "collectible", "art")):
+        return "nft"
+    if any(k in text_lower for k in ("social", "graph", "cast", "farcaster")):
+        return "social"
+    if any(k in text_lower for k in ("game", "gaming", "play")):
+        return "gaming"
+    if any(k in text_lower for k in ("bridge", "oracle", "infra", "rpc", "node")):
+        return "infrastructure"
+    if any(k in text_lower for k in ("airdrop", "claim", "reward")):
+        return "airdrop"
+    return "other"
+
+
+def _mock_reason(score: int, liq: float, vol: float, age: str, red_flags: int, cat: str) -> str:
+    parts = [f"liq=${liq:,.0f}", f"vol=${vol:,.0f}", f"age={age}"]
+    if red_flags > 0:
+        parts.append(f"redflags={red_flags}")
+    base = f"{cat}: " + ", ".join(parts)
+    if score >= 85:
+        return f"{base} — strong signal, eligible for full execution"
+    if score >= 60:
+        return f"{base} — moderate signal, eligible for micro execution"
+    if score <= 20:
+        return f"{base} — high risk / scam indicators, rejected"
+    return f"{base} — weak signal, below execution threshold"
+
+
 # ---- Real (OpenAI-compatible) -----------------------------------------------
 _AI_SYSTEM_PROMPT = (
-    "You are an expert Web3 project evaluator on Base Network. Given a project "
-    "description and target contract address, score the project from 1 (scam/rug) "
-    "to 100 (top-tier, audited, high TVL, active community).\n\n"
-    "Respond with ONLY a valid JSON object, no prose, no markdown fences. Schema:\n"
-    '{"score": <int 1-100>, "category": <one of defi|nft|social|gaming|'
-    'infrastructure|airdrop|other>, "reason": <string <=200 chars>, "amount_usd": <float 0.10-2.00>}\n\n'
+    "You are Agent A (The Scout), an expert Web3 project evaluator on Base Network. "
+    "You receive DEX_ALPHA_SIGNAL data from DexScreener containing real on-chain metrics. "
+    "Score the token from 1 (scam/rug) to 100 (top-tier).\n\n"
+    "SCORING RULES (use real data, not guesses):\n"
+    "- Liquidity USD: >$500K → +25, >$200K → +15, >$50K → +10, <$10K → -20 (high rug risk)\n"
+    "- 24h Volume: >$100K → +15 (active community), >$10K → +5, <$1K → -10 (dead token)\n"
+    "- Pair Age: >7 days → +10 (established), 1-7 days → +5, <1 hour → -15 (potential honeypot)\n"
+    "- Price Change 24h: positive → +5, extreme pump >500% → -10 (P&D risk)\n"
+    "- Market Cap / FDV: >$1M → +10, <$50K → -5\n"
+    "- 24h TX count: >1000 → +10 (real users), <50 → -5\n"
+    "- Base score starts at 30.\n"
+    "- If description contains scam/rug/honeypot keywords → score ≤ 20, reject.\n"
+    "- If ANY red flag (no liquidity, no volume, brand new, extreme pump) → cap score at 40.\n\n"
+    "Respond with ONLY a valid JSON object, no prose, no markdown. Schema:\n"
+    '{"score": <int 1-100>, "category": <one of defi|nft|social|gaming|infrastructure|airdrop|other>, '
+    '"reason": <string <=200 chars citing specific DEX data>, "amount_usd": <float 0.10-2.00>}\n\n'
     "Rules:\n"
-    "- score>=90 -> amount_usd=2.00; score>=85 -> amount_usd=1.50; else reject (amount_usd=0)\n"
-    "- reason MUST cite specific evidence from the description (e.g. \"audited by X\", \"TVL $Y\", \"rug signs: Z\")\n"
-    "- Do NOT invent audits or TVL. If unknown, score lower.\n"
+    "- score>=85 AND liquidity>$200K AND volume>$10K → amount_usd=2.00 (strong signal)\n"
+    "- score>=60 AND no red flags → amount_usd=0.50 (eligible for micro execution)\n"
+    "- score>=60 AND liquidity>$50K → amount_usd=0.50\n"
+    "- score<60 OR any red flag → amount_usd=0 (reject)\n"
+    "- reason MUST cite specific DexScreener numbers (e.g. \"liq=$X, vol=$Y, age=Z\")\n"
+    "- DO NOT invent data. Use ONLY what's in the DEX_ALPHA_SIGNAL.\n"
 )
 
 
