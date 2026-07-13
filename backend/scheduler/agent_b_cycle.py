@@ -211,8 +211,13 @@ async def _check_goplus(session: aiohttp.ClientSession, token_address: str) -> d
   raise RuntimeError(f"goplus upstream unavailable for {token_address}")
 
 
-async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_summary: str, dex_context: str = "", agent_a_score: int | None = None, agent_a_reason: str = "") -> dict[str, Any]:
-    if not AGENT_B_API_KEY or not AGENT_B_ENDPOINT or not AGENT_B_MODEL:
+async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_summary: str, dex_context: str = "", agent_a_score: int | None = None, agent_a_reason: str = ""):
+    # --- Force fresh config load every cycle (exorcise cached/stale env) ---
+    _endpoint = os.getenv("AGENT_B_ENDPOINT", "")
+    _api_key = os.getenv("AGENT_B_API_KEY", "")
+    _model = os.getenv("AGENT_B_MODEL", "")
+    _auto_discover = os.getenv("AGENT_B_MODEL_AUTO_DISCOVER", "0") == "1"
+    if not _api_key or not _endpoint or not _model:
         return {"score": 0, "reason": "missing agent b config", "amount_usd": 0.0, "model": "bypass", "latency_ms": 0}
     temperature = float(os.getenv("AGENT_B_TEMPERATURE", "0.0"))
     max_tokens = int(os.getenv("AGENT_B_MAX_TOKENS", "1024"))
@@ -242,108 +247,106 @@ async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_
     # Dynamic model discovery: prefer the actual model id reported by the
     # server itself. Falls back to AGENT_B_MODEL on any failure (timeout,
     # missing endpoint, auth error).
-    model_id = AGENT_B_MODEL
-    if AGENT_B_MODEL_AUTO_DISCOVER:
+    model_id = _model
+    if _auto_discover:
         try:
             async with aiohttp.ClientSession() as _sess:
-                discovered_list = await _discover_model_list(_sess, AGENT_B_ENDPOINT, AGENT_B_API_KEY)
+                discovered_list = await _discover_model_list(_sess, _endpoint, _api_key)
             if discovered_list:
-                # Prefer the model explicitly set in AGENT_B_MODEL if it is
-                # actually present in the server's model list. Only fall back
-                # to the first listed model when the configured one is absent
-                # (e.g. a self-hosted vLLM that only exposes one model id).
-                if AGENT_B_MODEL and AGENT_B_MODEL in discovered_list:
-                    model_id = AGENT_B_MODEL
+                if _model and _model in discovered_list:
+                    model_id = _model
                 else:
                     model_id = discovered_list[0]
-                    if AGENT_B_MODEL and AGENT_B_MODEL != model_id:
-                        logger.info(
-                            "Agent B model fallback: env=%s not in server list, using %s",
-                            AGENT_B_MODEL, model_id,
-                        )
+                    if _model and _model != model_id:
+                        logger.info("Agent B model fallback: env=%s not in server list, using %s", _model, model_id)
         except Exception as exc:
             logger.debug("Agent B auto-discovery skipped: %s", exc)
 
-    client = AsyncOpenAI(base_url=_normalize_agent_b_endpoint(AGENT_B_ENDPOINT), api_key=AGENT_B_API_KEY, timeout=25.0, max_retries=1)
-    _t0 = time.time()
-    try:
-        resp = await client.chat.completions.create(
-            model=model_id,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            # Force JSON so the model cannot wrap its verdict in prose (which
-            # previously made json.loads() fail -> score 0 -> never executes).
-            # Fireworks / OpenAI-compatible servers honor this.
-            response_format={"type": "json_object"},
-            messages=[
-                {"role": "system", "content": "Return only valid JSON, no prose."},
-                {"role": "user", "content": prompt},
-            ],
-        )
-    except Exception as exc:
-        logger.warning("Agent B inference failed: %s", exc)
-        return {"score": 0, "reason": f"inference_failed: {exc}", "amount_usd": 0.0, "model": model_id, "latency_ms": int((time.time() - _t0) * 1000)}
-
-    _latency = int((time.time() - _t0) * 1000)
-    content = resp.choices[0].message.content if resp.choices else ""
-    if not content:
-        _code = getattr(resp, "status_code", "?")
-        return {"score": 0, "reason": f"http {_code}", "amount_usd": 0.0, "model": model_id, "latency_ms": _latency}
-    # Bulletproof parse: DeepSeek-V4-Pro sometimes wraps JSON in prose
-    # ("We are asked to output..."). We strip to the first balanced {...}
-    # object via regex BEFORE json.loads, and never let a parse failure
-    # crash the pipeline (falls through to score 0 with the raw text).
-    parsed = None
-    _candidate = content.strip()
-
-    def _try_loads(text: str):
+    async def _do_inference() -> dict[str, Any]:
+        client = AsyncOpenAI(base_url=_normalize_agent_b_endpoint(_endpoint), api_key=_api_key, timeout=25.0, max_retries=1)
+        _t0 = time.time()
         try:
-            return json.loads(text)
-        except Exception:
-            return None
+            resp = await client.chat.completions.create(
+                model=model_id,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                response_format={"type": "json_object"},
+                messages=[
+                    {"role": "system", "content": "Return only valid JSON, no prose."},
+                    {"role": "user", "content": prompt},
+                ],
+            )
+        except Exception as exc:
+            return {"_error": exc}
+        _latency = int((time.time() - _t0) * 1000)
+        content = resp.choices[0].message.content if resp.choices else ""
+        if not content:
+            _code = getattr(resp, "status_code", "?")
+            return {"score": 0, "reason": f"http {_code}", "amount_usd": 0.0, "model": model_id, "latency_ms": _latency}
+        # Bulletproof parse: DeepSeek-V4-Pro sometimes wraps JSON in prose.
+        parsed = None
+        _candidate = content.strip()
+        def _try_loads(text: str):
+            try:
+                return json.loads(text)
+            except Exception:
+                return None
+        if _candidate.startswith("{"):
+            parsed = _try_loads(_candidate)
+        if parsed is None:
+            _m = re.search(r"\{.*\}", _candidate, re.DOTALL)
+            if _m:
+                parsed = _try_loads(_m.group(0))
+        if parsed is None:
+            _m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", _candidate, re.DOTALL)
+            if _m:
+                parsed = _try_loads(_m.group(1))
+        if parsed is None:
+            _m = re.search(r'\{\s*"score"\s*:.*?\}', _candidate, re.DOTALL)
+            if _m:
+                parsed = _try_loads(_m.group(0))
+        if isinstance(parsed, dict):
+            return {
+                "score": int(parsed.get("score", 0) or 0),
+                "reason": str(parsed.get("reason", ""))[:200],
+                "amount_usd": float(parsed.get("amount_usd", 0) or 0),
+                "category": str(parsed.get("category", "unknown")),
+                "model": str(parsed.get("model", model_id)),
+                "latency_ms": _latency,
+            }
+        if agent_a_score is not None:
+            return {
+                "score": int(agent_a_score),
+                "reason": f"[fallback to Agent A LLM] {agent_a_reason}"[:200],
+                "amount_usd": 0.0,
+                "category": "unknown",
+                "model": "agent_a_fallback",
+                "latency_ms": _latency,
+            }
+        return {"score": 0, "reason": content[:200], "amount_usd": 0.0, "model": model_id, "latency_ms": _latency}
 
-    # 1) Direct (already raw JSON)
-    if _candidate.startswith("{"):
-        parsed = _try_loads(_candidate)
-    # 2) Regex: grab the largest {...} block (handles prose-wrapped JSON)
-    if parsed is None:
-        _m = re.search(r"\{.*\}", _candidate, re.DOTALL)
-        if _m:
-            parsed = _try_loads(_m.group(0))
-    # 3) ```json ... ``` fences
-    if parsed is None:
-        _m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", _candidate, re.DOTALL)
-        if _m:
-            parsed = _try_loads(_m.group(1))
-    # 4) score-keyed object anywhere in prose
-    if parsed is None:
-        _m = re.search(r'\{\s*"score"\s*:.*?\}', _candidate, re.DOTALL)
-        if _m:
-            parsed = _try_loads(_m.group(0))
-
-    if isinstance(parsed, dict):
-        return {
-            "score": int(parsed.get("score", 0) or 0),
-            "reason": str(parsed.get("reason", ""))[:200],
-            "amount_usd": float(parsed.get("amount_usd", 0) or 0),
-            "category": str(parsed.get("category", "unknown")),
-            "model": str(parsed.get("model", model_id)),
-            "latency_ms": _latency,
-        }
-    # Final fallback: if DeepSeek regurgitated pure prose (no JSON at all),
-    # fall back to Agent A's own LLM verdict (computed on the AMD Llama
-    # model). This keeps the vault scoring real tokens instead of silently
-    # dropping them to score 0 on every DeepSeek prose failure.
-    if agent_a_score is not None:
-        return {
-            "score": int(agent_a_score),
-            "reason": f"[fallback to Agent A LLM] {agent_a_reason}"[:200],
-            "amount_usd": 0.0,
-            "category": "unknown",
-            "model": "agent_a_fallback",
-            "latency_ms": _latency,
-        }
-    return {"score": 0, "reason": content[:200], "amount_usd": 0.0, "model": model_id, "latency_ms": _latency}
+    # --- Inference with explicit 404 handling: CRITICAL log + 5s wait + retry once ---
+    _res = await _do_inference()
+    if "_error" in _res:
+        _exc = _res["_error"]
+        _status = getattr(getattr(_exc, "response", None), "status_code", None)
+        logger.critical("Agent B inference FAILED (first attempt): %s (status=%s)", _exc, _status)
+        if _status == 404:
+            logger.critical("Fireworks 404 detected -- reloading config and retrying once after 5s...")
+            await asyncio.sleep(5)
+            # Re-read config fresh before retry.
+            _endpoint = os.getenv("AGENT_B_ENDPOINT", "")
+            _api_key = os.getenv("AGENT_B_API_KEY", "")
+            _model = os.getenv("AGENT_B_MODEL", "")
+            model_id = _model
+            _res = await _do_inference()
+            if "_error" in _res:
+                _exc2 = _res["_error"]
+                logger.critical("Agent B inference FAILED on retry: %s", _exc2)
+                return {"score": 0, "reason": f"inference_failed: {_exc2}", "amount_usd": 0.0, "model": model_id, "latency_ms": 0}
+        else:
+            return {"score": 0, "reason": f"inference_failed: {_exc}", "amount_usd": 0.0, "model": model_id, "latency_ms": 0}
+    return _res
 
 
 async def process_task(task: dict[str, Any]) -> None:

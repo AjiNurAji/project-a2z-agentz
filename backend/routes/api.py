@@ -108,8 +108,9 @@ async def get_stats(request: Request):
             )
             total_usd = cur.fetchone()["total_usd"] or 0.0
 
-            # Projects Scanned
-            cur.execute("SELECT COUNT(*) as scanned FROM target_addresses")
+            # Projects Scanned — total unique Base token targets discovered
+            # by Agent A's DexScreener scout (scraping_queue.target_address).
+            cur.execute("SELECT COUNT(*) as scanned FROM scraping_queue")
             projects_scanned = cur.fetchone()["scanned"] or 0
 
             tvl_endpoint = os.getenv("TVL_ENDPOINT", "https://api.llama.fi/v2/chains")

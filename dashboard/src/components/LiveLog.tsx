@@ -18,7 +18,7 @@ const levelLabels: Record<LogEntry["level"], string> = {
 };
 
 export default function LiveLog() {
-  const { logs, agentAStatus } = useDashboard();
+  const { agentMessages, agentAStatus } = useDashboard();
   const bottomRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -33,7 +33,7 @@ export default function LiveLog() {
       }, 350);
       return () => clearTimeout(timeoutId);
     }
-  }, [logs, autoScroll]);
+  }, [agentMessages, autoScroll]);
 
   const handleScroll = useCallback(() => {
     if (!containerRef.current) return;
@@ -46,7 +46,9 @@ export default function LiveLog() {
     agentAStatus === "analyzing" ? "var(--color-warning)" :
     "var(--color-gray)";
 
-  const reversed = [...logs].reverse();
+  const reversed = [...agentMessages]
+    .filter((m) => m.sender === "agent_a")
+    .reverse();
 
   return (
     <div
@@ -61,7 +63,7 @@ export default function LiveLog() {
         <div className="flex items-center gap-2.5">
           <div
             className="flex items-center justify-center w-7 h-7 rounded-lg"
-            style={{ background: "var(--color-brand-softer)" }}
+            style={{ background: "var(--color-brand-soft)" }}
           >
             <Terminal className="w-3.5 h-3.5" style={{ color: "var(--color-fg-purple)" }} />
           </div>
@@ -112,7 +114,8 @@ export default function LiveLog() {
       >
           <AnimatePresence initial={false}>
             {reversed.map((entry) => {
-              const styles = levelStyles[entry.level];
+              const level = (entry.sender === "agent_a" ? "AGENT_A" : "AGENT_B") as LogEntry["level"];
+              const styles = levelStyles[level];
               return (
                 <motion.div
                   key={entry.id}
@@ -134,13 +137,13 @@ export default function LiveLog() {
                     className="flex-shrink-0 w-8 text-center font-bold text-[9px] sm:text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border"
                     style={{ background: `color-mix(in srgb, ${styles.badgeText} 10%, transparent)`, color: styles.badgeText, borderColor: `color-mix(in srgb, ${styles.badgeText} 20%, transparent)` }}
                   >
-                    {levelLabels[entry.level]}
+                    {levelLabels[level]}
                   </span>
                   <span
                     className="break-all text-[11px] sm:text-xs leading-relaxed"
                     style={{ color: styles.textColor }}
                   >
-                    {entry.message}
+                    {entry.content}
                   </span>
                 </motion.div>
               );
