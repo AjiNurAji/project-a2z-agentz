@@ -21,14 +21,17 @@ from database import (
     append_audit_log,
     ensure_pipeline_tables,
     fetch_and_lock_pending_task,
+    fetch_held_tokens,
     insert_execution_log,
+    insert_held_token,
     insert_synthesis_result,
     insert_transaction_proposal,
+    mark_token_sold,
     update_proposal_hash,
     update_task_status,
 )
 from routes.websockets import manager
-from web3_async import MultiRpcProvider, send_native_transaction, send_proof_of_execution, _usd_to_wei_real, swap_eth_for_token
+from web3_async import MultiRpcProvider, send_native_transaction, send_proof_of_execution, _usd_to_wei_real, swap_eth_for_token, swap_token_for_eth
 
 load_dotenv()
 
@@ -70,6 +73,8 @@ AGENT_B_MAX_TX_USD = float(os.getenv("AGENT_B_MAX_TX_USD", "0.5"))
 MAX_DAILY_SPEND_USD = float(os.getenv("MAX_DAILY_SPEND_USD", "10.0"))
 # Concurrency: how many queued tasks Agent B processes per worker tick.
 AGENT_B_CONCURRENCY = int(os.getenv("AGENT_B_CONCURRENCY", "1"))
+# Take-profit: sell held tokens when price increases by this % (default 30%)
+AGENT_B_PROFIT_PCT = float(os.getenv("AGENT_B_PROFIT_PCT", "30"))
 
 
 def _strip_models_path(endpoint: str) -> str:
@@ -595,6 +600,11 @@ async def process_task(task: dict[str, Any]) -> None:
                     insert_execution_log(tx_hash, contract_address, amount_usd, "SUCCESS")
                 except Exception:
                     pass
+                # Track purchase for take-profit sell
+                try:
+                    insert_held_token(contract_address, token_name, tx_hash, amount_usd, int(_val_wei))
+                except Exception:
+                    pass
             else:
                 tx_hash = f"mock::{contract_address}::{int(amount_usd * 1e15)}"
         except Exception as exc:
@@ -634,6 +644,64 @@ async def process_task(task: dict[str, Any]) -> None:
         update_task_status(queue_id, "FAILED", retry=True)
         return
     update_task_status(queue_id, "COMPLETED" if score < MAX_SCORE_FOR_AUTO else "FAILED", retry=False if score < MAX_SCORE_FOR_AUTO else True)
+
+
+async def _check_take_profit() -> None:
+    """Check held tokens for take-profit opportunities and sell if target met."""
+    import aiohttp as _aiohttp
+    held = fetch_held_tokens("HOLDING")
+    if not held:
+        return
+
+    for token in held:
+        addr = token.get("token_address", "")
+        name = token.get("token_name", "unknown")
+        entry_price = float(token.get("entry_price_usd") or 0)
+        if not addr or entry_price <= 0:
+            continue
+
+        # Fetch current price via DexScreener
+        try:
+            url = f"https://api.dexscreener.com/latest/dex/tokens/{addr}"
+            async with _aiohttp.ClientSession() as sess:
+                async with sess.get(url, timeout=10) as resp:
+                    if resp.status != 200:
+                        continue
+                    data = await resp.json()
+            pairs = (data.get("pairs") or []) if isinstance(data, dict) else []
+            if not pairs:
+                continue
+            current_price = float(pairs[0].get("priceUsd") or 0)
+        except Exception:
+            continue
+
+        if current_price <= 0:
+            continue
+
+        profit_pct = (current_price - entry_price) / entry_price * 100
+        logger.info("Take-profit check: %s entry=$%.6f now=$%.6f profit=%.1f%% target=%s%%",
+                    name, entry_price, current_price, profit_pct, AGENT_B_PROFIT_PCT)
+
+        if profit_pct >= AGENT_B_PROFIT_PCT:
+            logger.info("TAKE PROFIT TRIGGERED: %s +%.1f%% — selling...", name, profit_pct)
+            try:
+                result = await swap_token_for_eth(addr, int(token.get("amount_wei") or 0), chain_id=8453)
+                mark_token_sold(addr, result["tx_hash"])
+                append_audit_log(
+                    "agent_b.take_profit",
+                    f"Sold {name}: +{profit_pct:.1f}% profit, tx={result['tx_hash']}",
+                    {"token": addr, "profit_pct": profit_pct, "tx_hash": result["tx_hash"]},
+                )
+                await manager.broadcast(json.dumps({
+                    "type": "AGENT_LOG",
+                    "data": {
+                        "sender": "agent_b",
+                        "content": f"TAKE PROFIT: Sold {name} at +{profit_pct:.1f}% | Tx: {result['tx_hash']}",
+                        "metadata": {"txHash": result["tx_hash"], "profitPct": profit_pct, "projectName": name},
+                    },
+                }))
+            except Exception as exc:
+                logger.error("Take-profit sell failed for %s: %s", addr, exc)
 
 
 async def worker_loop(poll_interval: float = 2.0) -> None:
@@ -710,6 +778,11 @@ async def worker_loop(poll_interval: float = 2.0) -> None:
       try:
         await process_task(task)
         _poll_errors = 0
+        # After each task, check held tokens for take-profit
+        try:
+            await _check_take_profit()
+        except Exception:
+            pass
       except Exception as exc:
         logger.error("Agent B task failed: %s", exc, exc_info=True)
         queue_id = task.get("id") if isinstance(task, dict) else getattr(task, "id", None)

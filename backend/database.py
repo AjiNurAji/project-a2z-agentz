@@ -505,6 +505,18 @@ def ensure_pipeline_tables() -> None:
      CREATE INDEX IF NOT EXISTS scraping_queue_status_idx ON scraping_queue (processing_status);
      CREATE INDEX IF NOT EXISTS transaction_proposals_status_idx ON transaction_proposals (status);
      CREATE INDEX IF NOT EXISTS audit_log_created_at_idx ON audit_log (created_at DESC);
+     CREATE TABLE IF NOT EXISTS held_tokens (
+     id SERIAL PRIMARY KEY,
+     token_address VARCHAR(42) NOT NULL UNIQUE,
+     token_name VARCHAR(255),
+     buy_tx_hash VARCHAR(66),
+     entry_price_usd NUMERIC(20, 8),
+     amount_wei NUMERIC(78) NOT NULL DEFAULT 0,
+     bought_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     sold_at TIMESTAMP,
+     sell_tx_hash VARCHAR(66),
+     status VARCHAR(16) NOT NULL DEFAULT 'HOLDING' CHECK (status IN ('HOLDING','SOLD'))
+     );
     """  # noqa: E501  (multi-statement DDL; executed statement-by-statement below)
     try:
         with _get_cursor() as cur:
@@ -819,3 +831,53 @@ def get_daily_spend_usd() -> float:
     except psycopg2.Error as exc:
         logger.error("get_daily_spend_usd failed: %s", exc)
     return 0.0
+
+
+# ---------------------------------------------------------------------------
+# Held Tokens — Agent B buy/sell tracking
+# ---------------------------------------------------------------------------
+
+def insert_held_token(token_address: str, token_name: str, buy_tx_hash: str,
+                      entry_price_usd: float, amount_wei: int) -> int | None:
+    """Record a token purchase so Agent B can later take profit."""
+    query = """
+    INSERT INTO held_tokens (token_address, token_name, buy_tx_hash, entry_price_usd, amount_wei, status)
+    VALUES (%s, %s, %s, %s, %s, 'HOLDING')
+    ON CONFLICT (token_address) DO NOTHING
+    RETURNING id;
+    """
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (token_address, token_name, buy_tx_hash, entry_price_usd, amount_wei))
+            row = cur.fetchone()
+            return row[0] if row else None
+    except psycopg2.Error as exc:
+        logger.error("insert_held_token failed: %s", exc)
+        return None
+
+
+def fetch_held_tokens(status: str = "HOLDING") -> list[dict]:
+    """Return all tokens currently held (or sold)."""
+    query = "SELECT * FROM held_tokens WHERE status = %s ORDER BY bought_at"
+    try:
+        with _get_cursor(dict_rows=True) as cur:
+            cur.execute(query, (status,))
+            return [dict(r) for r in cur.fetchall()]
+    except psycopg2.Error as exc:
+        logger.error("fetch_held_tokens failed: %s", exc)
+        return []
+
+
+def mark_token_sold(token_address: str, sell_tx_hash: str) -> bool:
+    """Mark a held token as sold."""
+    query = """
+    UPDATE held_tokens SET status = 'SOLD', sell_tx_hash = %s, sold_at = CURRENT_TIMESTAMP
+    WHERE token_address = %s AND status = 'HOLDING'
+    """
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (sell_tx_hash, token_address))
+            return cur.rowcount > 0
+    except psycopg2.Error as exc:
+        logger.error("mark_token_sold failed: %s", exc)
+        return False

@@ -887,3 +887,173 @@ async def send_proof_of_execution() -> str:
     return await send_native_transaction(
         vault, value_wei, chain_id=chain_id, max_gas_price_gwei=cap
     )
+
+
+# ---------------------------------------------------------------------------
+# Agent B Sell Side — swap token -> ETH (take-profit exit)
+# ---------------------------------------------------------------------------
+
+# Minimal ERC20 ABI for approve + balanceOf
+_ERC20_ABI_APPROVE = [
+    {
+        "type": "function",
+        "name": "approve",
+        "inputs": [
+            {"name": "spender", "type": "address"},
+            {"name": "amount", "type": "uint256"},
+        ],
+        "outputs": [{"name": "", "type": "bool"}],
+        "stateMutability": "nonpayable",
+    },
+]
+
+
+async def _erc20_approve(
+    provider: MultiRpcProvider,
+    token_address: str,
+    spender: str,
+    amount: int,
+    chain_id: int,
+    max_gas_price_gwei: float | None = None,
+) -> str:
+    """Approve `spender` to spend `amount` of ERC20 `token_address`."""
+    from eth_abi import encode
+    acct = get_account()
+    token = _to_checksum(token_address)
+    sp = _to_checksum(spender)
+
+    # encode approve(spender, amount)
+    selector = b'\x09\x5e\xa7\xb3'  # keccak("approve(address,uint256)")[:4]
+    encoded = encode(['address', 'uint256'], [sp, amount])
+    data = '0x' + (selector + encoded).hex()
+
+    nonce = int(await provider.call("eth_getTransactionCount", [acct.address, "latest"]), 16)
+    max_fee, max_priority = await _estimate_eip1559_fees(provider, max_gas_price_gwei)
+
+    tx = {
+        "type": 2,
+        "nonce": nonce,
+        "to": token,
+        "value": 0,
+        "data": bytes.fromhex(data[2:]),
+        "gas": 80_000,
+        "maxFeePerGas": max_fee,
+        "maxPriorityFeePerGas": max_priority,
+        "chainId": chain_id,
+    }
+    signed = acct.sign_transaction(tx)
+    raw_bytes = getattr(signed, "raw_transaction", None) or getattr(signed, "rawTransaction", None)
+    raw = raw_bytes.hex() if isinstance(raw_bytes, (bytes, bytearray)) else raw_bytes
+
+    results = []
+    for ep in provider._endpoints:
+        try:
+            session = aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=DEFAULT_TIMEOUT),
+                headers={"Content-Type": "application/json"},
+            )
+            async with session.post(
+                ep.url,
+                json={"jsonrpc": "2.0", "id": RPC_ID, "method": "eth_sendRawTransaction", "params": ["0x" + raw]},
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    if "result" in data and data["result"]:
+                        return data["result"]
+                    results.append(data)
+        except Exception:
+            pass
+        finally:
+            await session.close()
+    raise RuntimeError(f"Approve broadcast failed: {results[:3]}")
+
+
+async def swap_token_for_eth(
+    token_address: str,
+    token_amount_wei: int,
+    *,
+    chain_id: int | None = None,
+    max_gas_price_gwei: float | None = None,
+) -> dict:
+    """Swap token -> ETH via Uniswap V2 on Base (Agent B take-profit exit).
+
+    Approves the router first, then calls swapExactTokensForETHSupportingFeeOnTransferTokens.
+    Returns dict with tx_hash, token_address, token_amount_wei.
+    """
+    from eth_abi import encode
+    import time as _time
+
+    if not _SIGNING_AVAILABLE:
+        raise RuntimeError("eth_account not installed")
+
+    cid = chain_id or BASE_CHAIN_ID
+    rpc_urls = [u for u in [
+        os.environ.get("BASE_RPC_1", ""), os.environ.get("BASE_RPC_2", ""),
+        os.environ.get("BASE_RPC_3", ""), os.environ.get("BASE_RPC_4", ""),
+    ] if u]
+    if not rpc_urls:
+        raise RuntimeError(f"No RPC endpoints for chain_id={cid}")
+
+    provider = MultiRpcProvider(rpc_urls=rpc_urls, chain_id=cid)
+    try:
+        acct = get_account()
+        router = _to_checksum(UNISWAP_V2_ROUTER)
+        token = _to_checksum(token_address)
+        weth = _to_checksum(WETH_BASE)
+        recipient = _to_checksum(acct.address)
+
+        # Step 1: Approve router to spend tokens (only if we haven't already)
+        approve_hash = await _erc20_approve(
+            provider, token_address, UNISWAP_V2_ROUTER, token_amount_wei,
+            chain_id=cid, max_gas_price_gwei=max_gas_price_gwei,
+        )
+        logger.info("Token approval tx=%s for %s amount=%s", approve_hash, token_address, token_amount_wei)
+
+        # Step 2: swapExactTokensForETHSupportingFeeOnTransferTokens
+        deadline = int(_time.time()) + 1200
+        path = [token, weth]
+        selector = b'\xb6\xf9\xde\x95'
+        encoded_params = encode(
+            ['uint256', 'address[]', 'address', 'uint256'],
+            [1, path, recipient, deadline],
+        )
+        calldata = '0x' + (selector + encoded_params).hex()
+
+        nonce = int(await provider.call("eth_getTransactionCount", [acct.address, "latest"]), 16)
+        max_fee, max_priority = await _estimate_eip1559_fees(provider, max_gas_price_gwei)
+
+        tx = {
+            "type": 2, "nonce": nonce, "to": router, "value": 0,
+            "data": bytes.fromhex(calldata[2:]), "gas": 300_000,
+            "maxFeePerGas": max_fee, "maxPriorityFeePerGas": max_priority, "chainId": cid,
+        }
+        signed = acct.sign_transaction(tx)
+        raw_bytes = getattr(signed, "raw_transaction", None) or getattr(signed, "rawTransaction", None)
+        raw = raw_bytes.hex() if isinstance(raw_bytes, (bytes, bytearray)) else raw_bytes
+
+        results = []
+        for ep in provider._endpoints:
+            try:
+                session = aiohttp.ClientSession(
+                    timeout=aiohttp.ClientTimeout(total=DEFAULT_TIMEOUT),
+                    headers={"Content-Type": "application/json"},
+                )
+                async with session.post(
+                    ep.url,
+                    json={"jsonrpc": "2.0", "id": RPC_ID, "method": "eth_sendRawTransaction", "params": ["0x" + raw]},
+                ) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        if "result" in data and data["result"]:
+                            tx_hash = data["result"]
+                            logger.info("SELL swap broadcast: %s wei of %s -> ETH, tx=%s",
+                                        token_amount_wei, token_address, tx_hash)
+                            return {"tx_hash": tx_hash, "token_address": token_address, "token_amount_wei": token_amount_wei}
+                        results.append(data)
+            except Exception:
+                pass
+            finally:
+                await session.close()
+        raise RuntimeError(f"Sell swap broadcast failed: {results[:3]}")
+    finally:
+        await provider.close()
