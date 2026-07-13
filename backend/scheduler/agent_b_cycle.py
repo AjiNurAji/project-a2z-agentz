@@ -208,7 +208,9 @@ async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_
         "- reason MUST cite specific GoPlus evidence (e.g. \"is_honeypot: true\", \"buy_tax: X%\")\n"
         "- Do NOT approve if security signals are unknown or suspicious.\n"
         "CRITICAL: Your entire response must be valid JSON starting with '{' and ending with '}'. "
-        "Do NOT write any text before or after the JSON. If you add any words, the parser fails."
+        "Do NOT write any text before or after the JSON. If you add any words, the parser fails.\n"
+        "EXAMPLE OUTPUT (emit exactly this shape, fill real values):\n"
+        '{"score": 95, "category": "defi", "reason": "no honeypot, 0% tax, open source", "amount_usd": 0.5, "model": "deepseek-v4-pro"}'
     )
     # Dynamic model discovery: prefer the actual model id reported by the
     # server itself. Falls back to AGENT_B_MODEL on any failure (timeout,
