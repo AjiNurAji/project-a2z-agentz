@@ -772,6 +772,7 @@ def insert_transaction_proposal(synthesis_id: int, amount_usd: float, gnosis_saf
     query = """
     INSERT INTO transaction_proposals (synthesis_id, amount_usd, gnosis_safe_tx_hash, status)
     VALUES (%s, %s, %s, 'PENDING')
+    ON CONFLICT (synthesis_id) DO UPDATE SET status='PENDING', amount_usd=EXCLUDED.amount_usd
     RETURNING id;
     """
     try:

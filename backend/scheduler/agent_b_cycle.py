@@ -31,7 +31,7 @@ from database import (
     update_task_status,
 )
 from routes.websockets import manager
-from web3_async import MultiRpcProvider, send_native_transaction, send_proof_of_execution, _usd_to_wei_real, swap_eth_for_token, swap_token_for_eth
+from web3_async import MultiRpcProvider, send_native_transaction, send_proof_of_execution, _usd_to_wei_real, swap_eth_for_token, swap_token_for_eth, WETH_BASE
 
 load_dotenv()
 
@@ -584,6 +584,21 @@ async def process_task(task: dict[str, Any]) -> None:
     # The early-return on amount_usd null/0 is REMOVED -- we force the trade.
     amount_usd = 0.5
 
+    # --- Guard: never try to "buy" a base asset / wrapped token (WETH). ---
+    # WETH (0x4200...0006) is the quote asset itself; swapping ETH->WETH or
+    # sending ETH to it is meaningless and the smart-contract guard aborts it,
+    # causing an infinite FAILED/retry loop. Mark eligible-but-unbuyable
+    # targets COMPLETED (no retry) so they don't wedge the queue.
+    if contract_address.lower() == WETH_BASE.lower():
+        logger.warning("Agent B skipping execution: target %s is WETH (not buyable)", contract_address)
+        update_task_status(queue_id, "COMPLETED", retry=False)
+        append_audit_log(
+            "agent_b.skipped_unbuyable",
+            f"Target {contract_address} is WETH; not auto-buying",
+            {"queue_id": queue_id, "address": contract_address},
+        )
+        return
+
     # Pre-exec diagnostics + RPC health retry loop.
     # Single _rpc_health_ok() was the #1 silent killer: RPC blip = zero execution
     # even with score=100. Now retry up to 3x with exponential backoff so
@@ -645,9 +660,15 @@ async def process_task(task: dict[str, Any]) -> None:
                     _cid = 8453
                     _gwei_cap = float(os.getenv("MAX_GAS_PRICE_GWEI", "0") or "0") or None
                     _val_wei = _usd_to_wei_real(amount_usd)
-                    tx_hash = await send_native_transaction(
+                    # BUY the token via Uniswap V2 swap (ETH -> token), NOT a
+                    # plain native transfer to the token contract (which reverts
+                    # under EIP-7611 / OP-070 and would waste gas).
+                    swap_res = await swap_eth_for_token(
                         contract_address, _val_wei, chain_id=_cid, max_gas_price_gwei=_gwei_cap
                     )
+                    tx_hash = swap_res.get("tx_hash") or swap_res.get("tx_hash_id")  # type: ignore[assignment]
+                    if not tx_hash:
+                        raise RuntimeError(f"swap returned no tx_hash: {swap_res}")
                 try:
                     if proposal_id is not None:
                         update_proposal_hash(proposal_id, tx_hash)
