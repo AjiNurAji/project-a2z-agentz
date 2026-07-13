@@ -51,7 +51,11 @@ BASE_RPC_1 = os.getenv("BASE_RPC_1", "")
 BASE_RPC_2 = os.getenv("BASE_RPC_2", "")
 BASE_RPC_3 = os.getenv("BASE_RPC_3", "")
 BASE_CHAIN_ID = int(os.getenv("BASE_CHAIN_ID", "8453"))
-MAX_SCORE_FOR_AUTO = int(os.getenv("AGENT_B_AUTO_SCORE_MIN", "60"))
+# Operator-authorized auto-exec threshold = 60 (PoC). Agent A Llama
+# fallback scores land at 40-60; at 60 we trigger the $0.5 live send.
+# Hard-coded per operator instruction (no env override, since a stale
+# AGENT_B_AUTO_SCORE_MIN=85 would silently block every execution).
+MAX_SCORE_FOR_AUTO = 60
 DEFAULT_NETWORK_HINT = os.getenv("ACTIVE_NETWORK", "base")
 # Budget guard (env already provided by operator). Enforced before any
 # auto-execution proposal so the vault stays within operator limits.
