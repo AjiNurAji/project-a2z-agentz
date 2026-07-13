@@ -51,7 +51,7 @@ BASE_RPC_1 = os.getenv("BASE_RPC_1", "")
 BASE_RPC_2 = os.getenv("BASE_RPC_2", "")
 BASE_RPC_3 = os.getenv("BASE_RPC_3", "")
 BASE_CHAIN_ID = int(os.getenv("BASE_CHAIN_ID", "8453"))
-MAX_SCORE_FOR_AUTO = int(os.getenv("AGENT_B_AUTO_SCORE_MIN", "85"))
+MAX_SCORE_FOR_AUTO = int(os.getenv("AGENT_B_AUTO_SCORE_MIN", "70"))
 DEFAULT_NETWORK_HINT = os.getenv("ACTIVE_NETWORK", "base")
 # Budget guard (env already provided by operator). Enforced before any
 # auto-execution proposal so the vault stays within operator limits.
@@ -207,7 +207,7 @@ async def _check_goplus(session: aiohttp.ClientSession, token_address: str) -> d
   raise RuntimeError(f"goplus upstream unavailable for {token_address}")
 
 
-async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_summary: str, dex_context: str = "") -> dict[str, Any]:
+async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_summary: str, dex_context: str = "", agent_a_score: int | None = None, agent_a_reason: str = "") -> dict[str, Any]:
     if not AGENT_B_API_KEY or not AGENT_B_ENDPOINT or not AGENT_B_MODEL:
         return {"score": 0, "reason": "missing agent b config", "amount_usd": 0.0, "model": "bypass", "latency_ms": 0}
     temperature = float(os.getenv("AGENT_B_TEMPERATURE", "0.0"))
@@ -326,7 +326,19 @@ async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_
             "model": str(parsed.get("model", model_id)),
             "latency_ms": _latency,
         }
-    # Final fallback: keep raw text so logs show what the model actually said.
+    # Final fallback: if DeepSeek regurgitated pure prose (no JSON at all),
+    # fall back to Agent A's own LLM verdict (computed on the AMD Llama
+    # model). This keeps the vault scoring real tokens instead of silently
+    # dropping them to score 0 on every DeepSeek prose failure.
+    if agent_a_score is not None:
+        return {
+            "score": int(agent_a_score),
+            "reason": f"[fallback to Agent A LLM] {agent_a_reason}"[:200],
+            "amount_usd": 0.0,
+            "category": "unknown",
+            "model": "agent_a_fallback",
+            "latency_ms": _latency,
+        }
     return {"score": 0, "reason": content[:200], "amount_usd": 0.0, "model": model_id, "latency_ms": _latency}
 
 
@@ -346,6 +358,8 @@ async def process_task(task: dict[str, Any]) -> None:
   # Agent B's prompt so the vault scores with full A2Z agent-to-agent context.
   dex_context = ""
   agent_a_llm = payload.get("agent_a_llm")
+  agent_a_score = None
+  agent_a_reason = ""
   try:
     liq = payload.get("liquidity_usd")
     mcap = payload.get("market_cap")
@@ -372,6 +386,13 @@ async def process_task(task: dict[str, Any]) -> None:
         f"category:{agent_a_llm.get('category')},"
         f"reason:{agent_a_llm.get('reason')}"
       )
+      # Capture Agent A's own LLM verdict so Agent B can fall back to it
+      # when the DeepSeek gatekeeper regurgitates prose instead of JSON.
+      try:
+        agent_a_score = int(agent_a_llm.get("score") or 0) or None
+      except Exception:
+        agent_a_score = None
+      agent_a_reason = str(agent_a_llm.get("reason") or "")
   except Exception:
     dex_context = ""
 
@@ -417,7 +438,10 @@ async def process_task(task: dict[str, Any]) -> None:
     else:
       goplus_summary = json.dumps({})
 
-    inference = await _run_agent_b_inference(token_name, contract_address, goplus_summary, dex_context)
+    inference = await _run_agent_b_inference(
+        token_name, contract_address, goplus_summary, dex_context,
+        agent_a_score=agent_a_score, agent_a_reason=agent_a_reason,
+    )
     score = int(inference.get("score", 0) or 0)
     reason = inference.get("reason") or ""
     synthesis_id = insert_synthesis_result(queue_id, score, reason)
