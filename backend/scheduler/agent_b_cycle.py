@@ -356,8 +356,14 @@ async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_
             if "_error" in _res:
                 _exc2 = _res["_error"]
                 logger.critical("Agent B inference FAILED on retry: %s", _exc2)
+                if agent_a_score is not None:
+                    logger.warning("Agent B retry failed — falling back to Agent A score=%s", agent_a_score)
+                    return {"score": int(agent_a_score), "reason": f"[fallback Agent A after retry fail] {agent_a_reason}"[:200], "amount_usd": 0.0, "category": "unknown", "model": "agent_a_fallback", "latency_ms": 0}
                 return {"score": 0, "reason": f"inference_failed: {_exc2}", "amount_usd": 0.0, "model": model_id, "latency_ms": 0}
         else:
+            if agent_a_score is not None:
+                logger.warning("Agent B inference failed (non-404) — falling back to Agent A score=%s", agent_a_score)
+                return {"score": int(agent_a_score), "reason": f"[fallback Agent A after inference fail] {agent_a_reason}"[:200], "amount_usd": 0.0, "category": "unknown", "model": "agent_a_fallback", "latency_ms": 0}
             return {"score": 0, "reason": f"inference_failed: {_exc}", "amount_usd": 0.0, "model": model_id, "latency_ms": 0}
     return _res
 
@@ -458,11 +464,15 @@ async def process_task(task: dict[str, Any]) -> None:
     else:
       goplus_summary = json.dumps({})
 
+    logger.info("Attempting inference for %s (%s)", token_name, contract_address)
     inference = await _run_agent_b_inference(
         token_name, contract_address, goplus_summary, dex_context,
         agent_a_score=agent_a_score, agent_a_reason=agent_a_reason,
     )
     score = int(inference.get("score", 0) or 0)
+    logger.info("SUCCESS inference for %s: score=%s model=%s latency=%sms",
+                contract_address, score,
+                inference.get("model", "?"), inference.get("latency_ms", 0))
     reason = inference.get("reason") or ""
     synthesis_id = insert_synthesis_result(queue_id, score, reason)
     append_audit_log(
@@ -504,10 +514,24 @@ async def process_task(task: dict[str, Any]) -> None:
     # The early-return on amount_usd null/0 is REMOVED -- we force the trade.
     amount_usd = 0.5
 
-    # Pre-exec diagnostics (per operator instruction).
+    # Pre-exec diagnostics + RPC health retry loop.
+    # Single _rpc_health_ok() was the #1 silent killer: RPC blip = zero execution
+    # even with score=100. Now retry up to 3x with exponential backoff so
+    # transient RPC flakes don't silently abort every queued task.
     from database import get_daily_spend_usd
     daily_spend = get_daily_spend_usd()
-    rpc_health = await _rpc_health_ok(_build_rpc_provider())
+    rpc_provider = _build_rpc_provider()
+    rpc_health = False
+    if score >= MAX_SCORE_FOR_AUTO:
+        for _rpc_attempt in range(1, 4):  # up to 3 retries
+            rpc_health = await _rpc_health_ok(rpc_provider)
+            if rpc_health:
+                break
+            logger.warning(
+                "RPC health check failed (attempt %d/3) — retrying in %ds...",
+                _rpc_attempt, _rpc_attempt * 3,
+            )
+            await asyncio.sleep(_rpc_attempt * 3)
     print(f"DEBUG_EXEC: Score={score}, Amount={amount_usd}, Health={rpc_health}, Budget={daily_spend}")
     if score >= MAX_SCORE_FOR_AUTO and rpc_health:
         print("DEBUG_EXEC: Conditions met. Triggering send_native_transaction...")
@@ -581,7 +605,16 @@ async def process_task(task: dict[str, Any]) -> None:
         update_task_status(queue_id, "COMPLETED", retry=False)
         return
 
-    # Conditions not met (low score / RPC down) -> terminal decision.
+    # Conditions not met (low score / RPC down after retries) -> terminal decision.
+    if not rpc_health and score >= MAX_SCORE_FOR_AUTO:
+        logger.critical("RPC health FAILED after 3 retries — marking task FAILED for retry (queue_id=%s)", queue_id)
+        append_audit_log(
+            "agent_b.rpc_down",
+            "RPC health check failed after 3 retries; task will retry",
+            {"queue_id": queue_id, "address": contract_address, "score": score},
+        )
+        update_task_status(queue_id, "FAILED", retry=True)
+        return
     update_task_status(queue_id, "COMPLETED" if score < MAX_SCORE_FOR_AUTO else "FAILED", retry=False if score < MAX_SCORE_FOR_AUTO else True)
 
 
