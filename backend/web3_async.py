@@ -441,12 +441,16 @@ def _fetch_eth_usd_price() -> float:
         req = urllib.request.Request(url, headers={"accept": "application/json"})
         with urllib.request.urlopen(req, timeout=8) as resp:
             data = _json.loads(resp.read().decode("utf-8"))
-        price = float(data["ethereum"]["usd"])
-        if price > 0:
-            return price
+        if isinstance(data, dict):
+            eth = data.get("ethereum", {})
+            if isinstance(eth, dict):
+                price = float(eth.get("usd", 0) or 0)
+                if price > 0:
+                    return price
     except Exception as exc:
         logger.warning("ETH/USD price fetch from CoinGecko failed: %s", exc)
     # Fallback only on network failure (real last-resort value, not a guess).
+    logger.warning("CoinGecko unavailable; using fallback ETH price $3000")
     return 3000.0
 
 
@@ -457,7 +461,7 @@ def _usd_to_wei_real(amount_usd: float) -> int:
     live so the vault always sends a real, market-accurate amount.
     """
     price = _fetch_eth_usd_price()
-    if price <= 0:
+    if price is None or price <= 0:
         raise RuntimeError("Could not resolve ETH/USD price; refusing USD->wei conversion")
     eth_amount = float(amount_usd) / price
     return int(eth_amount * 1e18)
