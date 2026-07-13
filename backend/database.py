@@ -492,7 +492,8 @@ def ensure_pipeline_tables() -> None:
      gnosis_safe_tx_hash VARCHAR(66) UNIQUE,
      amount_usd NUMERIC(20, 6) NOT NULL CHECK (amount_usd >= 0),
      status VARCHAR(32) NOT NULL DEFAULT 'PENDING'
- CHECK (status IN ('PENDING','AWAITING_SIGNATURES','EXECUTED','FAILED','REJECTED'))
+ CHECK (status IN ('PENDING','AWAITING_SIGNATURES','EXECUTED','FAILED','REJECTED')),
+     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
      );
      CREATE TABLE IF NOT EXISTS audit_log (
      id BIGSERIAL PRIMARY KEY,
@@ -524,6 +525,16 @@ def ensure_pipeline_tables() -> None:
             # Idempotent: CREATE INDEX IF NOT EXISTS + safe DROP path below.
             # ------------------------------------------------------------------
             _ensure_scraping_queue_target_address_unique(cur)
+            # Migration: transaction_proposals.created_at may be missing on
+            # older DBs (schema predates the budget-guard query). Add it
+            # idempotently so get_daily_spend_usd() doesn't crash.
+            try:
+                cur.execute(
+                    "ALTER TABLE transaction_proposals "
+                    "ADD COLUMN IF NOT EXISTS created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP;"
+                )
+            except psycopg2.Error as exc:
+                logger.warning("ensure_pipeline_tables: add created_at failed (benign): %s", exc)
     except psycopg2.Error as exc:
         if "duplicate key value violates unique constraint" in str(exc):
             logger.info('ensure_pipeline_tables race condition caught (tables already created)')
