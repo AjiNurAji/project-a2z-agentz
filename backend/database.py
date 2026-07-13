@@ -742,9 +742,11 @@ def insert_transaction_proposal(synthesis_id: int, amount_usd: float, gnosis_saf
 
 def update_proposal_hash(proposal_id: int, tx_hash: str) -> bool:
     """Persist the REAL on-chain tx hash onto a transaction proposal."""
+    # NOTE: transaction_proposals has no `updated_at` column (only created_at),
+    # so we must not reference it here or the UPDATE fails silently.
     query = """
     UPDATE transaction_proposals
-    SET gnosis_safe_tx_hash = %s, status = 'EXECUTED', updated_at = CURRENT_TIMESTAMP
+    SET gnosis_safe_tx_hash = %s, status = 'EXECUTED'
     WHERE id = %s;
     """
     try:

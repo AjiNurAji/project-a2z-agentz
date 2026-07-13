@@ -170,18 +170,37 @@ async def _check_goplus(session: aiohttp.ClientSession, token_address: str) -> d
     return {"safe": True, "warning": "GoPlus key missing"}
 
   base_url = GOPLUS_API_URL.rstrip('/')
-  if "/token_security/" in base_url:
-    urls = [f"{base_url}/{token_address}"]
-  else:
-    urls = [f"{base_url}/api/v1/token_security/8453/{token_address}"]
-
-  for url in urls:
-    resp = await session.get(url, timeout=15)
-    if resp.status == 200:
-      return await resp.json()
-    if resp.status == 404:
-      raise RuntimeError(f"goplus token not found: HTTP 404 for {token_address}")
-    resp.raise_for_status()
+  # GoPlus Token Security API (v1): query-param style, NOT path style.
+  # Correct:  {base}/api/v1/token_security/{chain_id}?contract_addresses={addr}
+  # (the script reference uses GOPLUS_BASE="https://api.gopluslabs.io/api/v1"
+  #  and hits /token_security/{chain}?contract_addresses=... -> HTTP 200).
+  # Path style (/token_security/{chain}/{addr}) returns 404.
+  if "/token_security" in base_url:
+    # strip any trailing /token_security/... so we rebuild cleanly
+    base_url = base_url.split("/token_security")[0]
+  chain_id = os.getenv("BASE_CHAIN_ID", "8453")
+  url = f"{base_url}/api/v1/token_security/{chain_id}?contract_addresses={token_address}"
+  headers = {}
+  if GOPLUS_API_KEY:
+    headers["X-API-KEY"] = GOPLUS_API_KEY
+  try:
+    async with session.get(url, headers=headers, timeout=15) as resp:
+      if resp.status == 200:
+        data = await resp.json()
+        # GoPlus returns: {"code":1,"message":"OK","result":{<address>:{...}}}
+        # result is a dict KEYED BY ADDRESS, not a flat object.
+        if isinstance(data, dict) and isinstance(data.get("result"), dict):
+          addr_data = data["result"].get(token_address.lower()) or data["result"].get(token_address) or next(iter(data["result"].values()), {})
+          # Wrap so the caller's result.get("is_honeypot") logic works:
+          # we return {"result": <per-address dict>} but the caller expects
+          # result to BE the per-address dict. Normalize here.
+          return {"result": addr_data if isinstance(addr_data, dict) else {}}
+        return data  # fall through; caller handles missing result
+      if resp.status == 404:
+        raise RuntimeError(f"goplus token not found: HTTP 404 for {token_address}")
+      resp.raise_for_status()
+  except aiohttp.ClientError as exc:
+    raise RuntimeError(f"goplus upstream unavailable for {token_address}: {exc}")
   raise RuntimeError(f"goplus upstream unavailable for {token_address}")
 
 
