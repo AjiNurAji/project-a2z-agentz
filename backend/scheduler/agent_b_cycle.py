@@ -500,7 +500,16 @@ async def process_task(task: dict[str, Any]) -> None:
         buy_t = float(result.get("buy_tax") or 0)
         sell_t = float(result.get("sell_tax") or 0)
         if is_hp not in ("1", "true") and buy_t <= 10 and sell_t <= 10:
-            forced_score = min(75, 30 + int(min(liq_hard / 50000, 5) * 5) + int(min(vol_hard / 5000, 3) * 3))
+            # Operator rule: Liquidity >$50K AND GoPlus clean => eligible (60-75).
+            # Scale bonuses so ANY qualifying token reaches >=60 (the auto-exec
+            # threshold). The old formula capped ~58 and silently blocked eligible
+            # tokens (0 executions). Floor at 60 so eligible tokens always clear
+            # the gate at the operator-defined $0.50 micro-trade size.
+            liq_bonus = int(min(liq_hard / 50000, 6) * 5)   # up to +30
+            vol_bonus = int(min(vol_hard / 5000, 4) * 5)    # up to +20
+            forced_score = min(75, 30 + liq_bonus + vol_bonus)
+            if forced_score < 60:
+                forced_score = 60
             logger.info("HARD-RULE BYPASS: liq=$%sK vol=$%sK GoPlus clean → forcing score %s (was %s)",
                         liq_hard/1000, vol_hard/1000, forced_score, score)
             score = max(score, forced_score)
