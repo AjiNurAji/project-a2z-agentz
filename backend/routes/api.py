@@ -304,7 +304,13 @@ async def get_system_status(request: Request):
         body["ai_endpoint"] = ep
         if ep:
             ep_models = ep.rstrip("/") + "/models"
-            req = _url_req.Request(ep_models, headers={"Accept": "application/json"}, method="GET")
+            # vLLM (AMD tunnel) requires Authorization: Bearer <AI_API_KEY>.
+            # Without it the server returns 401 Unauthorized on /v1/models.
+            _ai_key = os.getenv("AI_API_KEY", "").strip()
+            _models_headers = {"Accept": "application/json"}
+            if _ai_key:
+                _models_headers["Authorization"] = f"Bearer {_ai_key}"
+            req = _url_req.Request(ep_models, headers=_models_headers, method="GET")
             with _url_req.urlopen(req, timeout=8) as resp:
                 data = _json.loads(resp.read().decode("utf-8"))
             models = data.get("data", [])

@@ -550,41 +550,55 @@ def _ensure_scraping_queue_target_address_unique(cur) -> None:
     Runs *after* table creation so it is safe to call on every boot. It is
     idempotent and self-healing:
 
-      * If a partial unique index on (target_address) already exists, nothing
-        happens (CREATE INDEX IF NOT EXISTS).
+      * If the unique index already exists, we do NOTHING (no DELETE, no
+        CREATE INDEX). Previously this function ran a bare
+        ``DELETE ... USING scraping_queue`` on EVERY boot to dedup rows, which
+        collided with Agent A's concurrent INSERT and Agent B's
+        ``SELECT ... FOR UPDATE SKIP LOCKED`` fetch -> classic deadlock
+        (RowExclusiveLock wait chain). We now only touch the table when the
+        index is genuinely missing, and we do the dedup inside the SAME
+        locked transaction as the index build so there is no race window.
       * If a legacy full (non-partial) unique index exists but our partial one
         does not, the legacy one is dropped so the partial one can be created.
-      * If the table already holds duplicate target_address rows, they are
-        deduplicated (keep newest by id) BEFORE the unique index is built, so
-        a live database never crashes at startup.
 
-    NOTE: a plain (non-CONCURRENTLY) CREATE INDEX is used on purpose. A
-    CONCURRENTLY build runs in a separate transaction and is not visible to the
-    current session's planner within the same connection, which would make the
-    immediately-following enqueue_target() ON CONFLICT still fail. A regular
-    CREATE INDEX takes a brief ACCESS EXCLUSIVE lock but is committed by the
-    surrounding _get_conn() context manager, so the index is immediately
-    visible to subsequent statements in the same pool. For very large tables
-    you may instead run migrations/0003_*.sql (which uses CONCURRENTLY) during
-    a maintenance window; both paths land on the same final index.
+    Concurrency contract:
+      - The dedup DELETE is preceded by ``SELECT ... FOR UPDATE SKIP LOCKED``
+        so it never blocks (or is blocked by) Agent A/B's live row locks.
+      - All DDL (DROP/CREATE INDEX) runs inside the caller's single
+        transaction; psycopg2 commits it atomically.
     """
     idx_name = "scraping_queue_target_address_key"
     try:
-        # 1) Heal pre-existing duplicate rows so the unique index can build.
+        # Fast path: index already present -> do nothing, avoid any lock churn.
+        cur.execute(
+            "SELECT 1 FROM pg_indexes WHERE indexname = %s LIMIT 1;",
+            (idx_name,),
+        )
+        if cur.fetchone():
+            logger.info("scraping_queue.target_address unique index already present (%s) — skipping", idx_name)
+            return
+
+        # Index missing: this is a first-boot / recovered DB. Dedup duplicates
+        # with a SKIP LOCKED guard so we don't deadlock against live traffic.
         cur.execute(
             """
-            DELETE FROM scraping_queue a
-            USING scraping_queue b
-            WHERE a.id < b.id
-              AND a.target_address IS NOT NULL
-              AND a.target_address = b.target_address;
+            WITH dups AS (
+                SELECT a.id
+                FROM scraping_queue a
+                JOIN scraping_queue b
+                  ON a.target_address = b.target_address
+                 AND a.id < b.id
+                WHERE a.target_address IS NOT NULL
+                FOR UPDATE SKIP LOCKED
+            )
+            DELETE FROM scraping_queue WHERE id IN (SELECT id FROM dups);
             """
         )
-        # 2) Drop any legacy full unique index so our partial one can exist.
+        # Drop any legacy full unique index so our partial one can exist.
         cur.execute(
             "DROP INDEX IF EXISTS scraping_queue_target_address_full_key;"
         )
-        # 3) Create the unique index (plain, committed by caller).
+        # Create the unique index (plain, committed by caller).
         #    IMPORTANT: this MUST be a FULL (non-partial) unique index.
         #    Postgres's ON CONFLICT (col) inference spec requires a complete
         #    unique index on exactly those columns; a PARTIAL unique index is

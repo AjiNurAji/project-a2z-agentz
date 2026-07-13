@@ -536,14 +536,30 @@ async def process_task(task: dict[str, Any]) -> None:
 
 async def worker_loop(poll_interval: float = 2.0) -> None:
   logger.info("[AGENT_B_DAEMON] worker_loop entered")
-  try:
-    from database import get_system_config
-    if get_system_config("circuit_breaker", "active") == "paused":
-      logger.info("Circuit breaker is paused. Agent B skipping cycle.")
-      return
+  # --- Resilient startup: ensure_pipeline_tables() can hit a transient DB
+  # lock (incl. the scraping_queue deadlock). Never die permanently -- retry
+  # with backoff so Agent B stays online across transient lock contention.
+  from database import get_system_config
+  if get_system_config("circuit_breaker", "active") == "paused":
+    logger.info("Circuit breaker is paused. Agent B skipping cycle.")
+    return
 
-    ensure_pipeline_tables()
-    logger.info("Agent B worker starting cycle")
+  _startup_ok = False
+  for _attempt in range(1, 11):  # up to 10 startup retries
+    try:
+      ensure_pipeline_tables()
+      _startup_ok = True
+      break
+    except Exception as exc:
+      logger.error("[AGENT_B_DAEMON] startup ensure_pipeline_tables failed (attempt %d/10): %s",
+                    _attempt, exc, exc_info=True)
+      await asyncio.sleep(min(2.0 * _attempt, 20.0))
+  if not _startup_ok:
+    # Could not initialize after retries -- surface but still go into the
+    # poll loop (which is itself resilient) so the daemon does not exit.
+    logger.error("[AGENT_B_DAEMON] startup failed after retries; entering poll loop anyway")
+
+  try:
     await manager.broadcast(json.dumps({
         "type": "AGENT_LOG",
         "data": {
@@ -552,21 +568,8 @@ async def worker_loop(poll_interval: float = 2.0) -> None:
             "metadata": {"online": True},
         },
     }))
-  except Exception as exc:
-    # Surface startup failure to the dashboard instead of dying silently.
-    logger.error("[AGENT_B_DAEMON] startup failed: %s", exc, exc_info=True)
-    try:
-      await manager.broadcast(json.dumps({
-        "type": "AGENT_LOG",
-        "data": {
-          "sender": "agent_b",
-          "content": f"Agent B startup ERROR: {exc}",
-          "metadata": {"error": True},
-        },
-      }))
-    except Exception:
-      pass
-    return
+  except Exception:
+    pass
   # Continuous poll loop. This runs as a dedicated asyncio daemon task
   # (started in main.py lifespan), NOT inside an APScheduler job, so an
   # infinite loop here is safe -- it will not trigger
@@ -574,6 +577,7 @@ async def worker_loop(poll_interval: float = 2.0) -> None:
   # (ON CONFLICT DO UPDATE -> PENDING) so tokens that arrive later are still
   # picked up on the next poll.
   _hb_counter = 0
+  _poll_errors = 0
   while True:
     # Heartbeat broadcast so the dashboard shows Agent B alive even when the
     # queue is empty. agent_b_last_seen is derived from the WS log buffer, so
@@ -591,18 +595,50 @@ async def worker_loop(poll_interval: float = 2.0) -> None:
         }))
       except Exception:
         pass
-    task = fetch_and_lock_pending_task(limit=1)
-    if task is None:
-      await asyncio.sleep(poll_interval)
-      continue
+    # --- Resilient poll: a DB lock / transient error must NEVER kill the
+    # daemon (that knocks Agent B offline permanently). Catch, log, sleep,
+    # retry. The deadlock (RowExclusiveLock) from scraping_queue cleanup is
+    # handled upstream by FOR UPDATE SKIP LOCKED, but if it still surfaces we
+    # back off instead of crashing.
     try:
-      await process_task(task)
-    except Exception as exc:
-      logger.error("Agent B task failed: %s", exc, exc_info=True)
-      queue_id = task.get("id") if isinstance(task, dict) else getattr(task, "id", None)
-      if queue_id is not None:
-        update_task_status(queue_id, "FAILED", retry=True)
+      task = fetch_and_lock_pending_task(limit=1)
+      if task is None:
+        await asyncio.sleep(poll_interval)
+        continue
+      try:
+        await process_task(task)
+        _poll_errors = 0
+      except Exception as exc:
+        logger.error("Agent B task failed: %s", exc, exc_info=True)
+        queue_id = task.get("id") if isinstance(task, dict) else getattr(task, "id", None)
+        if queue_id is not None:
+          try:
+            update_task_status(queue_id, "FAILED", retry=True)
+          except Exception:
+            pass
         append_audit_log("agent_b.error", str(exc), {"queue_id": queue_id})
+    except Exception as exc:
+      # DB lock / connection blip / any poll-level failure.
+      _poll_errors += 1
+      logger.error(
+        "[AGENT_B_DAEMON] poll iteration failed (err #%d): %s",
+        _poll_errors, exc, exc_info=True,
+      )
+      # Back off briefly so we don't hammer a locked DB. Keep the daemon alive.
+      backoff = min(2.0 * _poll_errors, 30.0)
+      try:
+        await manager.broadcast(json.dumps({
+          "type": "AGENT_LOG",
+          "data": {
+            "sender": "agent_b",
+            "content": f"Agent B poll recovered from error (retry #{_poll_errors}). Staying online.",
+            "metadata": {"online": True, "error": True},
+          },
+        }))
+      except Exception:
+        pass
+      await asyncio.sleep(backoff)
+      continue
 
 
 async def main() -> None:

@@ -248,7 +248,7 @@ def _openai_compat_infer(
     )
     client = OpenAI(
         base_url=endpoint.rstrip("/"),
-        api_key=api_key or "not-required",
+        api_key=api_key or os.getenv("AI_API_KEY", "") or "not-required",
         timeout=50.0,
         max_retries=1,
     )
