@@ -12,10 +12,9 @@
 | **Long Description** | TBD — link to `PRD.md` |
 | **Technology Tags** | `vLLM`, `ROCm`, `AMD Instinct`, `AMD GPU`, `Cloudflare Tunnel`, `OpenAI-compatible API`, `Starlette`, `PostgreSQL`, `Base Network`, `Web3`, `Next.js`, `Python` |
 | **Category Tags** | `AI Agents`, `Web3`, `Open Innovation` |
-| **GitHub Repository** | https://github.com/<YOUR-ORG>/project-a2z-agentz |
-| **Slide Deck URL** | https://docsend.com/view/<YOUR-SLIDE-DECK> |
-| **Demo Video URL** | https://youtu.be/<YOUR-VIDEO> |
-| **Live Demo / Hosted URL** | https://<YOUR-DOMAIN> |
+| **GitHub Repository** | https://github.com/axzss/project-a2z-agentz |
+| **Live Demo / Hosted URL** | https://project-a2z-agentz-gamma.vercel.app |
+| **Backend API** | https://project-a2z-agentz-production-dc3d.up.railway.app |
 
 ## 🎯 Why AMD? (Executive Summary for Pre-Screening)
 

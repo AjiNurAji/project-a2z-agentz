@@ -1,6 +1,9 @@
-# A2Z Agentz — Autonomous Agent-to-Agent Web3 Trading Engine on AMD
+# A2Z Agentz — AMD MI300X-Powered Autonomous Web3 Trading Engine
 
-A2Z Agentz is an **autonomous Agent-to-Agent (A2A) Web3 trading engine** that discovers tokens on **Base Network** via DexScreener, scores them with data-driven LLM inference on **AMD Instinct™ GPUs**, performs security checks via **GoPlus**, and executes **DEX swaps** (buy & sell) via **Uniswap V2** — all autonomous, end-to-end.
+**AMD Instinct™ MI300X GPU + ROCm + vLLM** drives all LLM inference for this autonomous
+agent-to-agent (A2A) Web3 trading engine. Discovers tokens on **Base Network** via DexScreener,
+scores them with data-driven AI on **AMD silicon**, validates with **GoPlus** security, and executes
+**DEX swaps** via **Uniswap V2** — fully autonomous, end-to-end.
 
 Built for **Track 3: Unicorn (Open Innovation)** of the AMD Developer Hackathon.
 
@@ -53,6 +56,20 @@ All Agent A inference runs on **AMD Instinct™ GPUs** via ROCm + vLLM.
 | Tunnel | Cloudflare Quick Tunnel → `*.trycloudflare.com` |
 | Model | `hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4` |
 
+### AMD Compute Verification
+
+All Agent A inference is verifiable through backend logs:
+```
+[AMD MI300X COMPUTE] Executing payload to ROCm vLLM endpoint=... model=Llama-3.1-8B-AWQ
+[AMD MI300X COMPUTE] vLLM returned | model=... latency=XXXms score=YY
+```
+
+**Live Execution Proof** (Base mainnet):
+```
+TX: 0x594831ed5cc0a154745a55b625615fe8218f8ae206c1a6cba5b18f4fc4d764d3
+Vault: 0x9Bf220a384b757506A0892630D7FCaF60198605b (a2z-agentz.base.eth)
+```
+
 ---
 
 ## Tech Stack
@@ -76,14 +93,17 @@ All Agent A inference runs on **AMD Instinct™ GPUs** via ROCm + vLLM.
 | Feature | Status |
 |---|---|
 | Data-driven token scoring (DexScreener metrics) | ✅ |
+| Agent A fallback on inference failure (never score=0) | ✅ |
 | GoPlus security gate (honeypot/tax/ownership) | ✅ |
 | Uniswap V2 DEX buy (ETH → token) | ✅ |
 | Take-profit auto-sell (token → ETH at +30%) | ✅ |
+| Real-time P&L on vault holdings (live DexScreener price) | ✅ |
 | Vault holdings dashboard (`/api/holdings`) | ✅ |
-| Multi-RPC health with retry + exponential backoff | ✅ |
+| Multi-RPC health with retry + exponential backoff (3x) | ✅ |
 | Real-time WebSocket broadcasts to dashboard | ✅ |
 | ChromaDB semantic deduplication | ✅ |
 | Circuit breaker (pause/resume execution) | ✅ |
+| Live execution proof (Base mainnet tx verified) | ✅ |
 
 ---
 
