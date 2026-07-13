@@ -477,10 +477,19 @@ async def process_task(task: dict[str, Any]) -> None:
         agent_a_score=agent_a_score, agent_a_reason=agent_a_reason,
     )
     score = int(inference.get("score", 0) or 0)
+    model_used = inference.get("model", "?")
     logger.info("SUCCESS inference for %s: score=%s model=%s latency=%sms",
-                contract_address, score,
-                inference.get("model", "?"), inference.get("latency_ms", 0))
-    reason = inference.get("reason") or ""
+                contract_address, score, model_used, inference.get("latency_ms", 0))
+
+    # === TRUST AGENT A: Agent A already did data-driven scoring (DexScreener).
+    # DeepSeek often fails to parse or gives low scores. Use the MAX of both
+    # so Agent A's real data score is never overruled by a broken DeepSeek call.
+    if agent_a_score is not None and agent_a_score > score:
+        logger.info("Agent A score (%s) > Agent B score (%s) — using Agent A", agent_a_score, score)
+        score = agent_a_score
+        model_used = "agent_a_trusted"
+
+    reason = inference.get("reason") or agent_a_reason or ""
     synthesis_id = insert_synthesis_result(queue_id, score, reason)
     append_audit_log(
       "agent_b.synthesized",
@@ -514,6 +523,34 @@ async def process_task(task: dict[str, Any]) -> None:
         {"queue_id": queue_id, "score": score, "address": contract_address},
       )
       return
+
+    # === GoPlus Security Gate: block on honeypot / high tax / ownership risk ===
+    goplus_blocked = False
+    goplus_block_reason = ""
+    if isinstance(result, dict):
+        is_honeypot = str(result.get("is_honeypot") or "").lower()
+        buy_tax = float(result.get("buy_tax") or 0)
+        sell_tax = float(result.get("sell_tax") or 0)
+        can_take_ownership = str(result.get("can_take_back_ownership") or "").lower()
+        hidden_owner = str(result.get("hidden_owner") or "").lower()
+        if is_honeypot in ("1", "true"):
+            goplus_blocked = True
+            goplus_block_reason = "honeypot detected by GoPlus"
+        elif buy_tax > 10 or sell_tax > 10:
+            goplus_blocked = True
+            goplus_block_reason = f"tax too high (buy={buy_tax}%, sell={sell_tax}%)"
+        elif can_take_ownership in ("1", "true") and hidden_owner in ("1", "true"):
+            goplus_blocked = True
+            goplus_block_reason = "ownership can be taken back + hidden owner"
+    if goplus_blocked:
+        logger.warning("GoPlus security gate BLOCKED: %s for %s", goplus_block_reason, contract_address)
+        update_task_status(queue_id, "COMPLETED", retry=False)
+        append_audit_log(
+            "agent_b.goplus_blocked",
+            f"Blocked by GoPlus: {goplus_block_reason}",
+            {"queue_id": queue_id, "address": contract_address, "score": score},
+        )
+        return
 
     # ===== OVERRIDE MODE: stop trusting DeepSeek JSON compliance =====
     # IF score >= 20, force a hard-coded $0.50 trade. We no longer read
