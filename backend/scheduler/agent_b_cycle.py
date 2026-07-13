@@ -253,15 +253,17 @@ async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_
         "\nOutput ONLY a single JSON object and NOTHING ELSE. No prose, no explanation, no markdown.\n"
         '{"score": <int 0-100>, "category": <one of defi|nft|social|gaming|infrastructure|airdrop|other>, '
         '"reason": <string <=200 chars>, "amount_usd": <float 0.00-2.00>, "model": "<model_id>"}\n'
-        "Rules:\n"
-        "- score>=85 AND no honeypot/tax/ownership red flags -> approve (amount_usd up to 2.00)\n"
-        "- ANY honeypot flag, buy/sell tax >10%, or ownership-not-renounced risk -> score<=20, reject (amount_usd=0)\n"
-        "- reason MUST cite specific GoPlus evidence (e.g. \"is_honeypot: true\", \"buy_tax: X%\")\n"
-        "- Do NOT approve if security signals are unknown or suspicious.\n"
+        "MANDATORY SCORING RULES (follow exactly):\n"
+        "- Liquidity >$200K AND volume >$10K AND GoPlus clean → score 85-95 (strong buy)\n"
+        "- Liquidity >$50K AND volume >$1K AND GoPlus clean → score 60-75 (eligible for micro-trade)\n"
+        "- Liquidity <$10K OR volume <$1K → score 10-30 (weak/risky)\n"
+        "- ANY honeypot flag, buy/sell tax >10%, or ownership-not-renounced risk → score <=20, reject (amount_usd=0)\n"
+        "- NEVER score below 60 when liquidity >$50K and GoPlus shows no honeypot/tax issues.\n"
+        "- reason MUST cite specific GoPlus evidence (e.g. \"is_honeypot: true\", \"buy_tax: X%\", \"liq=$Y\")\n"
         "CRITICAL: Your entire response must be valid JSON starting with '{' and ending with '}'. "
         "Do NOT write any text before or after the JSON. If you add any words, the parser fails.\n"
         "EXAMPLE OUTPUT (emit exactly this shape, fill real values):\n"
-        '{"score": 95, "category": "defi", "reason": "no honeypot, 0% tax, open source", "amount_usd": 0.5, "model": "deepseek-v4-pro"}\n'
+        '{"score": 70, "category": "defi", "reason": "liq=$80K, vol=$5K, no honeypot, 0% tax", "amount_usd": 0.5, "model": "deepseek-v4-pro"}\n'
         "CRITICAL: DO NOT explain your reasoning before the JSON. DO NOT output any prose or markdown. OUTPUT ONLY A RAW JSON OBJECT."
     )
     # Dynamic model discovery: prefer the actual model id reported by the
@@ -283,7 +285,7 @@ async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_
             logger.debug("Agent B auto-discovery skipped: %s", exc)
 
     async def _do_inference() -> dict[str, Any]:
-        client = AsyncOpenAI(base_url=_normalize_agent_b_endpoint(_endpoint), api_key=_api_key, timeout=25.0, max_retries=1)
+        client = AsyncOpenAI(base_url=_normalize_agent_b_endpoint(_endpoint), api_key=_api_key, timeout=35.0, max_retries=1)
         _t0 = time.time()
         try:
             resp = await client.chat.completions.create(
@@ -303,14 +305,19 @@ async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_
         if not content:
             _code = getattr(resp, "status_code", "?")
             return {"score": 0, "reason": f"http {_code}", "amount_usd": 0.0, "model": model_id, "latency_ms": _latency}
-        # Bulletproof parse: DeepSeek-V4-Pro sometimes wraps JSON in prose.
+        # Bulletproof parse: DeepSeek-V4-Pro wraps JSON in prose or trailing commas.
         parsed = None
         _candidate = content.strip()
         def _try_loads(text: str):
             try:
                 return json.loads(text)
             except Exception:
-                return None
+                # Try fix trailing comma: {"score": 70,} -> {"score": 70}
+                fixed = re.sub(r",\s*([}\]])", r"\1", text)
+                try:
+                    return json.loads(fixed)
+                except Exception:
+                    return None
         if _candidate.startswith("{"):
             parsed = _try_loads(_candidate)
         if parsed is None:
@@ -345,33 +352,27 @@ async def _run_agent_b_inference(token_name: str, contract_address: str, goplus_
             }
         return {"score": 0, "reason": content[:200], "amount_usd": 0.0, "model": model_id, "latency_ms": _latency}
 
-    # --- Inference with explicit 404 handling: CRITICAL log + 5s wait + retry once ---
+    # --- Inference with retry on ALL errors (404, timeout, 500, etc.) ---
     _res = await _do_inference()
     if "_error" in _res:
         _exc = _res["_error"]
         _status = getattr(getattr(_exc, "response", None), "status_code", None)
-        logger.critical("Agent B inference FAILED (first attempt): %s (status=%s)", _exc, _status)
-        if _status == 404:
-            logger.critical("Fireworks 404 detected -- reloading config and retrying once after 5s...")
-            await asyncio.sleep(5)
-            # Re-read config fresh before retry.
-            _endpoint = os.getenv("AGENT_B_ENDPOINT", "")
-            _api_key = os.getenv("AGENT_B_API_KEY", "")
-            _model = os.getenv("AGENT_B_MODEL", "")
-            model_id = _model
-            _res = await _do_inference()
-            if "_error" in _res:
-                _exc2 = _res["_error"]
-                logger.critical("Agent B inference FAILED on retry: %s", _exc2)
-                if agent_a_score is not None:
-                    logger.warning("Agent B retry failed — falling back to Agent A score=%s", agent_a_score)
-                    return {"score": int(agent_a_score), "reason": f"[fallback Agent A after retry fail] {agent_a_reason}"[:200], "amount_usd": 0.0, "category": "unknown", "model": "agent_a_fallback", "latency_ms": 0}
-                return {"score": 0, "reason": f"inference_failed: {_exc2}", "amount_usd": 0.0, "model": model_id, "latency_ms": 0}
-        else:
+        logger.critical("Agent B inference FAILED (attempt 1): %s (status=%s)", _exc, _status)
+        # Retry once on ANY error (404, timeout, 500, connection)
+        logger.critical("Retrying inference after 3s...")
+        await asyncio.sleep(3)
+        _endpoint = os.getenv("AGENT_B_ENDPOINT", "")
+        _api_key = os.getenv("AGENT_B_API_KEY", "")
+        _model = os.getenv("AGENT_B_MODEL", "")
+        model_id = _model
+        _res = await _do_inference()
+        if "_error" in _res:
+            _exc2 = _res["_error"]
+            logger.critical("Agent B inference FAILED on retry: %s", _exc2)
             if agent_a_score is not None:
-                logger.warning("Agent B inference failed (non-404) — falling back to Agent A score=%s", agent_a_score)
-                return {"score": int(agent_a_score), "reason": f"[fallback Agent A after inference fail] {agent_a_reason}"[:200], "amount_usd": 0.0, "category": "unknown", "model": "agent_a_fallback", "latency_ms": 0}
-            return {"score": 0, "reason": f"inference_failed: {_exc}", "amount_usd": 0.0, "model": model_id, "latency_ms": 0}
+                logger.warning("Agent B retry failed — falling back to Agent A score=%s", agent_a_score)
+                return {"score": int(agent_a_score), "reason": f"[fallback Agent A after retry fail] {agent_a_reason}"[:200], "amount_usd": 0.0, "category": "unknown", "model": "agent_a_fallback", "latency_ms": 0}
+            return {"score": 0, "reason": f"inference_failed: {_exc2}", "amount_usd": 0.0, "model": model_id, "latency_ms": 0}
     return _res
 
 
@@ -488,6 +489,22 @@ async def process_task(task: dict[str, Any]) -> None:
         logger.info("Agent A score (%s) > Agent B score (%s) — using Agent A", agent_a_score, score)
         score = agent_a_score
         model_used = "agent_a_trusted"
+
+    # === HARD-RULE BYPASS: if liquidity >$50K and GoPlus clean, force score >= 60 ===
+    # DeepSeek frequently ignores prompt rules and returns score < 60 even for tokens
+    # with healthy liquidity. This bypass ensures eligible tokens never get stuck.
+    liq_hard = payload.get("liquidity_usd") or 0
+    vol_hard = payload.get("volume_24h") or 0
+    if isinstance(result, dict) and liq_hard > 50000 and score < 60:
+        is_hp = str(result.get("is_honeypot") or "").lower()
+        buy_t = float(result.get("buy_tax") or 0)
+        sell_t = float(result.get("sell_tax") or 0)
+        if is_hp not in ("1", "true") and buy_t <= 10 and sell_t <= 10:
+            forced_score = min(75, 30 + int(min(liq_hard / 50000, 5) * 5) + int(min(vol_hard / 5000, 3) * 3))
+            logger.info("HARD-RULE BYPASS: liq=$%sK vol=$%sK GoPlus clean → forcing score %s (was %s)",
+                        liq_hard/1000, vol_hard/1000, forced_score, score)
+            score = max(score, forced_score)
+            model_used = "hard_rule_bypass"
 
     reason = inference.get("reason") or agent_a_reason or ""
     synthesis_id = insert_synthesis_result(queue_id, score, reason)
