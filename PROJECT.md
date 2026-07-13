@@ -1,21 +1,23 @@
-# Project: A2Z Agent Dashboard Visual Evolution v3
+# Project: A2Z Agentz — Autonomous A2A Web3 Trading Engine
+
+**Current Version**: Production-ready with DEX swaps, take-profit, GoPlus security.
 
 ## Architecture
 
-- **Module / package boundaries**:
-  - Frontend built with Next.js (App Router), Tailwind CSS, TypeScript, and React.
-  - State management is centralized in `DashboardProvider` from `DashboardContext.tsx`. Live data is fed through `useAgentWebSocket.ts`, which connects to the backend WebSocket and normalizes events into context state. The context also exposes periodic simulation updates as a fallback when the live connection is unavailable.
-  - Custom React hooks under `dashboard/src/hooks/` modularize behavior (theme, preferences, keyboard shortcuts, data freshness, WebSocket connectivity).
-  - Page-level and layout components live under `dashboard/src/components/`, while shared UI primitives live under `dashboard/src/components/ui/`.
-  - Routes are organized as route groups: active dashboard pages under `dashboard/src/app/(dashboard)/` and authentication pages under `dashboard/src/app/(auth)/`.
+- **Backend**: Python 3.12, Starlette, PostgreSQL, asyncio daemons
+  - Agent A: DexScreener scraper + data-driven LLM scoring (AMD MI300X via vLLM)
+  - Agent B: GoPlus security gate + Uniswap V2 DEX swaps + take-profit automation
+  - Multi-RPC resilience with exponential backoff
+  - WebSocket real-time broadcast to dashboard
 
-- **Current active dashboard route**: `dashboard/src/app/(dashboard)/page.tsx`
-- **Live WebSocket client**: `dashboard/src/hooks/useAgentWebSocket.ts`
+- **Frontend**: Next.js 16, React 19, Tailwind CSS v4, TypeScript
+  - Dashboard: KPIs, agents page with vault holdings, live log, circuit breaker
+  - API: `/api/holdings`, `/api/stats`, `/api/system-status` (all real checks)
+  - Deployed on Vercel (`project-a2z-agentz-gamma.vercel.app`)
 
 - **Data flow**:
-  - `useAgentWebSocket.ts` opens a WebSocket connection, listens for `AGENT_LOG`, `SYSTEM_LOG`, and `TX_UPDATE` events, and pushes normalized payloads into `DashboardContext.tsx`.
-  - Theme and density settings resolve at runtime via CSS custom properties on `document.documentElement`, persisted to `localStorage`.
-  - All consumer components (`DashboardKpis`, `CircuitBreaker`, `AgentCommPanel`, `LiveLog`, `ApprovalQueue`, `TransactionList`) read exclusively from context — zero direct backend coupling.
+  - DexScreener → Agent A scoring → PostgreSQL scraping_queue → Agent B GoPlus check → Uniswap swap → held_tokens → take-profit monitor → auto-sell
+  - WebSocket broadcasts every inference, buy, sell, and take-profit event
 
 - **Shared interfaces**:
   - System theme and density are broadcast globally through CSS custom properties.
