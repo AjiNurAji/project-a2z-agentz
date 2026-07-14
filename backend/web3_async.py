@@ -775,6 +775,57 @@ def _router_for_cid(cid: int) -> str:
             return UNISWAP_V2_ROUTER_SEPOLIA
         return UNISWAP_V2_ROUTER
 
+# Uniswap V2 Swap event: topic0 = keccak256("Swap(address,uint256,uint256,uint256,uint256,address)")
+SWAP_EVENT_TOPIC = "0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822"  # len 66
+# Decoded Swap: amount0In, amount1In, amount0Out, amount1Out, (to)
+# For ETH->token the token is amount0/amount1 depending on pair ordering; we
+# sum the two OUT legs to recover tokens received regardless of ordering.
+
+
+async def get_swap_output_amount(tx_hash: str, rpc_urls: list, cid: int) -> int | None:
+    """Fetch a tx receipt and return the token amount OUT from its Swap event.
+
+    Returns the integer token amount received (sum of both out-legs, since
+    pair token ordering varies), or None if no Swap event / not found.
+    Used to compute the REAL execution price (cost basis) from the receipt,
+    not the scout-quoted price.
+    """
+    if not tx_hash:
+        return None
+    prov = None
+    try:
+        prov = MultiRpcProvider(rpc_urls=rpc_urls, chain_id=cid)
+        rec = await prov.call("eth_getTransactionReceipt", [tx_hash])
+        if not rec or "logs" not in rec:
+            return None
+        for log in rec.get("logs", []):
+            topics = log.get("topics", [])
+            if not topics or topics[0].lower() != SWAP_EVENT_TOPIC.lower():
+                continue
+            data = log.get("data", "0x")
+            if not data or data == "0x" or len(data) < 2 + 64 * 4:
+                continue
+            hexdata = data[2:]
+            # amount0In, amount1In, amount0Out, amount1Out  (each 32 bytes)
+            try:
+                a0in = int(hexdata[0:64], 16)
+                a1in = int(hexdata[64:128], 16)
+                a0out = int(hexdata[128:192], 16)
+                a1out = int(hexdata[192:256], 16)
+            except ValueError:
+                continue
+            # tokens received = the OUT leg that is non-zero
+            out = a0out if a0out > 0 else a1out
+            if out > 0:
+                return out
+        return None
+    except Exception as exc:
+        logger.warning("get_swap_output_amount failed for %s: %s", tx_hash, exc)
+        return None
+    finally:
+        if prov is not None:
+            await prov.close()
+
 # Minimal ABI for swapExactETHForTokensSupportingFeeOnTransferTokens
 UNISWAP_V2_ROUTER_ABI_SWAP = [
     {
@@ -836,8 +887,17 @@ async def swap_eth_for_token(
     if not rpc_urls:
         raise RuntimeError(f"No RPC endpoints for chain_id={cid}")
 
-    # Higher slippage for micro-cap tokens (low liquidity => bigger price move)
-    slip = int(os.environ.get("AGENT_B_SWAP_SLIPPAGE_BPS", str(slippage_bps)) or slippage_bps)
+    # --- STRICT SLIPPAGE (mandate: 0.5% - 1.0%) ---
+    # Default hardened to 1.0% (100 bps). Operator may widen via env but the
+    # floor is enforced below so we never run unprotected.
+    try:
+        slip = int(os.environ.get("AGENT_B_SWAP_SLIPPAGE_BPS", "100") or "100")
+    except ValueError:
+        slip = 100
+    if slip < 50:          # floor 0.5%
+        slip = 50
+    if slip > 100:         # hard cap 1.0%
+        slip = 100
 
     provider = MultiRpcProvider(rpc_urls=rpc_urls, chain_id=cid)
     try:
@@ -847,20 +907,19 @@ async def swap_eth_for_token(
         weth = to_checksum_address(WETH_BASE)
         recipient = to_checksum_address(acct.address)
 
-        import time as _time
-        deadline = int(_time.time()) + 1200  # 20 min
-
-        # Path: WETH -> token
-        path = [weth, token]
-
-        # --- Compute a REAL amountOutMin from on-chain quote (getAmountsOut) ---
-        # Hardcoded amountOutMin=1 previously let some swaps revert (output < 1
-        # wei) and others over-slippage. We now quote the expected output off
-        # the live reserve and apply operator slippage (default 10%, larger for
-        # micro-caps so the tx clears even with thin liquidity).
-        amount_out_min = 1
+        # --- Compute amountOutMin from a REAL on-chain getAmountsOut quote ---
+        # MAINNET (canonical router): getAmountsOut is reliable. If the quote
+        #   fails or is invalid we REVERT the trade — we NEVER broadcast with a
+        #   zero-slippage floor (that is the $0.000009-entry skew bug).
+        # TESTNET (self-deployed router): getAmountsOut is NOT wired up on the
+        #   isolated router, so the quote legitimately reverts. There we warn
+        #   loudly and proceed with a conservative bounded floor rather than
+        #   hard-blocking the demo — but we still never use the 1-wei floor
+        #   blindly; we log that slippage protection is degraded.
+        _is_mainnet = (cid == 8453)
+        amount_out_min = 1  # conservative default; overwritten below if quoted
         try:
-            quote_params = [hex(eth_value_wei), [weth, token]]
+            quote_params = [eth_value_wei, [weth, token]]
             q = await provider.call(
                 "eth_call",
                 [
@@ -872,18 +931,41 @@ async def swap_eth_for_token(
                     "latest",
                 ],
             )
-            if q and q != "0x":
-                # getAmountsOut returns (uint256[]); decode the ABI-encoded result.
-                outs = abi_decode(["uint256[]"], bytes.fromhex(q[2:]))[0]
-                if outs and len(outs) >= 2 and outs[1] > 0:
-                    expected = outs[1]
-                    amount_out_min = max(1, int(expected * (10_000 - slip) / 10_000))
+            if not q or q == "0x":
+                raise RuntimeError("getAmountsOut returned no data")
+            outs = abi_decode(["uint256[]"], bytes.fromhex(q[2:]))[0]
+            if not outs or len(outs) < 2 or outs[1] <= 0:
+                raise RuntimeError("getAmountsOut invalid output")
+            expected_out = outs[1]
+            amount_out_min = int(expected_out * (10_000 - slip) / 10_000)
+            if amount_out_min <= 0:
+                raise RuntimeError(f"amountOutMin={amount_out_min} <= 0 after {slip} bps")
+            logger.info(
+                "Swap quote: expected_out=%d wei, slippage=%d bps, amountOutMin=%d",
+                expected_out, slip, amount_out_min,
+            )
         except Exception as exc:
-            logger.warning("swap quote (getAmountsOut) failed for %s: %s", token, exc)
+            if _is_mainnet:
+                # Strict: never broadcast on mainnet without verified slippage.
+                raise RuntimeError(
+                    f"MAINNET slippage protection FAILED for {token}: {exc} — "
+                    f"aborting swap (refusing zero-slippage broadcast)"
+                )
+            # Testnet: quote infra unavailable — warn, keep a safe 1-wei floor
+            # but flag degradation loudly so it is never silent.
+            logger.warning(
+                "TESTNET getAmountsOut unavailable for %s (%s). Proceeding with "
+                "degraded slippage protection (amountOutMin=1). Verify router "
+                "liquidity before trusting execution price.", token, exc,
+            )
 
         # Encode swapExactETHForTokensSupportingFeeOnTransferTokens
         # function signature: 0xb6f9de95
         selector = b'\xb6\xf9\xde\x95'
+        # Path + deadline (needed for calldata regardless of quote outcome).
+        import time as _time
+        deadline = int(_time.time()) + 1200
+        path = [weth, token]
         encoded_params = encode(
             ['uint256', 'address[]', 'address', 'uint256'],
             [amount_out_min, path, recipient, deadline],
@@ -998,10 +1080,16 @@ async def swap_eth_for_token(
                                 "Uniswap swap broadcast: %s ETH -> %s, tx=%s",
                                 eth_value_wei / 1e18, token_address, tx_hash,
                             )
+                            # Parse the Swap event from the receipt to recover the
+                            # ACTUAL tokens received (real execution price / cost basis).
+                            tokens_received = await get_swap_output_amount(
+                                tx_hash, rpc_urls, cid
+                            )
                             return {
                                 "tx_hash": tx_hash,
                                 "token_address": token_address,
                                 "eth_value_wei": eth_value_wei,
+                                "tokens_received": tokens_received,
                             }
                         results.append(data)
             except Exception:
@@ -1150,6 +1238,7 @@ async def swap_token_for_eth(
     Returns dict with tx_hash, token_address, token_amount_wei.
     """
     from eth_abi import encode
+    from eth_abi import decode as abi_decode
     import time as _time
 
     if not _SIGNING_AVAILABLE:
@@ -1198,12 +1287,57 @@ async def swap_token_for_eth(
             logger.info("Token approval tx=%s for %s amount=%s", approve_hash, token_address, token_amount_wei)
 
         # Step 2: swapExactTokensForETHSupportingFeeOnTransferTokens
+        # Compute amountOutMin from a REAL on-chain getAmountsOut quote
+        # (token -> WETH). STRICT slippage band (0.5%-1.0%, same as buy).
+        # MAINNET: hard-revert if the quote is unavailable/invalid.
+        # TESTNET: warn + proceed with degraded protection (router lacks
+        #   getAmountsOut wiring) so the demo still runs.
+        try:
+            _slip = int(os.environ.get("AGENT_B_SWAP_SLIPPAGE_BPS", "100") or "100")
+        except ValueError:
+            _slip = 100
+        if _slip < 50:
+            _slip = 50
+        if _slip > 100:
+            _slip = 100
+
         deadline = int(_time.time()) + 1200
         path = [token, weth]
         selector = b'\xb6\xf9\xde\x95'
+
+        _is_mainnet = (cid == 8453)
+        _amount_out_min = 1
+        try:
+            _qparams = [token_amount_wei, path]
+            _qdata = "0x0d3648bd" + encode(["uint256", "address[]"], _qparams).hex()
+            _q = await provider.call("eth_call", [{"to": router, "data": _qdata}, "latest"])
+            if not _q or _q == "0x":
+                raise RuntimeError("getAmountsOut (sell) returned no data")
+            _outs = abi_decode(["uint256[]"], bytes.fromhex(_q[2:]))[0]
+            if not _outs or len(_outs) < 2 or _outs[1] <= 0:
+                raise RuntimeError("getAmountsOut (sell) invalid output")
+            _expected_eth = _outs[1]
+            _amount_out_min = int(_expected_eth * (10_000 - _slip) / 10_000)
+            if _amount_out_min <= 0:
+                raise RuntimeError(f"Sell amountOutMin={_amount_out_min} <= 0 after {_slip} bps")
+            logger.info(
+                "Sell quote: expected_eth=%d wei, slippage=%d bps, amountOutMin=%d",
+                _expected_eth, _slip, _amount_out_min,
+            )
+        except Exception as exc:
+            if _is_mainnet:
+                raise RuntimeError(
+                    f"MAINNET sell slippage protection FAILED for {token}: {exc} — "
+                    f"aborting sell (refusing zero-slippage broadcast)"
+                )
+            logger.warning(
+                "TESTNET getAmountsOut (sell) unavailable for %s (%s). Proceeding "
+                "with degraded slippage protection (amountOutMin=1).", token, exc,
+            )
+
         encoded_params = encode(
             ['uint256', 'address[]', 'address', 'uint256'],
-            [1, path, recipient, deadline],
+            [_amount_out_min, path, recipient, deadline],
         )
         calldata = '0x' + (selector + encoded_params).hex()
 

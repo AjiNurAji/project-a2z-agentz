@@ -985,9 +985,14 @@ async def get_holdings(request: Request):
 
         if current_price > 0 and entry_price > 0:
             pnl_pct = round((current_price - entry_price) / entry_price * 100, 2)
-            # Approximate P&L: entry was $0.50 worth, scale by price change
-            entry_value = 0.50  # micro trade amount
-            current_value = entry_value * (current_price / entry_price)
+            # P&L in USD: scale by the ACTUAL token amount held (from receipt),
+            # valued at entry vs current price. entry_price = per-token USD
+            # (real execution price), amount_wei = raw token units held.
+            held_tokens = float(token.get("amount_wei") or 0) / 1e18
+            # entry_price is the REAL per-token USD execution price; amount_wei
+            # is the ACTUAL token amount held (from the Swap receipt).
+            entry_value = entry_price * held_tokens
+            current_value = current_price * held_tokens
             pnl_usd = round(current_value - entry_value, 4)
 
         # Normalize Postgres types that are not JSON-serializable by default

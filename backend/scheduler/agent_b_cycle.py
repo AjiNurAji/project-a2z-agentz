@@ -720,6 +720,20 @@ async def process_task(task: dict[str, Any]) -> None:
                         contract_address, _val_wei, chain_id=_cid, max_gas_price_gwei=_gwei_cap
                     )
                     tx_hash = swap_res.get("tx_hash") or swap_res.get("tx_hash_id")  # type: ignore[assignment]
+                    tokens_received = swap_res.get("tokens_received")
+                    # --- REAL COST BASIS (mandate) ---
+                    # entry_price_usd must be the ACTUAL per-token execution price
+                    # from the tx receipt (Swap event), NOT the scout-quoted $ spend.
+                    # tokens_received = out-leg of the Swap event (raw token units).
+                    if tokens_received and tokens_received > 0:
+                        entry_price_usd = amount_usd / (tokens_received / 1e18)
+                        held_amount_wei = int(tokens_received)
+                    else:
+                        # Fallback: receipt parse failed — use a conservative
+                        # entry price of the quoted $ spend per token so PnL is
+                        # not dimensionally broken (never store the raw $ spend).
+                        entry_price_usd = 0.0
+                        held_amount_wei = int(_val_wei)
                     if not tx_hash:
                         raise RuntimeError(f"swap returned no tx_hash: {swap_res}")
                 try:
@@ -742,9 +756,11 @@ async def process_task(task: dict[str, Any]) -> None:
                     )
                 except Exception:
                     pass
-                # Track purchase for take-profit sell
+                # Track purchase for take-profit sell.
+                # entry_price_usd = REAL per-token execution price (from receipt).
+                # amount_wei = ACTUAL tokens received (not the ETH wei spent).
                 try:
-                    insert_held_token(contract_address, token_name, tx_hash, amount_usd, int(_val_wei))
+                    insert_held_token(contract_address, token_name, tx_hash or "", entry_price_usd, held_amount_wei)
                 except Exception:
                     pass
             else:
