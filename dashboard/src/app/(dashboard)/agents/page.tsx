@@ -100,12 +100,13 @@ function AgentHero({ name, role, icon: Icon, color, bg, status, health, spark, i
 export default function AgentsPage() {
   const { agentAStatus, agentBStatus, isPaused, setIsPaused, agentHealth, agentMessages } = useDashboard();
   const [holdings, setHoldings] = useState<any>(null);
+  const [netMode, setNetMode] = useState<"mainnet" | "testnet">("mainnet");
 
   useEffect(() => {
-    apiFetch("/api/holdings").then(setHoldings).catch(() => {});
-    const interval = setInterval(() => apiFetch("/api/holdings").then(setHoldings).catch(() => {}), 15000);
+    apiFetch(`/api/holdings?network=${netMode}`).then(setHoldings).catch(() => {});
+    const interval = setInterval(() => apiFetch(`/api/holdings?network=${netMode}`).then(setHoldings).catch(() => {}), 15000);
     return () => clearInterval(interval);
-  }, []);
+  }, [netMode]);
 
   // Real activity sparkline: count Agent A / B messages seen this session.
   const aActivity = agentMessages.filter((m) => m.sender === "agent_a").map((_, i) => i + 1);
@@ -176,7 +177,35 @@ export default function AgentsPage() {
           <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "var(--color-neutral-secondary-medium)", color: "var(--color-body-subtle)" }}>
             {holding.length} holding · {sold.length} sold
           </span>
+          {/* Network toggle: Mainnet (DB) vs Testnet (live Base Sepolia on-chain) */}
+          <div className="ml-auto flex items-center gap-1 text-[11px] rounded-full p-0.5" style={{ background: "var(--color-neutral-secondary-medium)" }}>
+            <button
+              onClick={() => setNetMode("mainnet")}
+              className="px-2.5 py-1 rounded-full font-semibold transition-colors"
+              style={{
+                background: netMode === "mainnet" ? "var(--color-fg-cyan)" : "transparent",
+                color: netMode === "mainnet" ? "#04141f" : "var(--color-body-subtle)",
+              }}
+            >
+              Mainnet
+            </button>
+            <button
+              onClick={() => setNetMode("testnet")}
+              className="px-2.5 py-1 rounded-full font-semibold transition-colors"
+              style={{
+                background: netMode === "testnet" ? "var(--color-fg-purple)" : "transparent",
+                color: netMode === "testnet" ? "#1a0b2e" : "var(--color-body-subtle)",
+              }}
+            >
+              Testnet
+            </button>
+          </div>
         </div>
+        {netMode === "testnet" && (
+          <p className="text-[11px]" style={{ color: "var(--color-fg-purple)" }}>
+            Live on-chain Base Sepolia balance (no database) — {holdings?.proof_only ? "proof-only mode" : "showing A2ZTestToken held by vault"}
+          </p>
+        )}
 
         {holding.length === 0 ? (
           <p className="text-sm" style={{ color: "var(--color-body-subtle)" }}>No tokens held. Agent B will auto-buy when a token scores ≥60.</p>
