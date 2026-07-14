@@ -495,18 +495,18 @@ async def send_native_transaction(
         raise RuntimeError("eth_account not installed (on-chain sending unavailable)")
     cid = chain_id or BASE_CHAIN_ID
     if cid == 84532:
-        rpc_urls = [u for u in [
+        rpc_urls = _rotated_rpc_urls([
             os.environ.get("BASE_SEPOLIA_RPC", ""),
             os.environ.get("BASE_SEPOLIA_RPC_1", ""),
             os.environ.get("BASE_SEPOLIA_RPC_2", ""),
-        ] if u]
+        ])
     else:
-        rpc_urls = [u for u in [
+        rpc_urls = _rotated_rpc_urls([
             os.environ.get("BASE_RPC_1", ""),
             os.environ.get("BASE_RPC_2", ""),
             os.environ.get("BASE_RPC_3", ""),
             os.environ.get("BASE_RPC_4", ""),
-        ] if u]
+        ])
     if not rpc_urls:
         raise RuntimeError(f"No RPC endpoints configured for chain_id={cid}")
     provider = MultiRpcProvider(rpc_urls=rpc_urls, chain_id=cid)
@@ -691,6 +691,29 @@ UNISWAP_V2_ROUTER_SEPOLIA = "0x47f5a990169Ec59e2013875478B52fe42146bA9b"
 # Local default chain id (Base mainnet). Overridden by callers passing chain_id.
 BASE_CHAIN_ID = int(os.getenv("BASE_CHAIN_ID", "8453"))
 
+# Auto-rotate RPC endpoints every 30 minutes to spread Alchemy (and other
+# provider) request quota across the configured keys. Deterministic per
+# 30-minute wall-clock bucket — no background scheduler required. Every new
+# MultiRpcProvider reads the rotated order, so load shifts to the next key
+# exactly once every 30 minutes.
+_ROTATE_BUCKET_S = 30 * 60
+
+
+def _rotated_rpc_urls(urls: list[str]) -> list[str]:
+    """Rotate RPC URL order by the current 30-minute wall-clock bucket.
+
+    Distributes load across multiple provider keys (BASE_RPC_1..4 /
+    BASE_SEPOLIA_RPC_*) so no single API key burns its quota. The rotation
+    changes exactly once every 30 minutes and is stable within a bucket.
+    """
+    urls = [u for u in urls if u]
+    if len(urls) <= 1:
+        return urls
+    bucket = int(time.time()) // _ROTATE_BUCKET_S
+    shift = bucket % len(urls)
+    return urls[shift:] + urls[:shift]
+
+
 
 def _router_for_cid(cid: int) -> str:
     """Pick the correct Uniswap V2 Router02 for the chain id.
@@ -747,18 +770,18 @@ async def swap_eth_for_token(
 
     cid = chain_id or BASE_CHAIN_ID
     if cid == 84532:
-        rpc_urls = [u for u in [
+        rpc_urls = _rotated_rpc_urls([
             os.environ.get("BASE_SEPOLIA_RPC", ""),
             os.environ.get("BASE_SEPOLIA_RPC_1", ""),
             os.environ.get("BASE_SEPOLIA_RPC_2", ""),
-        ] if u]
+        ])
     else:
-        rpc_urls = [u for u in [
+        rpc_urls = _rotated_rpc_urls([
             os.environ.get("BASE_RPC_1", ""),
             os.environ.get("BASE_RPC_2", ""),
             os.environ.get("BASE_RPC_3", ""),
             os.environ.get("BASE_RPC_4", ""),
-        ] if u]
+        ])
 
     if not rpc_urls:
         raise RuntimeError(f"No RPC endpoints for chain_id={cid}")
@@ -968,19 +991,19 @@ async def send_proof_of_execution() -> str:
     active = os.environ.get("ACTIVE_NETWORK", "base_sepolia").strip().lower()
     if active == "base":
         chain_id = 8453
-        guard_rpcs = [u for u in [
+        guard_rpcs = _rotated_rpc_urls([
             os.environ.get("BASE_RPC_1", ""),
             os.environ.get("BASE_RPC_2", ""),
             os.environ.get("BASE_RPC_3", ""),
             os.environ.get("BASE_RPC_4", ""),
-        ] if u]
+        ])
     else:
         chain_id = 84532
-        guard_rpcs = [u for u in [
+        guard_rpcs = _rotated_rpc_urls([
             os.environ.get("BASE_SEPOLIA_RPC", ""),
             os.environ.get("BASE_SEPOLIA_RPC_1", ""),
             os.environ.get("BASE_SEPOLIA_RPC_2", ""),
-        ] if u]
+        ])
     # Smart-contract guard: a plain ETH transfer to a contract reverts on Base
     # (EIP-7611), burning gas for nothing. Abort safely before broadcasting.
     # Whitelisted EIP-7702 EOAs (e.g. operator wallet) are allowed and sent
@@ -1101,16 +1124,16 @@ async def swap_token_for_eth(
 
     cid = chain_id or BASE_CHAIN_ID
     if cid == 84532:
-        rpc_urls = [u for u in [
+        rpc_urls = _rotated_rpc_urls([
             os.environ.get("BASE_SEPOLIA_RPC", ""),
             os.environ.get("BASE_SEPOLIA_RPC_1", ""),
             os.environ.get("BASE_SEPOLIA_RPC_2", ""),
-        ] if u]
+        ])
     else:
-        rpc_urls = [u for u in [
+        rpc_urls = _rotated_rpc_urls([
             os.environ.get("BASE_RPC_1", ""), os.environ.get("BASE_RPC_2", ""),
             os.environ.get("BASE_RPC_3", ""), os.environ.get("BASE_RPC_4", ""),
-        ] if u]
+        ])
     if not rpc_urls:
         raise RuntimeError(f"No RPC endpoints for chain_id={cid}")
 

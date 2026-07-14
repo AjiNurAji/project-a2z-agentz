@@ -19,6 +19,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 import database
 from agent_a_chroma import check_semantic_similarity
 import web3_async as w3_async
+from web3_async import _rotated_rpc_urls
 from eth_abi import encode as _encode, decode as _decode
 from eth_utils import to_checksum_address as _checksum
 
@@ -864,11 +865,11 @@ async def _fetch_testnet_holdings() -> dict:
         "0x49D83283c527A36335a70D70fc11342F4427d162",
     )
     vault = os.environ.get("VAULT_ADDRESS", "").strip()
-    rpc_urls = [u for u in [
+    rpc_urls = _rotated_rpc_urls([
         os.environ.get("BASE_SEPOLIA_RPC", ""),
         os.environ.get("BASE_SEPOLIA_RPC_1", ""),
         os.environ.get("BASE_SEPOLIA_RPC_2", ""),
-    ] if u]
+    ])
     if not vault or not rpc_urls:
         # No testnet config -> proof-only empty payload
         return {
