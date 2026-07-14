@@ -1088,10 +1088,17 @@ async def swap_token_for_eth(
         raise RuntimeError("eth_account not installed")
 
     cid = chain_id or BASE_CHAIN_ID
-    rpc_urls = [u for u in [
-        os.environ.get("BASE_RPC_1", ""), os.environ.get("BASE_RPC_2", ""),
-        os.environ.get("BASE_RPC_3", ""), os.environ.get("BASE_RPC_4", ""),
-    ] if u]
+    if cid == 84532:
+        rpc_urls = [u for u in [
+            os.environ.get("BASE_SEPOLIA_RPC", ""),
+            os.environ.get("BASE_SEPOLIA_RPC_1", ""),
+            os.environ.get("BASE_SEPOLIA_RPC_2", ""),
+        ] if u]
+    else:
+        rpc_urls = [u for u in [
+            os.environ.get("BASE_RPC_1", ""), os.environ.get("BASE_RPC_2", ""),
+            os.environ.get("BASE_RPC_3", ""), os.environ.get("BASE_RPC_4", ""),
+        ] if u]
     if not rpc_urls:
         raise RuntimeError(f"No RPC endpoints for chain_id={cid}")
 
