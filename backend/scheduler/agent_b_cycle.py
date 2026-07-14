@@ -537,10 +537,17 @@ async def process_task(task: dict[str, Any]) -> None:
     except Exception:
       pass
 
-        # Low score (but a *successful* analysis) is a terminal decision, NOT an
+    # STRICT MIRRORING (testnet): in base_sepolia mode we run an isolated
+    # sandbox where Agent A feeds a mock BUY signal for A2ZTestToken. Scoring
+    # (DeepSeek ≥60) and GoPlus are mainnet-only OSINT gates that don't apply
+    # to our self-deployed testnet token, so we bypass them to let Agent B
+    # actually execute the buy/sell flow on Base Sepolia.
+    _is_testnet = os.getenv("ACTIVE_NETWORK", "base").strip().lower() == "base_sepolia"
+
+    # Low score (but a *successful* analysis) is a terminal decision, NOT an
     # error -> do not retry (saves GoPlus + LLM calls). Only genuine failures
     # (inference errors, RPC down) should retry via the outer worker loop.
-    if score < MAX_SCORE_FOR_AUTO:
+    if score < MAX_SCORE_FOR_AUTO and not _is_testnet:
       print(f"[DBG] score {score} < {MAX_SCORE_FOR_AUTO} -> reject")
       update_task_status(queue_id, "COMPLETED", retry=False)
       append_audit_log(
@@ -549,6 +556,8 @@ async def process_task(task: dict[str, Any]) -> None:
         {"queue_id": queue_id, "score": score, "address": contract_address},
       )
       return
+    if score < MAX_SCORE_FOR_AUTO and _is_testnet:
+      logger.info("TESTNET BYPASS: score %s < %s but base_sepolia sandbox -> executing anyway", score, MAX_SCORE_FOR_AUTO)
 
     # === GoPlus Security Gate: block on honeypot / high tax / ownership risk ===
     goplus_blocked = False
@@ -568,7 +577,7 @@ async def process_task(task: dict[str, Any]) -> None:
         elif can_take_ownership in ("1", "true") and hidden_owner in ("1", "true"):
             goplus_blocked = True
             goplus_block_reason = "ownership can be taken back + hidden owner"
-    if goplus_blocked:
+    if goplus_blocked and not _is_testnet:
         logger.warning("GoPlus security gate BLOCKED: %s for %s", goplus_block_reason, contract_address)
         update_task_status(queue_id, "COMPLETED", retry=False)
         append_audit_log(
@@ -577,6 +586,8 @@ async def process_task(task: dict[str, Any]) -> None:
             {"queue_id": queue_id, "address": contract_address, "score": score},
         )
         return
+    if goplus_blocked and _is_testnet:
+        logger.info("TESTNET BYPASS: GoPlus flagged '%s' but base_sepolia sandbox -> executing anyway", goplus_block_reason)
 
     # ===== OVERRIDE MODE: stop trusting DeepSeek JSON compliance =====
     # IF score >= 20, force a hard-coded $0.50 trade. We no longer read
