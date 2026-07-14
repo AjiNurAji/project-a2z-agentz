@@ -168,7 +168,23 @@ async def get_targets(request: Request):
                 "SELECT address, sentiment_score, status, updated_at FROM target_addresses ORDER BY updated_at DESC"
             )
             targets = cur.fetchall()
-        return JSONResponse({"data": targets})
+        # Normalize Postgres types for JSON serialization (datetime -> str,
+        # Decimal -> float) — same fix applied to /api/holdings.
+        from decimal import Decimal as _Decimal
+        from datetime import datetime as _Dt, date as _Date
+
+        norm_targets = []
+        for t in targets:
+            nt = dict(t)
+            for k, v in nt.items():
+                if isinstance(v, _Decimal):
+                    nt[k] = float(v)
+                elif isinstance(v, (_Dt, _Date)):
+                    nt[k] = v.isoformat()
+                elif isinstance(v, bytes):
+                    nt[k] = v.decode("utf-8", "replace")
+            norm_targets.append(nt)
+        return JSONResponse({"data": norm_targets})
     except Exception as e:
         return JSONResponse({"detail": str(e)}, status_code=500)
 
