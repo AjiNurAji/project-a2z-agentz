@@ -877,6 +877,9 @@ async def get_holdings(request: Request):
             "pnl_usd": pnl_usd,
         })
 
+    # Normalize the SOLD list too (same Postgres types).
+    safe_sold = [{k: _norm(v) for k, v in t.items()} for t in sold]
+
     def _default(o):
         if isinstance(o, _Decimal):
             return float(o)
@@ -886,12 +889,13 @@ async def get_holdings(request: Request):
             return o.decode("utf-8", "replace")
         raise TypeError(f"Object of type {o.__class__.__name__} is not JSON serializable")
 
-    return JSONResponse({
+    payload = {
         "holding": enriched,
-        "sold": sold,
+        "sold": safe_sold,
         "count_holding": len(held),
         "count_sold": len(sold),
-    }, default=_default)
+    }
+    return JSONResponse(json.dumps(payload, default=_default), media_type="application/json")
 
 
 @require_auth
