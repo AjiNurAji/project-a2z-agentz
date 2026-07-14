@@ -620,6 +620,15 @@ async def _estimate_eip1559_fees(provider, max_gas_price_gwei):
     except Exception:
         base_fee = int(1.0 * 1e9)
     max_fee = base_fee + priority
+    # Floor the fee so we never broadcast an underpriced tx (Base Sepolia's
+    # eth_gasPrice can report a stale/zero base fee, causing
+    # "replacement transaction underpriced" rejections). 1 gwei is well above
+    # any realistic Sepolia base fee and stays tiny in absolute cost.
+    min_floor = int(1.0 * 1e9)
+    if max_fee < min_floor:
+        max_fee = min_floor
+    if priority < int(0.5 * 1e9):
+        priority = int(0.5 * 1e9)
     if max_gas_price_gwei:
         cap = int(max_gas_price_gwei * 1e9)
         max_fee = min(max_fee, cap)
@@ -678,6 +687,9 @@ WETH_BASE = "0x4200000000000000000000000000000000000006"
 # This is intentionally isolated to Base Sepolia (cid==84532) and MUST NOT
 # be used on mainnet (8453), where the canonical router above applies.
 UNISWAP_V2_ROUTER_SEPOLIA = "0x47f5a990169Ec59e2013875478B52fe42146bA9b"
+
+# Local default chain id (Base mainnet). Overridden by callers passing chain_id.
+BASE_CHAIN_ID = int(os.getenv("BASE_CHAIN_ID", "8453"))
 
 
 def _router_for_cid(cid: int) -> str:
@@ -1110,12 +1122,24 @@ async def swap_token_for_eth(
         weth = _to_checksum(WETH_BASE)
         recipient = _to_checksum(acct.address)
 
-        # Step 1: Approve router to spend tokens (only if we haven't already)
-        approve_hash = await _erc20_approve(
-            provider, token_address, _router_for_cid(cid), token_amount_wei,
-            chain_id=cid, max_gas_price_gwei=max_gas_price_gwei,
-        )
-        logger.info("Token approval tx=%s for %s amount=%s", approve_hash, token_address, token_amount_wei)
+        # Step 1: Approve router to spend tokens (only if allowance insufficient)
+        from eth_abi import encode as _enc
+        _allow_sel = b'\xdd\x62\xed\x3e'  # allowance(address,address)
+        _allow_data = '0x' + (_allow_sel + _enc(['address', 'address'], [token, _to_checksum(_router_for_cid(cid))])).hex()
+        try:
+            _allow_raw = await provider.call("eth_call", [{"to": token, "data": _allow_data}, "latest"])
+            _allowance = int(_allow_raw, 16) if isinstance(_allow_raw, str) else 0
+        except Exception:
+            _allowance = 0
+        if _allowance >= token_amount_wei:
+            approve_hash = "already-approved"
+            logger.info("Token allowance sufficient (%s >= %s) — skipping approve", _allowance, token_amount_wei)
+        else:
+            approve_hash = await _erc20_approve(
+                provider, token_address, _router_for_cid(cid), token_amount_wei,
+                chain_id=cid, max_gas_price_gwei=max_gas_price_gwei,
+            )
+            logger.info("Token approval tx=%s for %s amount=%s", approve_hash, token_address, token_amount_wei)
 
         # Step 2: swapExactTokensForETHSupportingFeeOnTransferTokens
         deadline = int(_time.time()) + 1200
@@ -1127,7 +1151,18 @@ async def swap_token_for_eth(
         )
         calldata = '0x' + (selector + encoded_params).hex()
 
-        nonce = int(await provider.call("eth_getTransactionCount", [acct.address, "latest"]), 16)
+        # Read nonce via a direct fresh RPC call (avoids stale MultiRpcProvider cache).
+        import urllib.request as _urllib
+        import json as _json
+        _rpc_url = (os.environ.get("BASE_SEPOLIA_RPC_1") or rpc_urls[0])
+        _nonce_body = _json.dumps({"jsonrpc": "2.0", "method": "eth_getTransactionCount",
+                                  "params": [acct.address, "pending"], "id": 1}).encode()
+        try:
+            _nr = _json.loads(_urllib.urlopen(_urllib.Request(
+                _rpc_url, data=_nonce_body, headers={"Content-Type": "application/json"}), timeout=12).read())
+            nonce = int(_nr.get("result", "0x0"), 16)
+        except Exception:
+            nonce = int(await provider.call("eth_getTransactionCount", [acct.address, "pending"]), 16)
         max_fee, max_priority = await _estimate_eip1559_fees(provider, max_gas_price_gwei)
 
         tx = {
@@ -1139,15 +1174,25 @@ async def swap_token_for_eth(
         raw_bytes = getattr(signed, "raw_transaction", None) or getattr(signed, "rawTransaction", None)
         raw = raw_bytes.hex() if isinstance(raw_bytes, (bytes, bytearray)) else raw_bytes
 
+        # Broadcast to the first available Sepolia RPC (Alchemy proven reliable).
+        # We use a direct POST (same path as the manual test that succeeds) and
+        # return as soon as one endpoint accepts the tx.
         results = []
-        for ep in provider._endpoints:
+        broadcast_urls = [u for u in [
+            os.environ.get("BASE_SEPOLIA_RPC_1", ""),
+            os.environ.get("BASE_SEPOLIA_RPC_2", ""),
+            os.environ.get("BASE_SEPOLIA_RPC", ""),
+        ] if u]
+        if not broadcast_urls:
+            broadcast_urls = [e.url for e in provider._endpoints]
+        for url in broadcast_urls:
             try:
                 session = aiohttp.ClientSession(
                     timeout=aiohttp.ClientTimeout(total=DEFAULT_TIMEOUT),
                     headers={"Content-Type": "application/json"},
                 )
                 async with session.post(
-                    ep.url,
+                    url,
                     json={"jsonrpc": "2.0", "id": RPC_ID, "method": "eth_sendRawTransaction", "params": ["0x" + raw]},
                 ) as resp:
                     if resp.status == 200:
@@ -1158,8 +1203,8 @@ async def swap_token_for_eth(
                                         token_amount_wei, token_address, tx_hash)
                             return {"tx_hash": tx_hash, "token_address": token_address, "token_amount_wei": token_amount_wei}
                         results.append(data)
-            except Exception:
-                pass
+            except Exception as exc:
+                results.append({"error": str(exc)})
             finally:
                 await session.close()
         raise RuntimeError(f"Sell swap broadcast failed: {results[:3]}")
