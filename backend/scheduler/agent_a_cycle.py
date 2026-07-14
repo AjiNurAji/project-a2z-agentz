@@ -60,9 +60,8 @@ logger = logging.getLogger("a2z.agent_a")
 
 BATCH_SIZE = int(os.getenv("AGENT_A_BATCH_SIZE", "20"))
 DEFAULT_USER_ID = int(os.getenv("AGENT_A_DEFAULT_USER_ID", "1"))
-# LLM brain for Agent A (Llama on AMD via Cloudflare tunnel). Falls back to the
-# generic AI_MODEL env if AGENT_A_MODEL is not set. Empty endpoint -> mock.
-AI_MODEL = os.getenv("AGENT_A_MODEL", os.getenv("AI_MODEL", ""))
+# LLM brain for Agent A (Llama on AMD via Cloudflare tunnel). Uses AI_MODEL as SSOT.
+AI_MODEL = os.getenv("AI_MODEL", "")
 AGENT_A_LLM_THRESHOLD = int(os.getenv("AGENT_A_LLM_THRESHOLD", "60"))  # >= 60 = eligible
 
 # --- Strict Alpha Filter thresholds ---

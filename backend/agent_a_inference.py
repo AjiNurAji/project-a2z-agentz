@@ -390,7 +390,7 @@ def generate_testnet_narrative(ca: str, token_name: str, ticker: str) -> str:
     )
     endpoint = os.getenv("AI_ENDPOINT", "").strip()
     api_key = os.getenv("AI_API_KEY", "").strip()
-    model = os.getenv("AGENT_A_MODEL", os.getenv("AI_MODEL", "")).strip()
+    model = os.getenv("AI_MODEL", "").strip()
 
     if endpoint and endpoint.lower() != "mock" and model:
         try:
@@ -444,8 +444,8 @@ def run_ai_inference(description: str, target_address: str, model: str) -> AIRes
         # Submission build requires a real endpoint; refuse mock fallback.
         raise RuntimeError("AI_ENDPOINT not configured — refusing mock fallback in submission build")
 
-    temperature = float(os.getenv("AGENT_A_TEMPERATURE", "0.0"))
-    max_tokens = int(os.getenv("AGENT_A_MAX_TOKENS", "1024"))
+    temperature = float(os.getenv("AI_TEMPERATURE", "0.0"))
+    max_tokens = int(os.getenv("AI_MAX_TOKENS", "1024"))
 
     try:
         result = _openai_compat_infer(

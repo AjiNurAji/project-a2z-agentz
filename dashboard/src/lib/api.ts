@@ -3,7 +3,7 @@
 // when explicitly provided (e.g. local dev against a running backend).
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY || "";
-const JUDGE_TOKEN = process.env.NEXT_PUBLIC_JUDGE_TOKEN || "";
+const ADMIN_TOKEN = process.env.NEXT_PUBLIC_ADMIN_TOKEN || "";
 
 interface ApiError extends Error {
   status: number;
@@ -13,7 +13,7 @@ interface ApiError extends Error {
 /**
  * Fetch wrapper for backend API calls.
  *
- * Always sends cookies (the ``a2z-token`` JWT or ``JUDGE_TOKEN``-equivalent
+ * Always sends cookies (the ``a2z-token`` JWT or ``ADMIN_TOKEN``-equivalent
  * demo cookie handled by the auth provider) via ``credentials: "include"``.
  *
  * In addition, when ``NEXT_PUBLIC_API_KEY`` is defined the call adds the
@@ -21,8 +21,8 @@ interface ApiError extends Error {
  * for read-only / mutate endpoints without forcing the dashboard to depend
  * on a JWT round-trip in every cycle (rules out 401s on cold-start).
  *
- * When ``NEXT_PUBLIC_JUDGE_TOKEN`` is defined (hackathon demo mode), the
- * token is forwarded as ``X-Judge-Token`` for the same read-only judge
+ * When ``NEXT_PUBLIC_ADMIN_TOKEN`` is defined (demo mode), the
+ * token is forwarded as ``X-Admin-Token`` for the same read-only admin
  * bypass used by ``backend/routes/api.py``.
  */
 export async function apiFetch<T = unknown>(
@@ -37,8 +37,8 @@ export async function apiFetch<T = unknown>(
   if (API_KEY && !headers["X-API-Key"]) {
     headers["X-API-Key"] = API_KEY;
   }
-  if (JUDGE_TOKEN && !headers["X-Judge-Token"]) {
-    headers["X-Judge-Token"] = JUDGE_TOKEN;
+  if (ADMIN_TOKEN && !headers["X-Admin-Token"]) {
+    headers["X-Admin-Token"] = ADMIN_TOKEN;
   }
   // Forward the JWT stored in localStorage (set after login/register) so
   // cross-site auth works without relying on flaky third-party cookies.

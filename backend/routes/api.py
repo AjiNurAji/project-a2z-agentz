@@ -38,8 +38,8 @@ AGENT_B_MODEL = os.getenv("AGENT_B_MODEL", "accounts/fireworks/models/deepseek-v
 AGENT_B_API_KEY = os.getenv("AGENT_B_API_KEY", "")
 FIREWORKS_API_KEY = AGENT_B_API_KEY
 
-# Read-only judge bypass token (hackathon judges); GET-only, never mutations.
-JUDGE_TOKEN = os.getenv("JUDGE_TOKEN")
+# Read-only admin/demo bypass token (demo mode); GET-only, never mutations.
+ADMIN_TOKEN = os.getenv("ADMIN_TOKEN")
 
 
 def check_auth(request: Request) -> bool:
@@ -60,17 +60,17 @@ def check_auth(request: Request) -> bool:
     if token and verify_access_token(token):
         return True
 
-    # Allow read-only judge access via cookie OR header.
-    # The dashboard forwards the JUDGE_TOKEN as ``X-Judge-Token`` when the
-    # public ``NEXT_PUBLIC_JUDGE_TOKEN`` env is set. The token is also still
+    # Allow read-only admin access via cookie OR header.
+    # The dashboard forwards the ADMIN_TOKEN as ``X-Admin-Token`` when the
+    # public ``NEXT_PUBLIC_ADMIN_TOKEN`` env is set. The token is also still
     # accepted as the cookie value to permit curl / scripted use.
-    judge_token_header = request.headers.get("X-Judge-Token")
+    admin_token_header = request.headers.get("X-Admin-Token")
     if (
         request.method in ("GET", "HEAD", "OPTIONS")
-        and JUDGE_TOKEN
+        and ADMIN_TOKEN
         and (
-            (token and token == JUDGE_TOKEN)
-            or (judge_token_header and judge_token_header == JUDGE_TOKEN)
+            (token and token == ADMIN_TOKEN)
+            or (admin_token_header and admin_token_header == ADMIN_TOKEN)
         )
     ):
         return True
@@ -355,7 +355,7 @@ async def get_system_status(request: Request):
     except Exception:
         body["circuit_breaker"] = "unknown"
     try:
-        ep = os.getenv("AGENT_A_ENDPOINT", "").rstrip("/")
+        ep = os.getenv("AI_ENDPOINT", "").rstrip("/")
         if not ep:
             ep = os.getenv("AGENT_B_ENDPOINT", "").rstrip("/")
         body["ai_endpoint"] = ep
@@ -399,7 +399,7 @@ async def get_system_status(request: Request):
         m = manager.get_metrics()
         body["agent_health"] = {
             "ws_connections": len(manager.active_connections),
-            "agent_a_model": os.getenv("AI_MODEL", "") or os.getenv("AGENT_A_MODEL", ""),
+            "agent_a_model": os.getenv("AI_MODEL", ""),
             "agent_b_model": os.getenv("AGENT_B_MODEL", ""),
             "agent_a_last_seen": last_a,
             "agent_b_last_seen": last_b,
@@ -422,9 +422,9 @@ async def get_system_status(request: Request):
 
 
 async def health(request: Request):
-    """Lightweight healthcheck for judges / uptime monitoring (judge token optional)."""
-    judge = request.headers.get("X-Judge-Token")
-    if JUDGE_TOKEN and judge and judge != JUDGE_TOKEN:
+    """Lightweight healthcheck for admin / uptime monitoring (admin token optional)."""
+    admin = request.headers.get("X-Admin-Token")
+    if ADMIN_TOKEN and admin and admin != ADMIN_TOKEN:
         return JSONResponse({"detail": "Unauthorized"}, status_code=401)
     return JSONResponse({"status": "ok", "service": "a2z-agentz-backend"})
 
