@@ -671,6 +671,25 @@ async def _is_smart_contract(provider, address: str) -> bool:
 UNISWAP_V2_ROUTER = "0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24"
 WETH_BASE = "0x4200000000000000000000000000000000000006"
 
+# TESTING BRANCH ONLY: Uniswap V2 Router02 we deployed on Base Sepolia
+# (chain 84532) so Agent B can run REAL swaps on the testnet without
+# touching mainnet funds. Deployed at:
+#   0x47f5a990169Ec59e2013875478B52fe42146bA9b  (see /root/a2z-sepolia-dex)
+# This is intentionally isolated to Base Sepolia (cid==84532) and MUST NOT
+# be used on mainnet (8453), where the canonical router above applies.
+UNISWAP_V2_ROUTER_SEPOLIA = "0x47f5a990169Ec59e2013875478B52fe42146bA9b"
+
+
+def _router_for_cid(cid: int) -> str:
+    """Pick the correct Uniswap V2 Router02 for the chain id.
+
+    Base mainnet (8453) -> canonical router.
+    Base Sepolia (84532)  -> our isolated testnet router (testing branch).
+    """
+    if cid == 84532:
+        return UNISWAP_V2_ROUTER_SEPOLIA
+    return UNISWAP_V2_ROUTER
+
 # Minimal ABI for swapExactETHForTokensSupportingFeeOnTransferTokens
 UNISWAP_V2_ROUTER_ABI_SWAP = [
     {
@@ -738,7 +757,7 @@ async def swap_eth_for_token(
     provider = MultiRpcProvider(rpc_urls=rpc_urls, chain_id=cid)
     try:
         acct = get_account()
-        router = to_checksum_address(UNISWAP_V2_ROUTER)
+        router = to_checksum_address(_router_for_cid(cid))
         token = to_checksum_address(token_address)
         weth = to_checksum_address(WETH_BASE)
         recipient = to_checksum_address(acct.address)
@@ -1079,14 +1098,14 @@ async def swap_token_for_eth(
     provider = MultiRpcProvider(rpc_urls=rpc_urls, chain_id=cid)
     try:
         acct = get_account()
-        router = _to_checksum(UNISWAP_V2_ROUTER)
+        router = _to_checksum(_router_for_cid(cid))
         token = _to_checksum(token_address)
         weth = _to_checksum(WETH_BASE)
         recipient = _to_checksum(acct.address)
 
         # Step 1: Approve router to spend tokens (only if we haven't already)
         approve_hash = await _erc20_approve(
-            provider, token_address, UNISWAP_V2_ROUTER, token_amount_wei,
+            provider, token_address, _router_for_cid(cid), token_amount_wei,
             chain_id=cid, max_gas_price_gwei=max_gas_price_gwei,
         )
         logger.info("Token approval tx=%s for %s amount=%s", approve_hash, token_address, token_amount_wei)
