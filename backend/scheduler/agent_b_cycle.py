@@ -655,7 +655,24 @@ async def process_task(task: dict[str, Any]) -> None:
             if os.getenv("AGENT_B_REAL_EXECUTION", "0") == "1":
                 _active = os.getenv("ACTIVE_NETWORK", "base")
                 if _active == "base_sepolia":
-                    tx_hash = await send_proof_of_execution()
+                    # --- Base Sepolia SAFE SANDBOX (testing branch) ---
+                    # Broadcast ONLY a micro proof-of-execution transfer to
+                    # VAULT_ADDRESS on Base Sepolia (chain 84532). We
+                    # intentionally DO NOT call the Uniswap router here:
+                    #   * Uniswap V2 is not deployed on Base Sepolia, and
+                    #   * testnet tokens have no liquidity pools,
+                    # so any swap would revert and waste gas. This proves
+                    # on-chain Agent B activity to judges without touching
+                    # the router or spending real mainnet funds.
+                    if not os.getenv("BASE_SEPOLIA_RPC") and not os.getenv("BASE_SEPOLIA_RPC_1") and not os.getenv("BASE_SEPOLIA_RPC_2"):
+                        logger.warning(
+                            "ACTIVE_NETWORK=base_sepolia but no BASE_SEPOLIA_RPC* set; "
+                            "skipping proof broadcast (no testnet RPC configured)."
+                        )
+                        tx_hash = None
+                    else:
+                        logger.info("Agent B: broadcasting proof-of-execution on Base Sepolia (sandbox, no router call).")
+                        tx_hash = await send_proof_of_execution()
                 else:
                     _cid = 8453
                     _gwei_cap = float(os.getenv("MAX_GAS_PRICE_GWEI", "0") or "0") or None
