@@ -366,6 +366,70 @@ def _openai_compat_infer(
     )
 
 
+def generate_testnet_narrative(ca: str, token_name: str, ticker: str) -> str:
+    """Generate a Farcaster-style OSINT 'why this is trending / BUY' narrative.
+
+    Testnet strict-mirroring: the Factory hands us a randomized token identity,
+    and Agent A's LLM wraps it in a convincing alpha callout. Provider-agnostic
+    (any OpenAI-compatible AI_ENDPOINT). Falls back to a varied template if the
+    endpoint is unset or errors, so the pipeline never breaks.
+    """
+    system_prompt = (
+        "You are an elite on-chain crypto OSINT analyst embedded in the A2Z "
+        "Agentz scout pipeline. A new token just launched on Base. Based ONLY "
+        "on the token identity provided, write a concise (2-3 sentence) "
+        "Farcaster-style alpha callout explaining why this token is TRENDING "
+        "RIGHT NOW and is a strong BUY. Be punchy, credible, degen-but-smart. "
+        "Cite plausible on-chain signals (liquidity inflow, whale accumulation, "
+        "social momentum). Output ONLY the narrative text, no preamble."
+    )
+    user_prompt = (
+        f"TOKEN: {token_name} (${ticker})\n"
+        f"CONTRACT: {ca}\n"
+        f"NETWORK: Base Sepolia"
+    )
+    endpoint = os.getenv("AI_ENDPOINT", "").strip()
+    api_key = os.getenv("AI_API_KEY", "").strip()
+    model = os.getenv("AGENT_A_MODEL", os.getenv("AI_MODEL", "")).strip()
+
+    if endpoint and endpoint.lower() != "mock" and model:
+        try:
+            client = OpenAI(
+                base_url=endpoint.rstrip("/"),
+                api_key=api_key or "not-required",
+                timeout=30.0,
+                max_retries=1,
+            )
+            resp = client.chat.completions.create(
+                model=model,
+                temperature=float(os.getenv("AGENT_A_NARRATIVE_TEMP", "0.8")),
+                max_tokens=int(os.getenv("AGENT_A_NARRATIVE_MAX_TOKENS", "220")),
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                timeout=25.0,
+            )
+            text = (resp.choices[0].message.content or "").strip()
+            if text:
+                logger.info("Testnet narrative generated via LLM for %s (%s)", token_name, ticker)
+                return text
+        except Exception as exc:
+            logger.warning("Testnet narrative LLM failed (%s) — using template fallback", exc)
+
+    # Fallback: varied template so the UI still shows credible reasoning.
+    import random as _r
+    signals = [
+        f"{token_name} (${ticker}) is seeing explosive early liquidity inflow on Base — "
+        f"smart money wallets are accumulating fast. Volume spiking, sentiment flipping bullish. Strong BUY.",
+        f"On-chain data shows whale accumulation on {token_name} (${ticker}) in the last hour. "
+        f"Fresh pair, tight float, momentum building across Farcaster. Early alpha — BUY signal.",
+        f"${ticker} is trending: liquidity depth climbing, buy/sell ratio heavily green, "
+        f"and social mentions accelerating. {token_name} looks like a breakout candidate. BUY.",
+    ]
+    return _r.choice(signals)
+
+
 def run_ai_inference(description: str, target_address: str, model: str) -> AIResult:
     """Dispatch to the configured AI endpoint (submission build: AMD ROCm vLLM).
 

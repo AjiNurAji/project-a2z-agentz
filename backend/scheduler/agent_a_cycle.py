@@ -52,7 +52,7 @@ from routes.websockets import manager
 # Opsi 2 (A2Z Agent-to-Agent): Agent A calls the LLM brain on the AMD GPU
 # server (via Cloudflare tunnel) to extract + score the signal BEFORE handing
 # the target to Agent B. run_ai_inference() is the shared entrypoint.
-from agent_a_inference import run_ai_inference
+from agent_a_inference import run_ai_inference, generate_testnet_narrative
 
 load_dotenv()
 
@@ -249,36 +249,55 @@ def build_alpha_payload(token: dict[str, Any]) -> dict[str, Any]:
         "txns_24h": token.get("txns_24h"),
         "dex_id": token.get("dex_id"),
         "chain": token.get("chain"),
+        # Testnet: carry the LLM-generated OSINT narrative for the UI / Agent B.
+        "narrative": token.get("_narrative", ""),
+        "agent_a_reason": token.get("_narrative", ""),
     }
     return payload
 
 
-def _mock_testnet_tokens() -> list[dict[str, Any]]:
-    """STRICT MIRRORING (testnet): simulated OSINT output for base_sepolia.
+def _load_factory_token() -> dict[str, Any]:
+    """STRICT MIRRORING (testnet): read the latest Factory-deployed token.
 
-    Instead of hitting DexScreener/Farcaster mainnet APIs, we return our
-    self-deployed A2ZTestToken as a 'trending' pick so Agent B executes the
-    full buy/sell flow on Base Sepolia in complete isolation from mainnet.
+    The Factory (vault 0xd6d8...79d3) deploys a randomized ERC20 and writes
+    {ca, name, ticker} to factory-latest.json (or FACTORY_TOKEN_CA env). Returns
+    a fully-formed token dict that Agent A wraps in an LLM narrative -> BUY.
+    Falls back to the static A2ZTestToken if no factory output is found.
     """
+    import json as _json
     import time as _t
     token_addr = os.getenv("A2Z_TESTNET_TOKEN", "0x49D83283c527A36335a70D70fc11342F4427d162")
+    name = os.getenv("A2Z_TESTNET_TOKEN_NAME", "A2ZTestToken")
+    ticker = os.getenv("A2Z_TESTNET_TOKEN_TICKER", "A2ZT")
+    # Prefer live factory output file (written by scripts/factory.js).
+    try:
+        with open("factory-latest.json") as _f:
+            _d = _json.load(_f)
+            token_addr = _d.get("ca", token_addr)
+            name = _d.get("name", name)
+            ticker = _d.get("ticker", ticker)
+    except Exception:
+        pass
     now_ms = int(_t.time() * 1000)
-    return [{
-        "token_name": "A2ZTestToken",
-        "token_symbol": "A2ZT",
+    return {
+        "token_name": name,
+        "token_symbol": ticker,
         "contract_address": token_addr,
-        "volume_24h": 25000.0,        # mock healthy volume
-        "price_change_24h": 42.0,     # mock pump
+        "volume_24h": 25000.0,
+        "price_change_24h": 42.0,
         "market_cap": 500000,
-        "liquidity_usd": 80000.0,     # >$50K so it looks eligible
+        "liquidity_usd": 80000.0,
         "fdv": 500000,
-        "pair_created_at": now_ms - 3600 * 1000,  # ~1h old
+        "pair_created_at": now_ms - 3600 * 1000,
         "pair_created_age_s": 3600,
         "price_usd": 0.00006,
         "txns_24h": {"h24": {"buys": 120, "sells": 30}},
         "dex_id": "uniswap_v2_sepolia",
         "chain": "base_sepolia",
-    }]
+        # Carried-through identity for the LLM narrative step:
+        "_factory_name": name,
+        "_factory_ticker": ticker,
+    }
 
 
 async def run_cycle() -> None:
@@ -293,8 +312,17 @@ async def run_cycle() -> None:
     async with aiohttp.ClientSession() as session:
         if _is_testnet:
             # === TESTNET MOCK OSINT FEEDER (no mainnet API calls) ===
-            logger.info("TESTNET MODE: using mock OSINT feeder (A2ZTestToken), skipping mainnet DexScreener/Farcaster")
-            tokens = _mock_testnet_tokens()
+            # Step 1: ingest the Factory-deployed token identity.
+            logger.info("TESTNET MODE: ingesting Factory-deployed token (no DexScreener/Farcaster API)")
+            raw = _load_factory_token()
+            # Step 2: wrap the CA + name in an LLM-generated OSINT narrative.
+            narrative = agent_a_inference.generate_testnet_narrative(
+                raw["contract_address"], raw.get("_factory_name", raw["token_name"]),
+                raw.get("_factory_ticker", raw["token_symbol"]),
+            )
+            raw["_narrative"] = narrative
+            logger.info("TESTNET narrative: %s", narrative[:120])
+            tokens = [raw]
         else:
             # Step 1: newly-created Base token addresses
             addresses = await fetch_new_base_token_addresses(session, limit=BATCH_SIZE * 3)
