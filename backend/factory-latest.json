@@ -1,9 +1,0 @@
-{
-  "ca": "0xEa8B9CC066f160c96AC75B3332d5273cE8f060de",
-  "name": "AlphaGPT",
-  "ticker": "ALPHA",
-  "factory": "0xD6d824fD3D19e46B5E2046955D13e9Fd42db79D3",
-  "network": "base_sepolia",
-  "chainId": 84532,
-  "deployedAt": "2026-07-14T14:30:22.457Z"
-}
