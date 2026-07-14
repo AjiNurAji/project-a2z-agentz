@@ -19,6 +19,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 import database
 from agent_a_chroma import check_semantic_similarity
 import web3_async as w3_async
+from eth_abi import encode as _encode, decode as _decode
+from eth_utils import to_checksum_address as _checksum
 
 # Also add backend directory so we can import auth module
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -833,10 +835,115 @@ async def get_execution_status(request: Request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+async def _fetch_testnet_holdings() -> dict:
+    """LIVE on-chain Base Sepolia holdings (no DB).
+
+    Reads the ERC20 balance of A2ZTestToken at VAULT_ADDRESS directly from
+    Base Sepolia via RPC. Falls back to an empty proof-only payload if the
+    RPC call fails (same shape as mainnet so the UI renders consistently).
+    """
+    # A2ZTestToken deployed on Base Sepolia (see /root/a2z-sepolia-dex)
+    TESTNET_TOKEN = os.environ.get(
+        "A2Z_TESTNET_TOKEN",
+        "0x49D83283c527A36335a70D70fc11342F4427d162",
+    )
+    vault = os.environ.get("VAULT_ADDRESS", "").strip()
+    rpc_urls = [u for u in [
+        os.environ.get("BASE_SEPOLIA_RPC", ""),
+        os.environ.get("BASE_SEPOLIA_RPC_1", ""),
+        os.environ.get("BASE_SEPOLIA_RPC_2", ""),
+    ] if u]
+    if not vault or not rpc_urls:
+        # No testnet config -> proof-only empty payload
+        return {
+            "holding": [],
+            "sold": [],
+            "count_holding": 0,
+            "count_sold": 0,
+            "network": "testnet",
+            "proof_only": True,
+            "note": "No Base Sepolia RPC / VAULT_ADDRESS configured.",
+        }
+    try:
+        from eth_abi import decode as _decode
+        provider = w3_async.MultiRpcProvider(rpc_urls=rpc_urls, chain_id=84532)
+        token = _checksum(TESTNET_TOKEN)
+        vault_cs = _checksum(vault)
+        # balanceOf(address) selector
+        selector = b"\x70\xa0\x82\x31"
+        data = "0x" + (selector + _encode(["address"], [vault_cs])).hex()
+        res = await provider.call("eth_call", [
+            {"to": token, "data": data},
+            "latest",
+        ])
+        raw = res.get("result") if isinstance(res, dict) else None
+        if not raw or raw == "0x":
+            bal = 0
+        else:
+            bal = int(raw, 16)
+        from decimal import Decimal as _D
+        # A2ZTestToken has 18 decimals
+        human = float(_D(bal) / _D(10 ** 18))
+        if bal == 0:
+            return {
+                "holding": [],
+                "sold": [],
+                "count_holding": 0,
+                "count_sold": 0,
+                "network": "testnet",
+                "proof_only": True,
+                "note": "Vault holds 0 A2ZTestToken on Base Sepolia (proof-only mode).",
+            }
+        return {
+            "holding": [{
+                "token_address": token,
+                "token_name": "A2ZTestToken",
+                "entry_price_usd": 0.0,
+                "amount_wei": bal,
+                "balance": human,
+                "current_price_usd": 0.0,
+                "pnl_pct": 0.0,
+                "pnl_usd": 0.0,
+                "chain": "base_sepolia",
+            }],
+            "sold": [],
+            "count_holding": 1,
+            "count_sold": 0,
+            "network": "testnet",
+            "proof_only": False,
+            "note": "Live on-chain balance from Base Sepolia (no DB).",
+        }
+    except Exception as exc:
+        logger.warning("testnet holdings RPC failed, falling back to empty: %s", exc)
+        return {
+            "holding": [],
+            "sold": [],
+            "count_holding": 0,
+            "count_sold": 0,
+            "network": "testnet",
+            "proof_only": True,
+            "note": f"RPC fetch failed: {exc}",
+        }
+
+
 @require_auth
 async def get_holdings(request: Request):
-    """GET /holdings — Agent B vault holdings with live P&L from DexScreener."""
+    """GET /holdings — Agent B vault holdings with live P&L from DexScreener.
+
+    Query params:
+        network=mainnet  (default) -> DB-backed holdings (Neon held_tokens)
+        network=testnet  -> LIVE on-chain Base Sepolia ERC20 balance of
+                             A2ZTestToken at VAULT_ADDRESS (no DB read).
+                             Falls back to an empty proof-only payload if the
+                             RPC call fails.
+    """
     import httpx as _httpx
+
+    # Testnet mode: bypass the DB entirely, read on-chain state live.
+    network = (request.query_params.get("network") or "mainnet").strip().lower()
+    if network == "testnet":
+        return JSONResponse(await _fetch_testnet_holdings())
+
     held = database.fetch_held_tokens("HOLDING")
     sold = database.fetch_held_tokens("SOLD")
 
