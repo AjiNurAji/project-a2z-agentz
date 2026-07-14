@@ -666,24 +666,35 @@ async def process_task(task: dict[str, Any]) -> None:
             if os.getenv("AGENT_B_REAL_EXECUTION", "0") == "1":
                 _active = os.getenv("ACTIVE_NETWORK", "base")
                 if _active == "base_sepolia":
-                    # --- Base Sepolia SAFE SANDBOX (testing branch) ---
-                    # Broadcast ONLY a micro proof-of-execution transfer to
-                    # VAULT_ADDRESS on Base Sepolia (chain 84532). We
-                    # intentionally DO NOT call the Uniswap router here:
-                    #   * Uniswap V2 is not deployed on Base Sepolia, and
-                    #   * testnet tokens have no liquidity pools,
-                    # so any swap would revert and waste gas. This proves
-                    # on-chain Agent B activity to judges without touching
-                    # the router or spending real mainnet funds.
+                    # --- Base Sepolia REAL SWAP (strict-mirroring testnet) ---
+                    # We deployed our own Uniswap V2 Router02 + A2ZTestToken +
+                    # liquidity on Base Sepolia (see /root/a2z-sepolia-dex), so
+                    # Agent B executes a REAL swap here (ETH -> token) via the
+                    # Sepolia router. Amount is a small FIXED wei value (NOT the
+                    # USD-converted mainnet size) so testnet runs stay cheap and
+                    # deterministic regardless of ETH price.
                     if not os.getenv("BASE_SEPOLIA_RPC") and not os.getenv("BASE_SEPOLIA_RPC_1") and not os.getenv("BASE_SEPOLIA_RPC_2"):
                         logger.warning(
                             "ACTIVE_NETWORK=base_sepolia but no BASE_SEPOLIA_RPC* set; "
-                            "skipping proof broadcast (no testnet RPC configured)."
+                            "skipping swap (no testnet RPC configured)."
                         )
                         tx_hash = None
                     else:
-                        logger.info("Agent B: broadcasting proof-of-execution on Base Sepolia (sandbox, no router call).")
-                        tx_hash = await send_proof_of_execution()
+                        _cid = 84532
+                        _gwei_cap = float(os.getenv("MAX_GAS_PRICE_GWEI", "0") or "0") or None
+                        # Small fixed testnet buy size (default 0.0002 ETH).
+                        _val_wei = int(os.getenv("AGENT_B_TESTNET_ETH_WEI", str(int(0.0002 * 1e18))))
+                        amount_usd = 0.0  # not USD-priced on testnet
+                        logger.info(
+                            "Agent B: REAL swap on Base Sepolia (cid=84532) %s wei -> %s via Sepolia router",
+                            _val_wei, contract_address,
+                        )
+                        swap_res = await swap_eth_for_token(
+                            contract_address, _val_wei, chain_id=_cid, max_gas_price_gwei=_gwei_cap
+                        )
+                        tx_hash = swap_res.get("tx_hash") or swap_res.get("tx_hash_id")  # type: ignore[assignment]
+                        if not tx_hash:
+                            raise RuntimeError(f"testnet swap returned no tx_hash: {swap_res}")
                 else:
                     _cid = 8453
                     _gwei_cap = float(os.getenv("MAX_GAS_PRICE_GWEI", "0") or "0") or None
