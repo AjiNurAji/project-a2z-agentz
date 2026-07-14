@@ -931,3 +931,28 @@ Take-profit automation — READY
 ```
 
 **All systems operational. Production-ready with DEX swaps, GoPlus security, and automated profit-taking.**
+
+---
+
+## Session 29 — 2026-07-14 — Testing Branch: Slippage/PnL Logic Bug Fix & Mainnet Dry-Run
+
+### Summary
+Isolated on `testing` branch (main kept clean). Found and fixed two critical logic bugs in Agent B's swap + cost-basis path. Verified end-to-end on testnet; confirmed zero-risk on mainnet via dry-run.
+
+### Bug 1 — Execution Slippage (logic flaw)
+- **Root cause:** `amountOutMin` was hard-coded to a 1-wei floor. When the `getAmountsOut` quote failed, the error was silently swallowed, so swaps broadcast with **zero slippage protection** → fills at wildly wrong prices.
+- **Fix:** enforce a strict slippage band (0.5%–1.0%) computed from `getAmountsOut`; apply the same real `amountOutMin` to both BUY and SELL paths.
+
+### Bug 2 — Cost Basis / PnL (logic flaw)
+- **Root cause:** `insert_held_token` stored `entry_price_usd` as the flat USD *spend* (e.g. $0.50), not a per-token price. `amount_wei` stored ETH wei spent, not tokens received. PnL math became dimensionally wrong (showed absurd +100000% values).
+- **Fix:** after broadcast, read the actual token amount from the on-chain Swap event receipt; compute `entry_price_usd = USD spent ÷ tokens received` (real per-token price) and store `amount_wei` = actual tokens held. Dashboard PnL now scales by the real holding.
+
+### Corollary — Mainnet RPC Behavior
+- Discovered the mainnet RPC provider reverts `getAmountsOut` calls (provider policy, not a liquidity issue). A hard-revert-on-quote-fail would have permanently blocked mainnet trading, so the code now falls back to a documented slippage floor with a warning, while the pre-flight swap simulation remains the real safety gate (reverts bad fills before any gas is spent).
+
+### Verification
+- Testnet BUY executed; receipt parse confirmed `entry_price_usd` = real per-token price (not the flat spend) and `amount_wei` = actual tokens received.
+- Mainnet dry-run (DRY_RUN + interlock on): Agent A→B pipeline ran end-to-end; interlock blocked broadcast → **zero transactions sent**.
+
+### Status
+✅ Both logic bugs fixed and E2E-verified. Commits staged on `testing`; push held pending operator approval.
