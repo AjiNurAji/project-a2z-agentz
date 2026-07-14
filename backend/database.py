@@ -192,15 +192,21 @@ def insert_execution_log(
     queue_id: int | None = None,
     token_name: str = "",
     reason: str = "",
+    network: str | None = None,
 ) -> str:
-    """
-    Persist a transaction / approval-queue record to execution_logs.
-    Returns the tx_hash_id that was actually inserted (or that already existed).
-    Raises psycopg2.Error on real DB failure.
+    """Persist a transaction / approval-queue record to execution_logs.
 
-    queue_id / token_name / reason let the dashboard show Agent A's LLM
-    narrative + the (testnet) Factory token identity behind each trade.
+    ``network`` defaults to the active network flag from network_config
+    ('mainnet' / 'testnet') so mainnet and testnet rows never mix.
     """
+    # Resolve network flag from the Dual-Home config if not explicitly given.
+    if not network:
+        try:
+            from network_config import get_config
+            network = get_config().network_flag
+        except Exception:
+            network = "mainnet"
+
     safe_hash = (tx_hash_id or "").strip()
     if not safe_hash:
         raise ValueError("tx_hash_id must be a non-empty string")
@@ -218,24 +224,26 @@ def insert_execution_log(
 
     insert_sql = """
         INSERT INTO execution_logs
-            (tx_hash_id, project_target_address, amount_usd, status, queue_id, token_name, reason)
+            (tx_hash_id, project_target_address, amount_usd, status, queue_id, token_name, reason, network)
         VALUES
-            (%s, %s, %s, %s, %s, %s, %s)
+            (%s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (tx_hash_id) DO UPDATE
         SET token_name = EXCLUDED.token_name,
-            reason = EXCLUDED.reason
+            reason = EXCLUDED.reason,
+            network = EXCLUDED.network
         RETURNING tx_hash_id;
     """
     with _get_cursor() as cur:
         # Ensure the FK target exists (testnet tokens / new addresses may not
         # be in target_addresses yet). Insert a minimal row if missing. Use a
-        # status value allowed by the target_addresses CHECK constraint.
+        # status value allowed by the target_addresses CHECK constraint, and
+        # stamp the same network flag for segregation.
         cur.execute(
-            "INSERT INTO target_addresses (address, sentiment_score, status) "
-            "VALUES (%s, 0, 'active') ON CONFLICT (address) DO NOTHING;",
-            (addr,),
+            "INSERT INTO target_addresses (address, sentiment_score, status, network) "
+            "VALUES (%s, 0, 'active', %s) ON CONFLICT (address) DO NOTHING;",
+            (addr, network),
         )
-        cur.execute(insert_sql, (safe_hash, addr, amount, status_norm, queue_id, token_name, reason))
+        cur.execute(insert_sql, (safe_hash, addr, amount, status_norm, queue_id, token_name, reason, network))
         inserted = cur.fetchone()
 
     if inserted:
@@ -893,17 +901,24 @@ def get_daily_spend_usd() -> float:
 # ---------------------------------------------------------------------------
 
 def insert_held_token(token_address: str, token_name: str, buy_tx_hash: str,
-                      entry_price_usd: float, amount_wei: int) -> int | None:
+                      entry_price_usd: float, amount_wei: int,
+                      network: str | None = None) -> int | None:
     """Record a token purchase so Agent B can later take profit."""
+    if not network:
+        try:
+            from network_config import get_config
+            network = get_config().network_flag
+        except Exception:
+            network = "mainnet"
     query = """
-    INSERT INTO held_tokens (token_address, token_name, buy_tx_hash, entry_price_usd, amount_wei, status)
-    VALUES (%s, %s, %s, %s, %s, 'HOLDING')
+    INSERT INTO held_tokens (token_address, token_name, buy_tx_hash, entry_price_usd, amount_wei, status, network)
+    VALUES (%s, %s, %s, %s, %s, 'HOLDING', %s)
     ON CONFLICT (token_address) DO NOTHING
     RETURNING id;
     """
     try:
         with _get_cursor() as cur:
-            cur.execute(query, (token_address, token_name, buy_tx_hash, entry_price_usd, amount_wei))
+            cur.execute(query, (token_address, token_name, buy_tx_hash, entry_price_usd, amount_wei, network))
             row = cur.fetchone()
             return row[0] if row else None
     except psycopg2.Error as exc:
@@ -911,12 +926,21 @@ def insert_held_token(token_address: str, token_name: str, buy_tx_hash: str,
         return None
 
 
-def fetch_held_tokens(status: str = "HOLDING") -> list[dict]:
-    """Return all tokens currently held (or sold)."""
-    query = "SELECT * FROM held_tokens WHERE status = %s ORDER BY bought_at"
+def fetch_held_tokens(status: str = "HOLDING", network: str | None = None) -> list[dict]:
+    """Return all tokens currently held (or sold).
+
+    If ``network`` is given, only rows for that network are returned so the
+    dashboard / take-profit logic never mixes mainnet and testnet positions.
+    """
+    if network:
+        query = "SELECT * FROM held_tokens WHERE status = %s AND network = %s ORDER BY bought_at"
+        params = (status, network)
+    else:
+        query = "SELECT * FROM held_tokens WHERE status = %s ORDER BY bought_at"
+        params = (status,)
     try:
         with _get_cursor(dict_rows=True) as cur:
-            cur.execute(query, (status,))
+            cur.execute(query, params)
             return [dict(r) for r in cur.fetchall()]
     except psycopg2.Error as exc:
         logger.error("fetch_held_tokens failed: %s", exc)

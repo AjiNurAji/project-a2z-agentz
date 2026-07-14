@@ -855,21 +855,17 @@ async def get_execution_status(request: Request):
 async def _fetch_testnet_holdings() -> dict:
     """LIVE on-chain Base Sepolia holdings (no DB).
 
-    Reads the ERC20 balance of A2ZTestToken at VAULT_ADDRESS directly from
-    Base Sepolia via RPC. Falls back to an empty proof-only payload if the
-    RPC call fails (same shape as mainnet so the UI renders consistently).
+    Uses network_config as the Single Source of Truth for RPC / vault /
+    chain id, so this endpoint follows ACTIVE_NETWORK automatically.
     """
-    # A2ZTestToken deployed on Base Sepolia (see /root/a2z-sepolia-dex)
+    from network_config import get_config, NETWORK_TESTNET
+    cfg = get_config(NETWORK_TESTNET)
     TESTNET_TOKEN = os.environ.get(
         "A2Z_TESTNET_TOKEN",
         "0x49D83283c527A36335a70D70fc11342F4427d162",
     )
-    vault = os.environ.get("VAULT_ADDRESS", "").strip()
-    rpc_urls = _rotated_rpc_urls([
-        os.environ.get("BASE_SEPOLIA_RPC", ""),
-        os.environ.get("BASE_SEPOLIA_RPC_1", ""),
-        os.environ.get("BASE_SEPOLIA_RPC_2", ""),
-    ])
+    vault = cfg.vault_address
+    rpc_urls = cfg.rpc_urls
     if not vault or not rpc_urls:
         # No testnet config -> proof-only empty payload
         return {
@@ -883,7 +879,7 @@ async def _fetch_testnet_holdings() -> dict:
         }
     try:
         from eth_abi import decode as _decode
-        provider = w3_async.MultiRpcProvider(rpc_urls=rpc_urls, chain_id=84532)
+        provider = w3_async.MultiRpcProvider(rpc_urls=rpc_urls, chain_id=cfg.chain_id)
         token = _checksum(TESTNET_TOKEN)
         vault_cs = _checksum(vault)
         # balanceOf(address) selector

@@ -35,7 +35,47 @@ import aiohttp
 
 logger = logging.getLogger("a2z.web3_async")
 
+# Dual-Home Network Architecture: ALL network resolution (RPC, chain id,
+# router, vault) goes through network_config — the Single Source of Truth.
+# No hard-coded Base URLs/addresses below.
+try:
+    import network_config as _nc
+except Exception:  # pragma: no cover - config module should always be present
+    _nc = None
+
+# Backward-compatible alias. Real chain id now comes from network_config so a
+# single ACTIVE_NETWORK switch flips every caller.
 BASE_CHAIN_ID: int = int(os.environ.get("BASE_CHAIN_ID", "8453"))
+
+# Hard safety interlock -------------------------------------------------------
+# Before ANY eth_sendRawTransaction we verify the target network. On mainnet
+# we emit a loud WARNING and enforce a dry-run gate unless explicitly cleared.
+_DRY_RUN = os.environ.get("AGENT_B_DRY_RUN", "0").strip().lower() in ("1", "true", "yes")
+_MAINNET_CONFIRMED = os.environ.get("MAINNET_CONFIRM", "0").strip().lower() in ("1", "true", "yes")
+
+
+def safety_interlock(cid: int) -> None:
+    """Block/confirm before broadcasting.
+
+    * testnet (84532): silent pass.
+    * mainnet (8453):
+        - always log "WARNING: OPERATING ON MAINNET"
+        - if AGENT_B_DRY_RUN=1 -> raise, NEVER broadcast (safe demo mode)
+        - if MAINNET_CONFIRM != 1 -> raise, require explicit double-check flag
+    """
+    if cid != 8453:
+        return
+    logger.warning("WARNING: OPERATING ON MAINNET (chain 8453) — real funds at risk")
+    if _DRY_RUN:
+        raise RuntimeError(
+            "SAFETY INTERLOCK: AGENT_B_DRY_RUN=1 — refusing to broadcast on "
+            "mainnet. Set AGENT_B_DRY_RUN=0 to disable dry-run."
+        )
+    if not _MAINNET_CONFIRMED:
+        raise RuntimeError(
+            "SAFETY INTERLOCK: mainnet broadcast requires MAINNET_CONFIRM=1 "
+            "(explicit double-check). Refusing to send real transactions."
+        )
 DEFAULT_TIMEOUT: float = float(os.environ.get("BASE_RPC_TIMEOUT", "10"))
 RPC_ID = 1  # JSON-RPC id field
 
@@ -583,6 +623,8 @@ async def send_native_transaction(
             raw = raw_bytes
         # Fan-out broadcast: send to every configured RPC so the tx propagates
         # even if one endpoint is flaky. Success on ANY endpoint is enough.
+        # HARD SAFETY INTERLOCK: never broadcast without the mainnet gate.
+        safety_interlock(cid)
         last_err = None
         for rpc_url in rpc_urls:
             single = None
@@ -718,12 +760,20 @@ def _rotated_rpc_urls(urls: list[str]) -> list[str]:
 def _router_for_cid(cid: int) -> str:
     """Pick the correct Uniswap V2 Router02 for the chain id.
 
-    Base mainnet (8453) -> canonical router.
-    Base Sepolia (84532)  -> our isolated testnet router (testing branch).
+    Resolution now goes through network_config (Single Source of Truth):
+      Base mainnet (8453) -> canonical router.
+      Base Sepolia (84532)  -> our isolated testnet router (testing branch).
     """
-    if cid == 84532:
-        return UNISWAP_V2_ROUTER_SEPOLIA
-    return UNISWAP_V2_ROUTER
+    try:
+        from network_config import router_for
+        # map cid -> network name for the lookup
+        net = "base" if cid == 8453 else "base_sepolia"
+        return router_for(net)
+    except Exception:
+        # fallback to hard-coded constants if config unavailable
+        if cid == 84532:
+            return UNISWAP_V2_ROUTER_SEPOLIA
+        return UNISWAP_V2_ROUTER
 
 # Minimal ABI for swapExactETHForTokensSupportingFeeOnTransferTokens
 UNISWAP_V2_ROUTER_ABI_SWAP = [
@@ -923,6 +973,8 @@ async def swap_eth_for_token(
             raw = raw_bytes
 
         results = []
+        # HARD SAFETY INTERLOCK: never broadcast without the mainnet gate.
+        safety_interlock(cid)
         for ep in provider._endpoints:
             try:
                 session = aiohttp.ClientSession(
@@ -974,36 +1026,17 @@ async def send_proof_of_execution() -> str:
     Requires: VAULT_ADDRESS (resolved 0x, not a .eth name - raw RPC cannot
     resolve ENS), MICRO_TX_ETH optional, MAX_GAS_PRICE_GWEI optional cap.
     """
-    vault = os.environ.get("VAULT_ADDRESS", "").strip()
+    # Resolve vault + chain + RPC from network_config (Single Source of Truth)
+    from network_config import get_config, NETWORK_MAINNET
+    _cfg = get_config()
+    vault = _cfg.vault_address
     if not vault:
         raise RuntimeError("VAULT_ADDRESS not set; cannot send proof-of-execution")
-    if vault.lower().endswith(".eth"):
-        raise RuntimeError(
-            "VAULT_ADDRESS must be the resolved 0x address (raw RPC cannot "
-            "resolve ENS names). Resolve your .eth name to its address first."
-        )
+    chain_id = _cfg.chain_id
+    guard_rpcs = _cfg.rpc_urls
     micro_eth = float(os.environ.get("MICRO_TX_ETH", "0.00001"))
     value_wei = int(micro_eth * 1e18)
     cap = float(os.environ.get("MAX_GAS_PRICE_GWEI", "0") or "0") or None
-    # Proof-of-execution target chain follows ACTIVE_NETWORK:
-    #   base        -> 8453 (Base mainnet)
-    #   base_sepolia-> 84532 (Base Sepolia, default for live demos)
-    active = os.environ.get("ACTIVE_NETWORK", "base_sepolia").strip().lower()
-    if active == "base":
-        chain_id = 8453
-        guard_rpcs = _rotated_rpc_urls([
-            os.environ.get("BASE_RPC_1", ""),
-            os.environ.get("BASE_RPC_2", ""),
-            os.environ.get("BASE_RPC_3", ""),
-            os.environ.get("BASE_RPC_4", ""),
-        ])
-    else:
-        chain_id = 84532
-        guard_rpcs = _rotated_rpc_urls([
-            os.environ.get("BASE_SEPOLIA_RPC", ""),
-            os.environ.get("BASE_SEPOLIA_RPC_1", ""),
-            os.environ.get("BASE_SEPOLIA_RPC_2", ""),
-        ])
     # Smart-contract guard: a plain ETH transfer to a contract reverts on Base
     # (EIP-7611), burning gas for nothing. Abort safely before broadcasting.
     # Whitelisted EIP-7702 EOAs (e.g. operator wallet) are allowed and sent
@@ -1208,6 +1241,8 @@ async def swap_token_for_eth(
         ] if u]
         if not broadcast_urls:
             broadcast_urls = [e.url for e in provider._endpoints]
+        # HARD SAFETY INTERLOCK: never broadcast without the mainnet gate.
+        safety_interlock(cid)
         for url in broadcast_urls:
             try:
                 session = aiohttp.ClientSession(
