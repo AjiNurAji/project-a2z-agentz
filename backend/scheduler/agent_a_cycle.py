@@ -316,7 +316,7 @@ async def run_cycle() -> None:
             logger.info("TESTNET MODE: ingesting Factory-deployed token (no DexScreener/Farcaster API)")
             raw = _load_factory_token()
             # Step 2: wrap the CA + name in an LLM-generated OSINT narrative.
-            narrative = agent_a_inference.generate_testnet_narrative(
+            narrative = generate_testnet_narrative(
                 raw["contract_address"], raw.get("_factory_name", raw["token_name"]),
                 raw.get("_factory_ticker", raw["token_symbol"]),
             )

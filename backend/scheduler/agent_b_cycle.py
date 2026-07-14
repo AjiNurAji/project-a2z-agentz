@@ -387,6 +387,7 @@ async def process_task(task: dict[str, Any]) -> None:
   token_name = payload.get("token_name") or task.get("project_name") or "Unknown"
   contract_address = payload.get("contract_address") or task.get("target_address") or ""
   source = task.get("source") or "unknown"
+  _is_testnet = os.getenv("ACTIVE_NETWORK", "base").strip().lower() == "base_sepolia"
 
   # Bridge Agent A's enriched DexScreener signals AND its LLM verdict into
   # Agent B's prompt so the vault scores with full A2Z agent-to-agent context.
@@ -633,8 +634,13 @@ async def process_task(task: dict[str, Any]) -> None:
         )
         update_task_status(queue_id, "FAILED", retry=False)
         return
-    if score >= MAX_SCORE_FOR_AUTO:
+    if score >= MAX_SCORE_FOR_AUTO or _is_testnet:
         for _rpc_attempt in range(1, 4):  # up to 3 retries
+            if _is_testnet:
+                # In testnet sandbox we skip the RPC health gate (isolated,
+                # small fixed swaps) so execution doesn't hinge on flaky probes.
+                rpc_health = True
+                break
             rpc_health = await _rpc_health_ok(rpc_provider)
             if rpc_health:
                 break
@@ -644,7 +650,7 @@ async def process_task(task: dict[str, Any]) -> None:
             )
             await asyncio.sleep(_rpc_attempt * 3)
     print(f"DEBUG_EXEC: Score={score}, Amount={amount_usd}, Health={rpc_health}, Budget={daily_spend}")
-    if score >= MAX_SCORE_FOR_AUTO and rpc_health:
+    if (score >= MAX_SCORE_FOR_AUTO and rpc_health) or (_is_testnet and rpc_health):
         print("DEBUG_EXEC: Conditions met. Triggering send_native_transaction...")
     else:
         print(f"DEBUG_EXEC: Conditions FAILED. Score status: {score >= MAX_SCORE_FOR_AUTO}, Health status: {rpc_health}")

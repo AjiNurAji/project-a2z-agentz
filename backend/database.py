@@ -227,6 +227,14 @@ def insert_execution_log(
         RETURNING tx_hash_id;
     """
     with _get_cursor() as cur:
+        # Ensure the FK target exists (testnet tokens / new addresses may not
+        # be in target_addresses yet). Insert a minimal row if missing. Use a
+        # status value allowed by the target_addresses CHECK constraint.
+        cur.execute(
+            "INSERT INTO target_addresses (address, sentiment_score, status) "
+            "VALUES (%s, 0, 'active') ON CONFLICT (address) DO NOTHING;",
+            (addr,),
+        )
         cur.execute(insert_sql, (safe_hash, addr, amount, status_norm, queue_id, token_name, reason))
         inserted = cur.fetchone()
 
