@@ -854,19 +854,44 @@ async def get_holdings(request: Request):
             current_value = entry_value * (current_price / entry_price)
             pnl_usd = round(current_value - entry_value, 4)
 
+        # Normalize Postgres types that are not JSON-serializable by default
+        # (Decimal -> float, datetime -> isoformat string, bytes -> utf-8 str).
+        from decimal import Decimal as _Decimal
+        from datetime import datetime as _Dt, date as _Date
+
+        def _norm(v):
+            if isinstance(v, _Decimal):
+                return float(v)
+            if isinstance(v, (_Dt, _Date)):
+                return v.isoformat()
+            if isinstance(v, bytes):
+                return v.decode("utf-8", "replace")
+            return v
+
+        safe_token = {k: _norm(v) for k, v in token.items()}
+
         enriched.append({
-            **token,
+            **safe_token,
             "current_price_usd": current_price,
             "pnl_pct": pnl_pct,
             "pnl_usd": pnl_usd,
         })
+
+    def _default(o):
+        if isinstance(o, _Decimal):
+            return float(o)
+        if isinstance(o, (_Dt, _Date)):
+            return o.isoformat()
+        if isinstance(o, bytes):
+            return o.decode("utf-8", "replace")
+        raise TypeError(f"Object of type {o.__class__.__name__} is not JSON serializable")
 
     return JSONResponse({
         "holding": enriched,
         "sold": sold,
         "count_holding": len(held),
         "count_sold": len(sold),
-    })
+    }, default=_default)
 
 
 @require_auth
