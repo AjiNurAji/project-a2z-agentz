@@ -52,9 +52,8 @@ export function mapRawTxToTransaction(tx: RawTransaction): MappedTransaction {
 
   return {
     id: tx.tx_hash_id,
-    // Prefer the testnet Factory token_name (from synthesis_results), then
-    // fall back to project_name, then a generic label.
-    projectName: tx.token_name || tx.project_name || "On-Chain Target",
+    // Prefer project_name (from execution_logs), fall back to a generic label.
+    projectName: tx.project_name || "On-Chain Target",
     targetAddress: tx.project_target_address,
     amountUsd: tx.amount_usd,
     status,
