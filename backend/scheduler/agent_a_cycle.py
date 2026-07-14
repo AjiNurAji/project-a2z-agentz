@@ -253,22 +253,57 @@ def build_alpha_payload(token: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
+def _mock_testnet_tokens() -> list[dict[str, Any]]:
+    """STRICT MIRRORING (testnet): simulated OSINT output for base_sepolia.
+
+    Instead of hitting DexScreener/Farcaster mainnet APIs, we return our
+    self-deployed A2ZTestToken as a 'trending' pick so Agent B executes the
+    full buy/sell flow on Base Sepolia in complete isolation from mainnet.
+    """
+    import time as _t
+    token_addr = os.getenv("A2Z_TESTNET_TOKEN", "0x49D83283c527A36335a70D70fc11342F4427d162")
+    now_ms = int(_t.time() * 1000)
+    return [{
+        "token_name": "A2ZTestToken",
+        "token_symbol": "A2ZT",
+        "contract_address": token_addr,
+        "volume_24h": 25000.0,        # mock healthy volume
+        "price_change_24h": 42.0,     # mock pump
+        "market_cap": 500000,
+        "liquidity_usd": 80000.0,     # >$50K so it looks eligible
+        "fdv": 500000,
+        "pair_created_at": now_ms - 3600 * 1000,  # ~1h old
+        "pair_created_age_s": 3600,
+        "price_usd": 0.00006,
+        "txns_24h": {"h24": {"buys": 120, "sells": 30}},
+        "dex_id": "uniswap_v2_sepolia",
+        "chain": "base_sepolia",
+    }]
+
+
 async def run_cycle() -> None:
     from database import get_system_config
     if get_system_config("circuit_breaker", "active") == "paused":
         logger.info("Circuit breaker is paused. Agent A skipping cycle.")
         return
 
+    _is_testnet = os.getenv("ACTIVE_NETWORK", "base").strip().lower() == "base_sepolia"
+
     ensure_pipeline_tables()
     async with aiohttp.ClientSession() as session:
-        # Step 1: newly-created Base token addresses
-        addresses = await fetch_new_base_token_addresses(session, limit=BATCH_SIZE * 3)
-        if not addresses:
-            logger.info("Agent A: no new Base token profiles fetched")
-            return
+        if _is_testnet:
+            # === TESTNET MOCK OSINT FEEDER (no mainnet API calls) ===
+            logger.info("TESTNET MODE: using mock OSINT feeder (A2ZTestToken), skipping mainnet DexScreener/Farcaster")
+            tokens = _mock_testnet_tokens()
+        else:
+            # Step 1: newly-created Base token addresses
+            addresses = await fetch_new_base_token_addresses(session, limit=BATCH_SIZE * 3)
+            if not addresses:
+                logger.info("Agent A: no new Base token profiles fetched")
+                return
 
-        # Step 2: enrich with pair stats + apply Strict Alpha Filter
-        tokens = await fetch_base_pair_stats(session, addresses)
+            # Step 2: enrich with pair stats + apply Strict Alpha Filter
+            tokens = await fetch_base_pair_stats(session, addresses)
         if not tokens:
             logger.info("Agent A: no Base pairs passed the alpha filter")
             return
