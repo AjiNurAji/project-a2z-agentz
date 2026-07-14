@@ -76,3 +76,7 @@ chroma_db/
 .skill-archive/
 .worktrees/
 _archive_stale/
+
+# Chroma vector DB (local, not committed)
+.chroma_db/
+backend/.chroma_db/
