@@ -1,4 +1,7 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Default to a relative URL so Next.js rewrites (next.config.ts) proxy
+// /api/* to the Railway backend same-origin. Only use an absolute API_URL
+// when explicitly provided (e.g. local dev against a running backend).
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY || "";
 const JUDGE_TOKEN = process.env.NEXT_PUBLIC_JUDGE_TOKEN || "";
 

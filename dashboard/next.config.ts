@@ -10,6 +10,20 @@ const nextConfig: NextConfig = {
     "harold-occasion-qualities-plasma.trycloudflare.com",
     "harold-occasion-qualities-plasma.trycloudflare.com:3000",
   ],
+  // Proxy /api/* to the Railway backend so the dashboard can call backend
+  // routes (e.g. /api/holdings) same-origin without CORS or NEXT_PUBLIC_API_URL.
+  // Override target via NEXT_PUBLIC_API_URL at build time if needed.
+  async rewrites() {
+    const target =
+      process.env.NEXT_PUBLIC_API_URL ||
+      "https://project-a2z-agentz-production-dc3d.up.railway.app";
+    return [
+      {
+        source: "/api/:path*",
+        destination: `${target}/api/:path*`,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

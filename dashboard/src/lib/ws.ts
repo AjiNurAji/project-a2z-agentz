@@ -43,7 +43,9 @@ const INITIAL_BACKOFF_MS = 1000;
 const MAX_BACKOFF_MS = 30000;
 
 function buildWsUrl(): string {
-  const api = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const api =
+    process.env.NEXT_PUBLIC_API_URL ||
+    "https://project-a2z-agentz-production-dc3d.up.railway.app";
   const wsProto = api.startsWith("https") ? "wss" : "ws";
   const host = api.replace(/^https?:\/\//, "").replace(/\/$/, "");
   return `${wsProto}://${host}/ws`;
