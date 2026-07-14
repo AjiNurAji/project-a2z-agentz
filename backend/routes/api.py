@@ -880,22 +880,15 @@ async def get_holdings(request: Request):
     # Normalize the SOLD list too (same Postgres types).
     safe_sold = [{k: _norm(v) for k, v in t.items()} for t in sold]
 
-    def _default(o):
-        if isinstance(o, _Decimal):
-            return float(o)
-        if isinstance(o, (_Dt, _Date)):
-            return o.isoformat()
-        if isinstance(o, bytes):
-            return o.decode("utf-8", "replace")
-        raise TypeError(f"Object of type {o.__class__.__name__} is not JSON serializable")
-
     payload = {
         "holding": enriched,
         "sold": safe_sold,
         "count_holding": len(held),
         "count_sold": len(sold),
     }
-    return JSONResponse(json.dumps(payload, default=_default), media_type="application/json")
+    # All values are now JSON-native (float/str/int) thanks to _norm above,
+    # so Starlette can serialize the dict directly without a custom default.
+    return JSONResponse(payload)
 
 
 @require_auth
