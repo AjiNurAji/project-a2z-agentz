@@ -193,11 +193,27 @@ async def get_targets(request: Request):
 
 @require_auth
 async def get_transactions(request: Request):
-    """Returns list of execution logs / transaction history."""
+    """Returns list of execution logs / transaction history.
+
+    Includes Agent A's LLM narrative (reason) + Factory token_name so the
+    dashboard can display the AI's reasoning behind each trade.
+    """
     try:
         with database._get_cursor(dict_rows=True) as cur:
             cur.execute(
-                "SELECT tx_hash_id, project_target_address, amount_usd, status, created_at FROM execution_logs ORDER BY created_at DESC LIMIT 100"
+                """
+                SELECT
+                    tx_hash_id,
+                    project_target_address,
+                    amount_usd,
+                    status,
+                    created_at,
+                    COALESCE(token_name, '') AS token_name,
+                    COALESCE(reason, '')     AS reason
+                FROM execution_logs
+                ORDER BY created_at DESC
+                LIMIT 100
+                """
             )
             transactions = cur.fetchall()
         # Convert datetime to string for JSON serialization

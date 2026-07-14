@@ -516,7 +516,11 @@ async def process_task(task: dict[str, Any]) -> None:
             model_used = "hard_rule_bypass"
 
     reason = inference.get("reason") or agent_a_reason or ""
-    synthesis_id = insert_synthesis_result(queue_id, score, reason)
+    # Persist narrative + token identity so the UI (trade history) can show
+    # Agent A's LLM reasoning. In testnet, agent_a_reason carries the
+    # Factory token identity + LLM narrative.
+    _synthesis_token_name = (inference.get("token_name") or token_name or "")
+    synthesis_id = insert_synthesis_result(queue_id, score, reason, reason=reason, token_name=_synthesis_token_name)
     append_audit_log(
       "agent_b.synthesized",
       f"Synthesized score={score} for queue_id={queue_id}",
@@ -722,9 +726,14 @@ async def process_task(task: dict[str, Any]) -> None:
                     f"Real on-chain swap tx={tx_hash} amount_usd={amount_usd}",
                     {"proposal_id": proposal_id, "tx_hash": tx_hash, "network": _active},
                 )
-                # Also insert to execution_logs so /api/stats total_transactions updates
+                # Also insert to execution_logs so /api/stats total_transactions
+                # updates. Carry Agent A's LLM narrative + token name so the
+                # dashboard trade history can display the reasoning.
                 try:
-                    insert_execution_log(tx_hash, contract_address, amount_usd, "SUCCESS")
+                    insert_execution_log(
+                        tx_hash, contract_address, amount_usd, "SUCCESS",
+                        queue_id=queue_id, token_name=token_name, reason=reason,
+                    )
                 except Exception:
                     pass
                 # Track purchase for take-profit sell

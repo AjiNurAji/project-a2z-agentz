@@ -8,7 +8,8 @@ Environment:
 
 Schema contract (see database_schema.sql):
     target_addresses(address PK, sentiment_score, status, updated_at)
-    execution_logs(tx_hash_id PK, project_target_address, amount_usd, status, created_at)
+    execution_logs(tx_hash_id PK, project_target_address, amount_usd, status, created_at,
+                   queue_id INTEGER, token_name VARCHAR(255), reason TEXT)
 """
 
 from __future__ import annotations
@@ -188,11 +189,17 @@ def insert_execution_log(
     address: str,
     amount: float | int | str,
     status: str,
+    queue_id: int | None = None,
+    token_name: str = "",
+    reason: str = "",
 ) -> str:
     """
     Persist a transaction / approval-queue record to execution_logs.
     Returns the tx_hash_id that was actually inserted (or that already existed).
     Raises psycopg2.Error on real DB failure.
+
+    queue_id / token_name / reason let the dashboard show Agent A's LLM
+    narrative + the (testnet) Factory token identity behind each trade.
     """
     safe_hash = (tx_hash_id or "").strip()
     if not safe_hash:
@@ -202,20 +209,25 @@ def insert_execution_log(
     if not addr:
         raise ValueError("address must be a non-empty string")
 
-    status_norm = (status or "").strip().lower()
+    status_norm = (status or "").strip()
+    # NOTE: execution_logs.status CHECK constraint allows specific values
+    # (e.g. 'SUCCESS', 'FAILED') in UPPERCASE. Do NOT .lower() here or the
+    # insert will violate the constraint.
     if not status_norm:
         raise ValueError("status must be a non-empty string")
 
     insert_sql = """
         INSERT INTO execution_logs
-            (tx_hash_id, project_target_address, amount_usd, status)
+            (tx_hash_id, project_target_address, amount_usd, status, queue_id, token_name, reason)
         VALUES
-            (%s, %s, %s, %s)
-        ON CONFLICT (tx_hash_id) DO NOTHING
+            (%s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (tx_hash_id) DO UPDATE
+        SET token_name = EXCLUDED.token_name,
+            reason = EXCLUDED.reason
         RETURNING tx_hash_id;
     """
     with _get_cursor() as cur:
-        cur.execute(insert_sql, (safe_hash, addr, amount, status_norm))
+        cur.execute(insert_sql, (safe_hash, addr, amount, status_norm, queue_id, token_name, reason))
         inserted = cur.fetchone()
 
     if inserted:
@@ -484,6 +496,8 @@ def ensure_pipeline_tables() -> None:
      queue_id INTEGER NOT NULL UNIQUE,
      score INTEGER CHECK (score BETWEEN 0 AND 100),
      risk_flags TEXT,
+     reason TEXT,
+     token_name VARCHAR(255),
      synthesized_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
      );
      CREATE TABLE IF NOT EXISTS transaction_proposals (
@@ -547,6 +561,31 @@ def ensure_pipeline_tables() -> None:
                 )
             except psycopg2.Error as exc:
                 logger.warning("ensure_pipeline_tables: add created_at failed (benign): %s", exc)
+            # Migration: synthesis_results needs reason + token_name so the
+            # UI can display Agent A's LLM narrative / Factory token identity.
+            try:
+                cur.execute(
+                    "ALTER TABLE synthesis_results ADD COLUMN IF NOT EXISTS reason TEXT;"
+                )
+                cur.execute(
+                    "ALTER TABLE synthesis_results ADD COLUMN IF NOT EXISTS token_name VARCHAR(255);"
+                )
+            except psycopg2.Error as exc:
+                logger.warning("ensure_pipeline_tables: add synthesis_results cols failed (benign): %s", exc)
+            # Migration: execution_logs needs queue_id + token_name + reason so
+            # /api/transactions can return Agent A's narrative without a JOIN.
+            try:
+                cur.execute(
+                    "ALTER TABLE execution_logs ADD COLUMN IF NOT EXISTS queue_id INTEGER;"
+                )
+                cur.execute(
+                    "ALTER TABLE execution_logs ADD COLUMN IF NOT EXISTS token_name VARCHAR(255);"
+                )
+                cur.execute(
+                    "ALTER TABLE execution_logs ADD COLUMN IF NOT EXISTS reason TEXT;"
+                )
+            except psycopg2.Error as exc:
+                logger.warning("ensure_pipeline_tables: add execution_logs cols failed (benign): %s", exc)
     except psycopg2.Error as exc:
         if "duplicate key value violates unique constraint" in str(exc):
             logger.info('ensure_pipeline_tables race condition caught (tables already created)')
@@ -738,7 +777,7 @@ def update_task_status(task_id: int, status: str, retry: bool = False) -> bool:
         return False
 
 
-def insert_synthesis_result(queue_id: int, score: int, risk_flags: str) -> int | None:
+def insert_synthesis_result(queue_id: int, score: int, risk_flags: str, reason: str = "", token_name: str = "") -> int | None:
  """
  Insert or update a synthesis result for a queue item.
 
@@ -748,17 +787,19 @@ def insert_synthesis_result(queue_id: int, score: int, risk_flags: str) -> int |
  one the returned id still points to the same row.
  """
  query = """
- INSERT INTO synthesis_results (queue_id, score, risk_flags)
- VALUES (%s, %s, %s)
+ INSERT INTO synthesis_results (queue_id, score, risk_flags, reason, token_name)
+ VALUES (%s, %s, %s, %s, %s)
  ON CONFLICT (queue_id) DO UPDATE
  SET score = EXCLUDED.score,
  risk_flags = EXCLUDED.risk_flags,
+ reason = EXCLUDED.reason,
+ token_name = EXCLUDED.token_name,
  synthesized_at = CURRENT_TIMESTAMP
  RETURNING id;
  """
  try:
   with _get_cursor() as cur:
-   cur.execute(query, (queue_id, score, risk_flags))
+   cur.execute(query, (queue_id, score, risk_flags, reason, token_name))
    row = cur.fetchone()
    if row:
     return row[0] if isinstance(row, (tuple, list)) else row.get('id')
