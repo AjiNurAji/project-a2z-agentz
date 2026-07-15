@@ -389,7 +389,74 @@ async def process_task(task: dict[str, Any]) -> None:
   source = task.get("source") or "unknown"
   _is_testnet = os.getenv("ACTIVE_NETWORK", "base").strip().lower() == "base_sepolia"
 
-  # Bridge Agent A's enriched DexScreener signals AND its LLM verdict into
+  # --- Subscription plan gate (P4 enforcement) ---
+  # Determine the owning user's plan and enforce free-plan limits.
+  _owner_id = task.get("user_id") or 1
+  try:
+    _plan = database.get_user_plan(_owner_id)
+  except Exception:
+    _plan = "free"
+  _free_allow_real = os.getenv("FREE_PLAN_ALLOW_REAL_EXECUTION", "0") == "1"
+  _free_daily_cap = int(os.getenv("FREE_PLAN_DAILY_TRADE_CAP", "0") or "0")
+  _network_flag = "testnet" if _is_testnet else "mainnet"
+
+  # Admin bypass: user IDs listed in ADMIN_USER_IDS (comma-separated) are
+  # operators/owners. They bypass the plan gate entirely (real execution
+  # allowed even without an active paid plan). The operator accepts all risk.
+  _admin_ids_raw = os.getenv("ADMIN_USER_IDS", "")
+  _admin_ids: set[int] = set()
+  for _aid in _admin_ids_raw.split(","):
+    _aid = _aid.strip()
+    if _aid.isdigit():
+      _admin_ids.add(int(_aid))
+  _is_admin = _owner_id in _admin_ids
+
+  # Tier-0 (free) gate state, default = blocked.
+  _plan_blocked_real = False
+  _plan_blocked_cap = False
+  _paid = False
+  try:
+    _paid = bool(database.is_plan_active(_owner_id))
+  except Exception:
+    _paid = False
+
+  if _is_testnet:
+    # Testnet sandbox ALWAYS runs (free or paid) — it is the judge/demo surface.
+    pass
+  elif _is_admin:
+    # Operator/owner bypass: admin runs real execution regardless of plan.
+    # The operator explicitly accepts the EIP-7702 / execution risk.
+    logger.info(
+      "Plan gate: user %s is ADMIN -> bypassing plan gate (real execution allowed).",
+      _owner_id,
+    )
+  else:
+    # MAINNET gate:
+    # 1) Real execution is reserved for paid (active) plans. Free users may
+    #    only run in demo mode unless explicitly allowed via env override.
+    if not _paid and not _free_allow_real:
+      _plan_blocked_real = True
+    # 2) Free-plan daily trade cap (count of SUCCESS logs since UTC midnight).
+    if not _paid and _free_daily_cap > 0:
+      try:
+        _used = database.count_user_daily_trades(_owner_id, network=_network_flag)
+      except Exception:
+        _used = _free_daily_cap  # fail closed -> treat cap as hit
+      if _used >= _free_daily_cap:
+        _plan_blocked_cap = True
+
+  if _plan_blocked_real:
+    logger.info(
+      "Plan gate [HARD-BLOCK]: user %s plan='%s' (paid=%s) -> mainnet REAL execution DENIED (demo/sim only).",
+      _owner_id, _plan, _paid,
+    )
+  if _plan_blocked_cap:
+    logger.info(
+      "Plan gate [HARD-BLOCK]: user %s hit free daily trade cap (%d) -> further real trades DENIED on mainnet.",
+      _owner_id, _free_daily_cap,
+    )
+  # (Paid/Pro/Enterprise pass through; AGENT_B_REAL_EXECUTION still governs globally.)
+
   # Agent B's prompt so the vault scores with full A2Z agent-to-agent context.
   dex_context = ""
   agent_a_llm = payload.get("agent_a_llm")
@@ -656,6 +723,29 @@ async def process_task(task: dict[str, Any]) -> None:
         print(f"DEBUG_EXEC: Conditions FAILED. Score status: {score >= MAX_SCORE_FOR_AUTO}, Health status: {rpc_health}")
 
     if score >= MAX_SCORE_FOR_AUTO and rpc_health:
+        # ---- Plan gate (P4 HARD-BLOCK) ----
+        # If this is a mainnet run and the user's plan is NOT paid/active
+        # (free tier, expired, or never subscribed), DENY real on-chain
+        # execution absolutely. They only ever get demo/simulation output.
+        # Testnet sandbox is exempt (judge/demo surface, never real value).
+        _gate_denied = False
+        if not _is_testnet and (_plan_blocked_real or _plan_blocked_cap):
+            _gate_denied = True
+            logger.warning(
+                "Plan gate [HARD-BLOCK]: SKIPPING real execution for queue_id=%s "
+                "(user=%s, paid=%s, blocked_real=%s, blocked_cap=%s). "
+                "Falling back to demo/mock execution only.",
+                queue_id, _owner_id, _paid, _plan_blocked_real, _plan_blocked_cap,
+            )
+            append_audit_log(
+                "agent_b.plan_gate_denied",
+                "Real execution blocked by plan gate (free tier / cap hit)",
+                {
+                    "queue_id": queue_id, "user_id": _owner_id, "paid": _paid,
+                    "blocked_real": _plan_blocked_real, "blocked_cap": _plan_blocked_cap,
+                },
+            )
+
         # ---- Real on-chain execution (A2Z Agent B gatekeeper) ----
         # Gated by AGENT_B_REAL_EXECUTION so a demo never accidentally spends.
         # EXECUTION ENFORCEMENT: insert proposal but DON'T let a failed insert
@@ -673,7 +763,7 @@ async def process_task(task: dict[str, Any]) -> None:
             proposal_id = None
 
         try:
-            if os.getenv("AGENT_B_REAL_EXECUTION", "0") == "1":
+            if os.getenv("AGENT_B_REAL_EXECUTION", "0") == "1" and not _gate_denied:
                 _active = os.getenv("ACTIVE_NETWORK", "base")
                 if _active == "base_sepolia":
                     # --- Base Sepolia REAL SWAP (strict-mirroring testnet) ---
@@ -753,6 +843,7 @@ async def process_task(task: dict[str, Any]) -> None:
                     insert_execution_log(
                         tx_hash, contract_address, amount_usd, "SUCCESS",
                         queue_id=queue_id, token_name=token_name, reason=reason,
+                        user_id=_owner_id,
                     )
                 except Exception:
                     pass

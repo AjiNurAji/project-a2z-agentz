@@ -18,6 +18,7 @@ import hashlib
 import logging
 import os
 import threading
+from datetime import datetime
 from contextlib import contextmanager
 from typing import Iterator, Optional
 
@@ -193,6 +194,7 @@ def insert_execution_log(
     token_name: str = "",
     reason: str = "",
     network: str | None = None,
+    user_id: int | None = None,
 ) -> str:
     """Persist a transaction / approval-queue record to execution_logs.
 
@@ -224,13 +226,14 @@ def insert_execution_log(
 
     insert_sql = """
         INSERT INTO execution_logs
-            (tx_hash_id, project_target_address, amount_usd, status, queue_id, token_name, reason, network)
+            (tx_hash_id, project_target_address, amount_usd, status, queue_id, token_name, reason, network, user_id)
         VALUES
-            (%s, %s, %s, %s, %s, %s, %s, %s)
+            (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (tx_hash_id) DO UPDATE
         SET token_name = EXCLUDED.token_name,
             reason = EXCLUDED.reason,
-            network = EXCLUDED.network
+            network = EXCLUDED.network,
+            user_id = EXCLUDED.user_id
         RETURNING tx_hash_id;
     """
     with _get_cursor() as cur:
@@ -243,7 +246,7 @@ def insert_execution_log(
             "VALUES (%s, 0, 'active', %s) ON CONFLICT (address) DO NOTHING;",
             (addr, network),
         )
-        cur.execute(insert_sql, (safe_hash, addr, amount, status_norm, queue_id, token_name, reason, network))
+        cur.execute(insert_sql, (safe_hash, addr, amount, status_norm, queue_id, token_name, reason, network, user_id))
         inserted = cur.fetchone()
 
     if inserted:
@@ -467,6 +470,61 @@ def get_user_plan(user_id: int) -> str:
         logger.error("get_user_plan failed: %s", exc)
         return "free"
 
+
+def is_plan_active(user_id: int) -> bool:
+    """Return True if the user's paid plan (pro/enterprise) is currently
+    within its active window (plan_active_until is set AND in the future).
+
+    Free users, users with a NULL/empty plan_active_until, or an expired
+    window all return False. Used by the plan gate to deny real execution
+    to non-paying users on mainnet.
+    """
+    try:
+        with _get_cursor() as cur:
+            cur.execute(
+                "SELECT plan, plan_active_until FROM users WHERE id = %s LIMIT 1;",
+                (user_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                return False
+            _plan, _until = row[0], row[1]
+            # Free tier is never "active" for real-exec purposes.
+            if _plan in (None, "", "free"):
+                return False
+            if _until is None:
+                return False
+            # plan_active_until is a datetime; compare to server NOW().
+            return _until > datetime.utcnow()
+    except psycopg2.Error as exc:
+        logger.error("is_plan_active failed: %s", exc)
+        # Fail closed: if we cannot verify the plan is paid+active, deny.
+        return False
+
+
+def count_user_daily_trades(user_id: int, network: str = "mainnet") -> int:
+    """Count the number of SUCCESS execution_logs for a user since UTC midnight
+    today. Used to enforce the free-plan daily trade cap. Returns 0 on error
+    (fail closed -> cap is effectively hit, which is safe).
+    """
+    try:
+        with _get_cursor() as cur:
+            cur.execute(
+                """
+                SELECT COUNT(*) FROM execution_logs
+                WHERE user_id = %s
+                  AND UPPER(status) = 'SUCCESS'
+                  AND network = %s
+                  AND created_at >= date_trunc('day', CURRENT_TIMESTAMP AT TIME ZONE 'UTC');
+                """,
+                (user_id, network),
+            )
+            row = cur.fetchone()
+            return int(row[0]) if row else 0
+    except psycopg2.Error as exc:
+        logger.error("count_user_daily_trades failed: %s", exc)
+        return 0
+
 def update_last_login(user_id: int) -> None:
     query = "UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = %s;"
     try:
@@ -630,6 +688,11 @@ def ensure_pipeline_tables() -> None:
                 )
                 cur.execute(
                     "ALTER TABLE execution_logs ADD COLUMN IF NOT EXISTS reason TEXT;"
+                )
+                # Migration: execution_logs needs user_id so the free-plan
+                # daily trade cap can be enforced per user. Self-healing ALTER.
+                cur.execute(
+                    "ALTER TABLE execution_logs ADD COLUMN IF NOT EXISTS user_id INTEGER;"
                 )
             except psycopg2.Error as exc:
                 logger.warning("ensure_pipeline_tables: add execution_logs cols failed (benign): %s", exc)
@@ -990,4 +1053,61 @@ def mark_token_sold(token_address: str, sell_tx_hash: str) -> bool:
             return cur.rowcount > 0
     except psycopg2.Error as exc:
         logger.error("mark_token_sold failed: %s", exc)
+        return False
+
+
+def create_password_reset(email: str, code: str, expires_at) -> bool:
+    """Store a password-reset code (single-use, expires_at datetime)."""
+    query = """
+        INSERT INTO password_resets (email, code, expires_at)
+        VALUES (%s, %s, %s)
+        ON CONFLICT (email) DO UPDATE SET code = EXCLUDED.code,
+            expires_at = EXCLUDED.expires_at, used = FALSE, created_at = CURRENT_TIMESTAMP;
+    """
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (email, code, expires_at))
+            return True
+    except psycopg2.Error as exc:
+        logger.error("create_password_reset failed: %s", exc)
+        return False
+
+
+def verify_password_reset(email: str, code: str) -> bool:
+    """Return True if a valid (unused, unexpired) reset code exists."""
+    query = """
+        SELECT 1 FROM password_resets
+        WHERE email = %s AND code = %s AND used = FALSE AND expires_at > CURRENT_TIMESTAMP
+        LIMIT 1;
+    """
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (email, code))
+            return cur.fetchone() is not None
+    except psycopg2.Error as exc:
+        logger.error("verify_password_reset failed: %s", exc)
+        return False
+
+
+def consume_password_reset(email: str, code: str) -> bool:
+    """Mark a reset code as used (call after password updated)."""
+    query = "UPDATE password_resets SET used = TRUE WHERE email = %s AND code = %s;"
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (email, code))
+            return cur.rowcount > 0
+    except psycopg2.Error as exc:
+        logger.error("consume_password_reset failed: %s", exc)
+        return False
+
+
+def update_user_password(email: str, password_hash: str) -> bool:
+    """Set a new password hash for the user by email."""
+    query = "UPDATE users SET password_hash = %s WHERE email = %s;"
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (password_hash, email))
+            return cur.rowcount > 0
+    except psycopg2.Error as exc:
+        logger.error("update_user_password failed: %s", exc)
         return False

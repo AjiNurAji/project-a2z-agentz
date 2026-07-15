@@ -52,8 +52,12 @@ CREATE TABLE IF NOT EXISTS execution_logs (
                                               'FAILED',
                                               'REJECTED_BLACKLIST'
                                           )),
+    user_id                 INTEGER,
     created_at              TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX IF NOT EXISTS execution_logs_user_idx
+    ON execution_logs (user_id);
 
 -- ----------------------------------------------------------------------------
 -- Optimal Indexing
@@ -124,3 +128,14 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE INDEX IF NOT EXISTS users_email_idx ON users (email);
+
+CREATE TABLE IF NOT EXISTS password_resets (
+    email       VARCHAR(255)  NOT NULL,
+    code        VARCHAR(16)   NOT NULL,
+    expires_at  TIMESTAMP     NOT NULL,
+    used        BOOLEAN       NOT NULL DEFAULT FALSE,
+    created_at  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_password_resets PRIMARY KEY (email)
+);
+
+CREATE INDEX IF NOT EXISTS password_resets_email_idx ON password_resets (email);

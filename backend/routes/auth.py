@@ -1,9 +1,17 @@
 import sys
 import os
 import re
+import smtplib
+import ssl
+import secrets
+import logging
+from datetime import datetime, timedelta
+from email.message import EmailMessage
 from starlette.routing import Route
 from starlette.responses import JSONResponse
 from starlette.requests import Request
+
+logger = logging.getLogger("a2z.auth")
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 import database
@@ -13,6 +21,36 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from auth import hash_password, verify_password, create_access_token, verify_access_token
 
 API_KEY = os.getenv("API_KEY", "")
+
+RESET_CODE_TTL_MIN = int(os.getenv("RESET_CODE_TTL_MIN", "15"))
+SMTP_HOST = os.getenv("SMTP_HOST", "")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+SMTP_FROM = os.getenv("SMTP_FROM", SMTP_USER)
+
+
+def _send_email(to_addr: str, subject: str, body: str) -> bool:
+    """Send a plain-text email via configured SMTP. Returns True on success."""
+    if not SMTP_HOST or not SMTP_USER or not SMTP_PASSWORD:
+        logger.warning("SMTP not configured; skipping email to %s", to_addr)
+        return False
+    try:
+        msg = EmailMessage()
+        msg["From"] = SMTP_FROM
+        msg["To"] = to_addr
+        msg["Subject"] = subject
+        msg.set_content(body)
+        ctx = ssl.create_default_context()
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
+            server.starttls(context=ctx)
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.send_message(msg)
+        return True
+    except Exception as exc:
+        logger.error("send_email failed: %s", exc)
+        return False
+
 
 def validate_email(email):
     return re.match(r"[^@]+@[^@]+\.[^@]+", email)
@@ -142,9 +180,64 @@ async def logout(request: Request):
     )
     return response
 
+async def forgot_password(request: Request):
+    """Generate a 6-digit reset code and email it to the user."""
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+
+    email = data.get("email")
+    if not email or not validate_email(email):
+        return JSONResponse({"error": "Invalid email"}, status_code=422)
+
+    user = database.get_user_by_email(email)
+    if not user:
+        # Do not reveal whether the email exists (security).
+        return JSONResponse({"ok": True, "message": "If the email exists, a reset code was sent."})
+
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    expires_at = datetime.utcnow() + timedelta(minutes=RESET_CODE_TTL_MIN)
+    database.create_password_reset(email, code, expires_at)
+    _send_email(
+        email,
+        "A2Z Agentz — Password Reset Code",
+        f"Your password reset code is: {code}\n\nThis code expires in {RESET_CODE_TTL_MIN} minutes.\n"
+        f"If you did not request this, ignore this email.",
+    )
+    return JSONResponse({"ok": True, "message": "If the email exists, a reset code was sent."})
+
+
+async def reset_password(request: Request):
+    """Verify the reset code and set a new password."""
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+
+    email = data.get("email")
+    code = (data.get("code") or "").strip()
+    new_password = data.get("password")
+
+    if not email or not code or not new_password:
+        return JSONResponse({"error": "email, code, and password required"}, status_code=422)
+    if len(new_password) < 8:
+        return JSONResponse({"error": "Password must be at least 8 characters"}, status_code=422)
+    if not database.verify_password_reset(email, code):
+        return JSONResponse({"error": "Invalid or expired reset code"}, status_code=400)
+
+    hashed = hash_password(new_password)
+    if not database.update_user_password(email, hashed):
+        return JSONResponse({"error": "Failed to update password"}, status_code=500)
+    database.consume_password_reset(email, code)
+    return JSONResponse({"ok": True, "message": "Password updated. Please log in."})
+
+
 routes = [
     Route("/register", register, methods=["POST"]),
     Route("/login", login, methods=["POST"]),
     Route("/me", me, methods=["GET"]),
-    Route("/logout", logout, methods=["POST"])
+    Route("/logout", logout, methods=["POST"]),
+    Route("/forgot-password", forgot_password, methods=["POST"]),
+    Route("/reset-password", reset_password, methods=["POST"]),
 ]

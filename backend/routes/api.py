@@ -707,11 +707,22 @@ async def analyze_target(request: Request):
                 else:
                     tx_hash = _mock_execute_transaction(checksum, val_wei)
 
+                # Best-effort user_id for per-user daily trade cap accounting.
+                _uid = None
+                _auth = request.headers.get("Authorization", "")
+                if _auth.lower().startswith("bearer "):
+                    _pl = verify_access_token(_auth[7:].strip())
+                    if _pl and _pl.get("sub"):
+                        try:
+                            _uid = int(_pl["sub"])
+                        except Exception:
+                            _uid = None
                 database.insert_execution_log(
                     tx_hash_id=log_key,
                     address=checksum,
                     amount=ai_result["amount_usd"],
                     status="SUCCESS",
+                    user_id=_uid,
                 )
 
                 ai_message = _format_with_deepseek(
@@ -768,11 +779,22 @@ async def analyze_target(request: Request):
                     )
                 )
         else:
+            # Best-effort user_id for per-user daily trade cap accounting.
+            _uid = None
+            _auth = request.headers.get("Authorization", "")
+            if _auth.lower().startswith("bearer "):
+                _pl = verify_access_token(_auth[7:].strip())
+                if _pl and _pl.get("sub"):
+                    try:
+                        _uid = int(_pl["sub"])
+                    except Exception:
+                        _uid = None
             database.insert_execution_log(
                 tx_hash_id=log_key,
                 address=checksum,
                 amount=ai_result["amount_usd"],
                 status="PENDING_APPROVAL",
+                user_id=_uid,
             )
 
             ai_message = _format_with_deepseek(

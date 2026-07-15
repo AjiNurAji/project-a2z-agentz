@@ -82,11 +82,23 @@ RPC_ID = 1  # JSON-RPC id field
 # Operator-declared EOAs that are safe for direct native transfer even though
 # they carry bytecode (e.g. EIP-7702 delegated EOAs used to deploy contracts
 # like BaseTenfold, but which still receive/send ETH freely). These bypass the
-# smart-contract guard so Agent B executes without aborting. Operator-trusted.
-EOA_WHITELIST: set[str] = {
-    "0xd4714d22a338d932eec1fb38818d01ce361284dd",  # adityamlna.base.eth (EIP-7702, does NOT accept native ETH)
-    "0xd6d824fd3d19e46b5e2046955d13e9fd42db79d3",  # operator clean EOA (receives native ETH)
-}
+# smart-contract guard so Agent B executes without aborting.
+#
+# NOTE: no addresses are hardcoded here. All trusted EOAs (including the
+# operator's own EIP-7702 admin wallet) are supplied at runtime via the
+# ADMIN_WALLET_ADDRESSES env var and merged into this set below. Keep secrets
+# out of source — only configure them in .env (gitignored).
+EOA_WHITELIST: set[str] = set()
+
+# Admin wallet addresses loaded from env (comma-separated, lowercase-normalized).
+# Any address listed here is added to EOA_WHITELIST at import so admin wallets
+# are never blocked by the smart-contract guard, regardless of EIP-7702 status.
+# The operator accepts the EIP-7702 execution risk for these addresses.
+_ADMIN_WALLET_ENV = os.environ.get("ADMIN_WALLET_ADDRESSES", "")
+for _aw in _ADMIN_WALLET_ENV.split(","):
+    _aw = _aw.strip().lower()
+    if _aw:
+        EOA_WHITELIST.add(_aw)
 
 # ---------------------------------------------------------------------------
 # Errors

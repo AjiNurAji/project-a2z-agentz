@@ -88,6 +88,17 @@ factory-latest.json
 # Submission / local notes (not part of source)
 SUBMISSION_TEXT.md
 
+# Local planning / scratch .md docs (NEVER push to repo — local only)
+# Ignore ALL root-level .md except the official repo docs below.
+/*.md
+!README.md
+!memory.md
+!SUBMISSION.md
+AaaS_PLAN.md
+*_PLAN.md
+PLAN_*.md
+MEMORY_A2Z*.md
+
 # Secrets / sensitive patterns — defense in depth (never commit)
 *.env
 *.env.*
