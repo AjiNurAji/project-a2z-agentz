@@ -19,7 +19,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 import database
 from agent_a_chroma import check_semantic_similarity
 import web3_async as w3_async
-from web3_async import _rotated_rpc_urls
+from web3_async import _rotated_rpc_urls, verify_usdc_payment, USDC_BASE
 from eth_abi import encode as _encode, decode as _decode
 from eth_utils import to_checksum_address as _checksum
 
@@ -1041,6 +1041,91 @@ async def get_gpu_metrics(request: Request):
     return JSONResponse({"gpu": gpu, "available": True}, status_code=200)
 
 
+# ---------------------------------------------------------------------------
+# Subscription / Payment verification (P4: crypto-native, TxHash flow)
+# ---------------------------------------------------------------------------
+
+# Static plan catalog (business config — future: move to runtime config store).
+PLAN_PRICES_USDC = {
+    "free": 0.0,
+    "pro": 29.0,
+    "enterprise": 199.0,
+}
+PLAN_DURATION_DAYS = {
+    "free": 0,
+    "pro": 30,
+    "enterprise": 30,
+}
+PAYMENT_VAULT_ADDRESS = os.getenv("PAYMENT_VAULT_ADDRESS", "")
+
+
+async def verify_payment(request: Request):
+    """Verify a user-submitted USDC payment TxHash and activate the plan.
+
+    Body: {"user_id": int, "tx_hash": str, "plan": "pro"|"enterprise"}
+    Checks the tx receipt for a USDC Transfer to PAYMENT_VAULT_ADDRESS of the
+    correct amount, then activates the plan for 30 days.
+    """
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"ok": False, "error": "Invalid JSON"}, status_code=400)
+
+    user_id = data.get("user_id")
+    tx_hash = (data.get("tx_hash") or "").strip()
+    plan = (data.get("plan") or "").strip().lower()
+
+    if not user_id or not tx_hash or plan not in PLAN_PRICES_USDC:
+        return JSONResponse(
+            {"ok": False, "error": "user_id, tx_hash, and valid plan required"},
+            status_code=422,
+        )
+    if plan == "free":
+        return JSONResponse({"ok": False, "error": "free plan needs no payment"}, status_code=400)
+
+    if not PAYMENT_VAULT_ADDRESS:
+        return JSONResponse({"ok": False, "error": "PAYMENT_VAULT_ADDRESS not configured"}, status_code=500)
+
+    expected = PLAN_PRICES_USDC[plan]
+    # Resolve chain from active network (testnet -> sepolia USDC check skipped; mainnet only)
+    cid = int(os.getenv("BASE_CHAIN_ID", "8453"))
+    result = await verify_usdc_payment(
+        tx_hash, PAYMENT_VAULT_ADDRESS, expected, chain_id=cid
+    )
+    if not result.get("ok"):
+        return JSONResponse(
+            {"ok": False, "error": f"payment verification failed: {result.get('reason')}"},
+            status_code=402,
+        )
+
+    # Activate plan
+    from datetime import datetime, timedelta
+    active_until = datetime.utcnow() + timedelta(days=PLAN_DURATION_DAYS[plan])
+    ok = database.update_user_plan(user_id, plan, active_until, payment_ref=tx_hash)
+    if not ok:
+        return JSONResponse({"ok": False, "error": "failed to update user plan"}, status_code=500)
+
+    return JSONResponse({
+        "ok": True,
+        "plan": plan,
+        "plan_active_until": active_until.strftime("%Y-%m-%d %H:%M:%S"),
+        "amount_usdc": result.get("amount_usdc"),
+    })
+
+
+async def get_plans(request: Request):
+    """Return the public plan catalog (prices in USDC)."""
+    return JSONResponse({
+        "plans": [
+            {"id": "free", "name": "Free", "price_usdc": PLAN_PRICES_USDC["free"], "duration_days": 0},
+            {"id": "pro", "name": "Pro", "price_usdc": PLAN_PRICES_USDC["pro"], "duration_days": PLAN_DURATION_DAYS["pro"]},
+            {"id": "enterprise", "name": "Enterprise", "price_usdc": PLAN_PRICES_USDC["enterprise"], "duration_days": PLAN_DURATION_DAYS["enterprise"]},
+        ],
+        "payment_vault_address": PAYMENT_VAULT_ADDRESS,
+        "usdc_address": USDC_BASE,
+    })
+
+
 routes = [
     Route("/health", health, methods=["GET"]),
     Route("/stats", get_stats, methods=["GET"]),
@@ -1051,5 +1136,7 @@ routes = [
     Route("/gpu-metrics", get_gpu_metrics, methods=["GET"]),
     Route("/analyze", analyze_target, methods=["POST"]),
     Route("/status", get_execution_status, methods=["GET"]),
+    Route("/plans", get_plans, methods=["GET"]),
+    Route("/verify-payment", verify_payment, methods=["POST"]),
     Route("/holdings", get_holdings, methods=["GET"]),
 ]

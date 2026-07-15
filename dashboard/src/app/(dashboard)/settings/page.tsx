@@ -2,8 +2,9 @@
 
 import { motion } from "motion/react";
 import SettingsPanel from "@/components/SettingsPanel";
+import SubscriptionPanel from "@/components/SubscriptionPanel";
 import PageHeader from "@/components/PageHeader";
-import { Settings } from "lucide-react";
+import { Settings, CreditCard } from "lucide-react";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -35,6 +36,9 @@ export default function SettingsPage() {
       </motion.div>
       <motion.div variants={itemVariants}>
         <SettingsPanel />
+      </motion.div>
+      <motion.div variants={itemVariants}>
+        <SubscriptionPanel />
       </motion.div>
     </motion.div>
   );

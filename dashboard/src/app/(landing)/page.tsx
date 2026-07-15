@@ -89,7 +89,7 @@ function LandingContent() {
             {/* Tagline */}
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] md:text-[11px] font-mono text-[var(--color-fg-cyan)] border backdrop-blur-sm" style={{ background: "color-mix(in srgb, var(--color-fg-cyan) 10%, transparent)", borderColor: "color-mix(in srgb, var(--color-fg-cyan) 20%, transparent)" }}>
               <Cpu className="w-3.5 h-3.5" />
-              <span>AMD Hackathon ACT II Participant</span>
+              <span>A2Z Agentz — Autonomous Agent-as-a-Service</span>
             </div>
 
             {/* Hero Heading */}
@@ -103,7 +103,7 @@ function LandingContent() {
 
             {/* Description */}
             <p className="text-sm md:text-base text-[var(--color-body-subtle)] max-w-xl leading-relaxed">
-              Unlock hands-free multi-agent yields. Agent A scans Web3 airdrops on Farcaster & social networks, scoring sentiment via AMD Instinct™ MI300X. Agent B validates and triggers atomic executions securely on Base L2.
+              Unlock hands-free multi-agent yields. Agent A scans Web3 opportunities across social and on-chain signals, scoring conviction with GPU-accelerated AI inference. Agent B validates and triggers atomic executions securely on Base L2.
             </p>
 
             {/* Call to Actions */}
@@ -144,7 +144,7 @@ function LandingContent() {
                 </div>
                 <h3 className="text-sm font-semibold text-[var(--color-heading)]">OSINT Sentiment Parser</h3>
                 <p className="text-[11px] text-[var(--color-body-subtle)] leading-relaxed">
-                  Scrapes Neynar, Farcaster, and Base explorers. Runs AIM-tuned hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4 on vLLM to analyze sentiment score. Trigger at score {'>'} 85.
+                  Scrapes Neynar, Farcaster, and Base explorers. Runs hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4 on vLLM to analyze sentiment and conviction. Trigger at score {'>'} 85.
                 </p>
               </div>
 
@@ -221,7 +221,7 @@ function LandingContent() {
                 {/* HUD Overlay Elements - Top Right */}
                 <div className="absolute top-3 right-4 font-mono text-[8px] md:text-[9px] text-[var(--color-fg-brand)]/70 tracking-wider text-right flex flex-col gap-0.5">
                   <span>NETWORK: BASE_MAINNET_SYNC</span>
-                  <span>ROUTING: AMD_AIM_INSTINCT</span>
+                  <span>ROUTING: AIM_INSTINCT_ENGINE</span>
                 </div>
 
                 {/* Interactive labels matching robot position in the GIF */}
@@ -268,7 +268,13 @@ function LandingContent() {
       {/* Tech Stack / Bottom Footer */}
       <footer className="relative z-20 w-full py-6 md:py-8 border-t border-[var(--color-border-default)] backdrop-blur-md px-4 md:px-6 flex flex-col lg:flex-row gap-5 lg:gap-6 items-center justify-between text-[10px] md:text-xs" style={{ background: "color-mix(in srgb, var(--color-surface) 40%, transparent)" }}>
         <div className="text-[var(--color-body-subtle)] font-mono text-center lg:text-left w-full lg:w-auto">
-          Powered by <br className="md:hidden" /> <span className="text-[var(--color-heading)] font-semibold">AMD Instinct™ MI300X</span> &amp; <span className="text-[var(--color-heading)] font-semibold">Base L2</span>
+          Powered by <br className="md:hidden" /> <span className="text-[var(--color-heading)] font-semibold">AMD Instinct MI300X</span> &amp; <span className="text-[var(--color-heading)] font-semibold">Base L2</span> — production-grade autonomous execution.
+        </div>
+
+        {/* Contact */}
+        <div className="flex flex-col items-center lg:items-end gap-1 text-[var(--color-body-subtle)]">
+          <span>Support: <a href="mailto:archbusins@gmail.com" className="text-[var(--color-fg-cyan)] font-semibold">archbusins@gmail.com</a></span>
+          <span>Web: <a href="https://archbusins.web.id" target="_blank" rel="noopener noreferrer" className="text-[var(--color-fg-cyan)] font-semibold">archbusins.web.id</a></span>
         </div>
 
         {/* Tech StackBadges */}

@@ -418,7 +418,7 @@ def get_user_by_email(email: str) -> dict:
     return None
 
 def get_user_by_id(user_id: int) -> dict:
-    query = "SELECT id, email, wallet_address, created_at, last_login_at FROM users WHERE id = %s LIMIT 1;"
+    query = "SELECT id, email, wallet_address, plan, plan_active_until, payment_ref, created_at, last_login_at FROM users WHERE id = %s LIMIT 1;"
     try:
         with _get_cursor() as cur:
             cur.execute(query, (user_id,))
@@ -428,13 +428,44 @@ def get_user_by_id(user_id: int) -> dict:
                     'id': row[0],
                     'email': row[1],
                     'wallet_address': row[2],
-                    'created_at': row[3].strftime('%Y-%m-%d %H:%M:%S') if row[3] else None,
-                    'last_login_at': row[4].strftime('%Y-%m-%d %H:%M:%S') if row[4] else None
+                    'plan': row[3],
+                    'plan_active_until': row[4].strftime('%Y-%m-%d %H:%M:%S') if row[4] else None,
+                    'payment_ref': row[5],
+                    'created_at': row[6].strftime('%Y-%m-%d %H:%M:%S') if row[6] else None,
+                    'last_login_at': row[7].strftime('%Y-%m-%d %H:%M:%S') if row[7] else None
                 }
     except psycopg2.Error as exc:
         logger.error("get_user_by_id failed: %s", exc)
         return None
     return None
+
+
+def update_user_plan(user_id: int, plan: str, plan_active_until, payment_ref: str | None = None) -> bool:
+    """Activate a subscription plan for a user. plan_active_until is a
+    datetime (or None). Returns True on success."""
+    query = """
+        UPDATE users SET plan = %s, plan_active_until = %s, payment_ref = %s
+        WHERE id = %s;
+    """
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (plan, plan_active_until, payment_ref, user_id))
+            return cur.rowcount > 0
+    except psycopg2.Error as exc:
+        logger.error("update_user_plan failed: %s", exc)
+        return False
+
+
+def get_user_plan(user_id: int) -> str:
+    """Return the user's current plan string (default 'free')."""
+    try:
+        with _get_cursor() as cur:
+            cur.execute("SELECT plan FROM users WHERE id = %s LIMIT 1;", (user_id,))
+            row = cur.fetchone()
+            return row[0] if row else "free"
+    except psycopg2.Error as exc:
+        logger.error("get_user_plan failed: %s", exc)
+        return "free"
 
 def update_last_login(user_id: int) -> None:
     query = "UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = %s;"

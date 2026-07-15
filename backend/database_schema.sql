@@ -113,6 +113,9 @@ CREATE TABLE IF NOT EXISTS users (
     email           VARCHAR(255)  UNIQUE NOT NULL,
     password_hash   TEXT          NOT NULL,
     wallet_address  VARCHAR(42),
+    plan            VARCHAR(32)   NOT NULL DEFAULT 'free',
+    plan_active_until TIMESTAMP,
+    payment_ref     VARCHAR(128),
     created_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_login_at   TIMESTAMP,
     CONSTRAINT chk_wallet CHECK (

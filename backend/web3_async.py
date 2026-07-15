@@ -826,6 +826,83 @@ async def get_swap_output_amount(tx_hash: str, rpc_urls: list, cid: int) -> int 
         if prov is not None:
             await prov.close()
 
+
+# ERC20 Transfer event: topic0 = keccak256("Transfer(address,address,uint256)")
+ERC20_TRANSFER_TOPIC = "0xddf252ad1be2c89b069fc7590675206a29ccb2e9bbf1b9999a4c3d6f9e0e6b6f"
+# USDC on Base mainnet (native Circle issuance)
+USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+
+
+async def verify_usdc_payment(
+    tx_hash: str,
+    expected_to: str,
+    expected_amount_usdc: float,
+    *,
+    chain_id: int | None = None,
+    rpc_urls: list | None = None,
+    tolerance_usdc: float = 0.01,
+) -> dict:
+    """Verify a USDC payment by inspecting the tx receipt's ERC20 Transfer logs.
+
+    Returns:
+        {"ok": True, "amount_usdc": <float>, "from": <addr>, "to": <addr>}
+        {"ok": False, "reason": <str>}
+
+    The expected ERC20 contract is USDC_BASE. We look for a Transfer whose
+    `to` matches ``expected_to`` (our payment vault) and whose value equals
+    ``expected_amount_usdc`` within ``tolerance_usdc``.
+    """
+    if not tx_hash:
+        return {"ok": False, "reason": "missing tx_hash"}
+    cid = chain_id or BASE_CHAIN_ID
+    if rpc_urls is None:
+        rpc_urls = (
+            _rotated_rpc_urls([
+                os.environ.get("BASE_RPC_1", ""), os.environ.get("BASE_RPC_2", ""),
+                os.environ.get("BASE_RPC_3", ""), os.environ.get("BASE_RPC_4", ""),
+            ])
+            if cid != 84532 else
+            _rotated_rpc_urls([
+                os.environ.get("BASE_SEPOLIA_RPC_1", ""), os.environ.get("BASE_SEPOLIA_RPC", ""),
+            ])
+        )
+    if not rpc_urls:
+        return {"ok": False, "reason": "no RPC configured"}
+    prov = None
+    try:
+        prov = MultiRpcProvider(rpc_urls=rpc_urls, chain_id=cid)
+        rec = await prov.call("eth_getTransactionReceipt", [tx_hash])
+        if not rec or "logs" not in rec:
+            return {"ok": False, "reason": "receipt not found"}
+        to_addr = _to_checksum(expected_to)
+        for log in rec.get("logs", []):
+            topics = log.get("topics", [])
+            if not topics or topics[0].lower() != ERC20_TRANSFER_TOPIC.lower():
+                continue
+            # Transfer(address indexed from, address indexed to, uint256 value)
+            if len(topics) < 3:
+                continue
+            # log address is the token contract
+            token = (log.get("address") or "").lower()
+            if token != USDC_BASE.lower():
+                continue
+            from_addr = _to_checksum("0x" + topics[1][26:])
+            recv_addr = _to_checksum("0x" + topics[2][26:])
+            value_hex = (log.get("data") or "0x")[2:]
+            if len(value_hex) < 64:
+                continue
+            amount_raw = int(value_hex[:64], 16)
+            amount_usdc = amount_raw / 1e6  # USDC has 6 decimals
+            if recv_addr.lower() == to_addr.lower() and abs(amount_usdc - expected_amount_usdc) <= tolerance_usdc:
+                return {"ok": True, "amount_usdc": amount_usdc, "from": from_addr, "to": recv_addr}
+        return {"ok": False, "reason": "no matching USDC transfer to payment vault"}
+    except Exception as exc:
+        logger.warning("verify_usdc_payment failed for %s: %s", tx_hash, exc)
+        return {"ok": False, "reason": str(exc)}
+    finally:
+        if prov is not None:
+            await prov.close()
+
 # Minimal ABI for swapExactETHForTokensSupportingFeeOnTransferTokens
 UNISWAP_V2_ROUTER_ABI_SWAP = [
     {

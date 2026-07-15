@@ -1,11 +1,15 @@
-# A2Z Agentz — AMD MI300X-Powered Autonomous Web3 Scavenger
+# A2Z Agentz — Autonomous Agent-as-a-Service (AaaS)
 
-**AMD Instinct™ MI300X GPU + ROCm + vLLM** drives all LLM inference for this autonomous
-agent-to-agent (A2A) Web3 trading engine. Discovers tokens on **Base Network** via DexScreener,
-scores them with data-driven AI on **AMD silicon**, validates with **GoPlus** security, and executes
-**DEX swaps** via **Uniswap V2** — fully autonomous, end-to-end.
+A2Z Agentz is a **production-grade, multi-agent platform** that autonomously
+discovers Web3 opportunities on **Base Network**, scores them with data-driven
+AI, validates them through security gates, and executes **DEX swaps** end-to-end
+— no human in the loop. A2Z Agentz ships as a managed **Agent-as-a-Service**:
+point it at a network, configure your risk policy, and the agent fleet runs
+continuous discovery, execution, and profit-taking on your behalf.
 
-Built for **Track 3: Unicorn (Open Innovation)** of the AMD Developer Hackathon.
+All LLM inference is served from a dedicated **AMD Instinct™ MI300X** GPU via
+**ROCm + vLLM**, keeping the entire AI brain on AMD silicon for verifiable,
+cost-efficient inference at scale.
 
 ---
 
@@ -13,7 +17,7 @@ Built for **Track 3: Unicorn (Open Innovation)** of the AMD Developer Hackathon.
 
 ```
 ┌──────────────────────────────────────────────────┐      ┌──────────────────────────────────────────┐
-│  HOUSE A — SCOUT (AMD MI300X)                    │      │  HOUSE B — VAULT (Base On-Chain)           │
+│  HOUSE A — SCOUT (Inference Engine)               │      │  HOUSE B — VAULT (Base On-Chain)           │
 │                                                  │      │                                           │
 │  • DexScreener scraper (Base tokens)             │ ───▶ │  • GoPlus security gate (honeypot/tax)    │
 │  • Data-driven LLM scoring (liquidity/vol/age)   │      │  • Uniswap V2 DEX swap (ETH→token buy)     │
@@ -32,8 +36,8 @@ Built for **Track 3: Unicorn (Open Innovation)** of the AMD Developer Hackathon.
   - 24h Volume >$100K → +15 (active community), <$1K → -10 (dead)
   - Pair age >7 days → +10, <1 hour → -15 (honeypot risk)
   - Scam/rug/honeypot keywords → cap score at 20
-- Inference on **AMD Instinct™ MI300X** via ROCm + vLLM with `Llama-3.1-8B-Instruct-AWQ-INT4`.
-- Score ≥60 → eligible for execution. Score ≥85 + strong liquidity → full $2.00.
+- Inference served from **AMD Instinct™ MI300X** via ROCm + vLLM with `Llama-3.1-8B-Instruct-AWQ-INT4`.
+- Score ≥60 → eligible for execution. Score ≥85 + strong liquidity → full $2.00 budget.
 
 ### House B — Vault (DEX Swaps + Security)
 - **GoPlus Security Gate**: blocks tokens with honeypot, tax >10%, hidden owner risks.
@@ -44,9 +48,10 @@ Built for **Track 3: Unicorn (Open Innovation)** of the AMD Developer Hackathon.
 
 ---
 
-## AMD Compute Requirement
+## Infrastructure & Compute
 
-All Agent A inference runs on **AMD Instinct™ GPUs** via ROCm + vLLM.
+A2Z Agentz is built on a split architecture: an inference engine (AMD GPU) and a
+command-center security gatekeeper (VPS), connected over a secure tunnel.
 
 | Layer | Technology |
 |---|---|
@@ -56,12 +61,12 @@ All Agent A inference runs on **AMD Instinct™ GPUs** via ROCm + vLLM.
 | Tunnel | Cloudflare Quick Tunnel → `*.trycloudflare.com` |
 | Model | `hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4` |
 
-### AMD Compute Verification
+### Compute Verification
 
 All Agent A inference is verifiable through backend logs:
 ```
-[AMD MI300X COMPUTE] Executing payload to ROCm vLLM endpoint=... model=Llama-3.1-8B-AWQ
-[AMD MI300X COMPUTE] vLLM returned | model=... latency=XXXms score=YY
+[INFERENCE] Executing payload to ROCm vLLM endpoint=... model=Llama-3.1-8B-AWQ
+[INFERENCE] vLLM returned | model=... latency=XXXms score=YY
 ```
 
 **Live Execution Proof** (Base mainnet):
@@ -115,6 +120,19 @@ docker compose up --build
 ```
 
 Required env: `POSTGRES_PASSWORD`, `JWT_SECRET`, `API_KEY`, `AI_ENDPOINT`, `AI_API_KEY`, `AGENT_B_ENDPOINT`, `AGENT_B_API_KEY`, `BASE_RPC_1/2/3`, `PRIVATE_KEY`, `VAULT_ADDRESS`, `AGENT_B_REAL_EXECUTION`.
+
+### Network Modes (Dual-Home)
+A2Z Agentz runs isolated mainnet/testnet environments via a single `ACTIVE_NETWORK`
+switch (`base` | `base_sepolia`). Each mode resolves its own RPC, router, vault, and
+database segregation (`network` column) — flip the switch to move the agent fleet
+between production and testnet without code changes.
+
+---
+
+## Contact & Support
+
+- **Support Email:** [archbusins@gmail.com](mailto:archbusins@gmail.com)
+- **Website:** [archbusins.web.id](https://archbusins.web.id)
 
 ---
 
