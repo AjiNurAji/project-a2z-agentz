@@ -214,9 +214,17 @@ async def forgot_password(request: Request):
     database.create_password_reset(email, code, expires_at)
     _send_email(
         email,
-        "A2Z Agentz — Password Reset Code",
-        f"Your password reset code is: {code}\n\nThis code expires in {RESET_CODE_TTL_MIN} minutes.\n"
-        f"If you did not request this, ignore this email.",
+        "A2Z Agentz — Your Password Reset Code",
+        f"Hello,\n\n"
+        f"We received a request to reset your A2Z Agentz password.\n\n"
+        f"Your 6-digit verification code is:\n\n"
+        f"    {code}\n\n"
+        f"This code is valid for {RESET_CODE_TTL_MIN} minutes "
+        f"(until {expires_at.strftime('%Y-%m-%d %H:%M UTC')}).\n\n"
+        f"Enter this code on the password reset page to choose a new password.\n\n"
+        f"If you did not request this, you can safely ignore this email "
+        f"— your password will not change.\n\n"
+        f"– The A2Z Agentz Team",
     )
     return JSONResponse({"ok": True, "message": "If the email exists, a reset code was sent."})
 
