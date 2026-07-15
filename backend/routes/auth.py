@@ -191,6 +191,19 @@ async def forgot_password(request: Request):
     if not email or not validate_email(email):
         return JSONResponse({"error": "Invalid email"}, status_code=422)
 
+    # Rate limit: prevent reset-code spam / enumeration abuse. A new code may
+    # only be requested once per RESET_RATE_LIMIT_SEC per email address.
+    RESET_RATE_LIMIT_SEC = int(os.getenv("RESET_RATE_LIMIT_SEC", "60"))
+    recent = database.get_recent_password_reset(email)
+    if recent is not None:
+        elapsed = (datetime.utcnow() - recent).total_seconds()
+        if elapsed < RESET_RATE_LIMIT_SEC:
+            wait = int(RESET_RATE_LIMIT_SEC - elapsed)
+            return JSONResponse(
+                {"error": f"Please wait {wait}s before requesting another code."},
+                status_code=429,
+            )
+
     user = database.get_user_by_email(email)
     if not user:
         # Do not reveal whether the email exists (security).

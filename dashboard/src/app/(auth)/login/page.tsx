@@ -196,12 +196,13 @@ export default function LoginPage() {
               />
               Remember me
             </label>
-            <span
-              className="cursor-pointer hover:underline"
+            <Link
+              href="/forgot-password"
+              className="hover:underline"
               style={{ color: "var(--color-fg-brand)" }}
             >
               Forgot password?
-            </span>
+            </Link>
           </div>
 
           {/* Submit */}

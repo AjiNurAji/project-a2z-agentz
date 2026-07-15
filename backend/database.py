@@ -1104,6 +1104,21 @@ def create_password_reset(email: str, code: str, expires_at) -> bool:
         return False
 
 
+def get_recent_password_reset(email: str):
+    """Return the created_at timestamp of the most recent reset request for
+    this email, or None if there is no prior request. Used for rate-limiting
+    repeat forgot-password calls (anti-spam / anti-enumeration)."""
+    query = "SELECT created_at FROM password_resets WHERE email = %s ORDER BY created_at DESC LIMIT 1;"
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (email,))
+            row = cur.fetchone()
+            return row[0] if row else None
+    except psycopg2.Error as exc:
+        logger.error("get_recent_password_reset failed: %s", exc)
+        return None
+
+
 def verify_password_reset(email: str, code: str) -> bool:
     """Return True if a valid (unused, unexpired) reset code exists."""
     query = """
