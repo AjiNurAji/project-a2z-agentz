@@ -696,6 +696,37 @@ def ensure_pipeline_tables() -> None:
                 )
             except psycopg2.Error as exc:
                 logger.warning("ensure_pipeline_tables: add execution_logs cols failed (benign): %s", exc)
+
+            # Migration: P4 subscription gate needs users.plan /
+            # plan_active_until / payment_ref. Self-healing ALTERs.
+            try:
+                cur.execute(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS plan VARCHAR(32) NOT NULL DEFAULT 'free';"
+                )
+                cur.execute(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_active_until TIMESTAMP;"
+                )
+                cur.execute(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS payment_ref VARCHAR(255);"
+                )
+            except psycopg2.Error as exc:
+                logger.warning("ensure_pipeline_tables: add users plan cols failed (benign): %s", exc)
+
+            # Migration: P4 password-reset flow needs the password_resets table.
+            try:
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS password_resets (
+                        email VARCHAR(255) NOT NULL PRIMARY KEY,
+                        code VARCHAR(16) NOT NULL,
+                        expires_at TIMESTAMP NOT NULL,
+                        used BOOLEAN NOT NULL DEFAULT FALSE,
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    );
+                    """
+                )
+            except psycopg2.Error as exc:
+                logger.warning("ensure_pipeline_tables: create password_resets failed (benign): %s", exc)
     except psycopg2.Error as exc:
         if "duplicate key value violates unique constraint" in str(exc):
             logger.info('ensure_pipeline_tables race condition caught (tables already created)')
