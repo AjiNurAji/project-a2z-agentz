@@ -282,11 +282,11 @@ async def circuit_breaker(request: Request):
 def _fetch_gpu_metrics() -> dict | None:
     """Scrape live AMD GPU metrics from the vLLM /metrics endpoint (Agent A brain).
 
-    AI_ENDPOINT is e.g. https://tunnel/v1 -> metrics live at https://tunnel/metrics.
+    AGENT_A_ENDPOINT is e.g. https://tunnel/v1 -> metrics live at https://tunnel/metrics.
     Parses the Prometheus exposition format for the fields the dashboard shows.
-    Returns None if AI_ENDPOINT is unset or the metrics endpoint is unreachable.
+    Returns None if AGENT_A_ENDPOINT is unset or the metrics endpoint is unreachable.
     """
-    endpoint = os.getenv("AI_ENDPOINT", "").strip().rstrip("/")
+    endpoint = os.getenv("AGENT_A_ENDPOINT", "").strip().rstrip("/")
     if not endpoint:
         return None
     # https://tunnel/v1 -> https://tunnel ; then /metrics
@@ -376,7 +376,7 @@ async def get_system_status(request: Request):
     except Exception:
         body["circuit_breaker"] = "unknown"
     try:
-        ep = os.getenv("AI_ENDPOINT", "").rstrip("/")
+        ep = os.getenv("AGENT_A_ENDPOINT", "").rstrip("/")
         if not ep:
             ep = os.getenv("AGENT_B_ENDPOINT", "").rstrip("/")
         body["ai_endpoint"] = ep
