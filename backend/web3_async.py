@@ -1244,6 +1244,40 @@ async def send_proof_of_execution() -> str:
     )
 
 
+async def collect_platform_fee(amount_out_wei: int, chain_id: int | None = None) -> str | None:
+    """P1: skim the platform fee (PLATFORM_FEE_BPS) from realized ETH proceeds
+    and route it to ADMIN_VAULT_ADDRESS.
+
+    Guardrails (fail-safe, never broadcasts unless all conditions hold):
+      * AGENT_B_DRY_RUN=1            -> skip (demo / no real broadcast)
+      * PLATFORM_FEE_BPS unset/0     -> skip (fee disabled)
+      * ADMIN_VAULT_ADDRESS missing  -> skip (no destination configured)
+      * amount_out_wei <= 0          -> skip (nothing to skim)
+      * fee_wei computed > proceeds  -> clamped to proceeds (never over-charge)
+
+    Returns the fee tx hash, or None when skipped / failed. Never raises to the
+    caller (fee failure must not abort the user's sell).
+    """
+    try:
+        _dry = os.getenv("AGENT_B_DRY_RUN", "0") in ("1", "true", "True")
+        _bps = int(os.getenv("PLATFORM_FEE_BPS", "0") or "0")
+        _vault = os.getenv("ADMIN_VAULT_ADDRESS")
+        if _dry or _bps <= 0 or not _vault or amount_out_wei <= 0:
+            return None
+        _fee = amount_out_wei * _bps // 10_000
+        if _fee <= 0:
+            return None
+        _fee = min(_fee, amount_out_wei)  # never exceed proceeds
+        _cid = chain_id or BASE_CHAIN_ID
+        _tx = await send_native_transaction(_to_checksum(_vault), _fee, chain_id=_cid)
+        logger.info("PLATFORM FEE collected: %d wei (%.4f%%) -> %s tx=%s",
+                    _fee, _bps / 100.0, _vault, _tx)
+        return _tx
+    except Exception as exc:
+        logger.error("collect_platform_fee failed: %s", exc)
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Agent B Sell Side — swap token -> ETH (take-profit exit)
 # ---------------------------------------------------------------------------
