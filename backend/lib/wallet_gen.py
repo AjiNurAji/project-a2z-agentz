@@ -30,10 +30,8 @@ def _get_enc_secret() -> bytes | None:
     """Return the 32-byte WALLET_ENC_SECRET, or None if not configured."""
     raw = os.getenv("WALLET_ENC_SECRET")
     if not raw:
-        logger.warning("WALLET_ENC_SECRET not set (len check skipped)")
         return None
     raw = raw.strip()
-    logger.warning("WALLET_ENC_SECRET present, raw_len=%d", len(raw))
     try:
         # Accept raw 32-byte (64 hex chars) or any secret string (hashed to 32 bytes).
         if len(raw) == 64:
