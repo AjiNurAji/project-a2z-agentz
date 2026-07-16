@@ -429,6 +429,38 @@ def get_account():
     return _EthAccount.from_key(key)
 
 
+def get_user_wallet_account(user_id: int):
+    """P5: return a LocalAccount for a USER's own self-custodial (P3) wallet.
+
+    Decrypts the per-user AES-GCM key blob from the DB in-memory using
+    WALLET_ENC_SECRET and never persists or logs the plaintext key.
+
+    Raises RuntimeError when the user has no generated wallet (e.g. they only
+    linked an external address) or decryption fails — callers must handle
+    this and refuse to withdraw from a non-existent wallet.
+    """
+    if not _SIGNING_AVAILABLE:
+        raise RuntimeError("eth_account is not installed (signing unavailable)")
+    if user_id is None:
+        raise RuntimeError("user_id required to load user wallet")
+    blob = database.get_user_encrypted_key(int(user_id))
+    if not blob:
+        raise RuntimeError(
+            f"User {user_id} has no self-custodial wallet to withdraw from"
+        )
+    try:
+        from lib.wallet_gen import decrypt_wallet
+
+        plaintext_key = decrypt_wallet(blob)
+    except Exception as exc:
+        raise RuntimeError(f"Failed to decrypt user {user_id} wallet: {exc}")
+    if not plaintext_key:
+        raise RuntimeError(f"Decrypted key for user {user_id} was empty")
+    if not plaintext_key.startswith("0x"):
+        plaintext_key = "0x" + plaintext_key
+    return _EthAccount.from_key(plaintext_key)
+
+
 def canonical_message_for_signing(
     project_target_address: str,
     timestamp: int,
@@ -661,6 +693,129 @@ async def send_native_transaction(
         await provider.close()
 
 
+async def send_native_from_account(
+    account,
+    to_address: str,
+    value_wei: int,
+    *,
+    chain_id: int | None = None,
+    max_gas_price_gwei: float | None = None,
+) -> str:
+    """P5: EIP-1559 native ETH transfer signed by an ARBITRARY account
+    (e.g. a user's own P3-generated wallet from get_user_wallet_account),
+    NOT the shared global vault.
+
+    Reuses the same safety primitives as send_native_transaction:
+      * smart-contract guard (OP-070) with EOA_WHITELIST exception
+      * live EIP-1559 fee estimation, hard-capped at max_gas_price_gwei
+      * balance check: aborts if account balance < value + gas (never
+        broadcasts a tx that would revert for lack of funds)
+      * HARD SAFETY INTERLOCK via safety_interlock(cid) (mainnet gate)
+
+    Returns the real tx hash, or raises on failure. The caller is
+    responsible for sequencing (e.g. user-payout tx before platform-fee tx).
+    """
+    if not _SIGNING_AVAILABLE:
+        raise RuntimeError("eth_account not installed (on-chain sending unavailable)")
+    cid = chain_id or BASE_CHAIN_ID
+    if cid == 84532:
+        rpc_urls = _rotated_rpc_urls([
+            os.environ.get("BASE_SEPOLIA_RPC", ""),
+            os.environ.get("BASE_SEPOLIA_RPC_1", ""),
+            os.environ.get("BASE_SEPOLIA_RPC_2", ""),
+        ])
+    else:
+        rpc_urls = _rotated_rpc_urls([
+            os.environ.get("BASE_RPC_1", ""),
+            os.environ.get("BASE_RPC_2", ""),
+            os.environ.get("BASE_RPC_3", ""),
+            os.environ.get("BASE_RPC_4", ""),
+        ])
+    if not rpc_urls:
+        raise RuntimeError(f"No RPC endpoints configured for chain_id={cid}")
+    provider = MultiRpcProvider(rpc_urls=rpc_urls, chain_id=cid)
+    try:
+        to = _to_checksum(to_address)
+
+        # Smart-contract guard (mirrors send_native_transaction).
+        if await _is_smart_contract(provider, to):
+            if to.lower() in EOA_WHITELIST:
+                emit_data = b"\x00"
+                logger.info(
+                    "Target %s is a whitelisted EIP-7702 EOA; sending with "
+                    "non-empty data to satisfy OP-070 (avoid revert).",
+                    to,
+                )
+            else:
+                logger.warning(
+                    "Target is a Smart Contract, skipping plain ETH transfer to avoid revert: %s",
+                    to,
+                )
+                raise RuntimeError(
+                    "Target is a Smart Contract, skipping plain ETH transfer to avoid revert"
+                )
+        else:
+            emit_data = b""
+
+        nonce = int(
+            await provider.call("eth_getTransactionCount", [account.address, "latest"]),
+            16,
+        )
+        max_fee, max_priority = await _estimate_eip1559_fees(provider, max_gas_price_gwei)
+        gas_limit = 21000 + (100 if emit_data else 0)
+        estimated_gas_cost = max_fee * gas_limit
+
+        balance = await provider.eth_get_balance(account.address)
+        if balance < value_wei + estimated_gas_cost:
+            raise RuntimeError(
+                f"Insufficient balance: have {balance / 1e18:.6f} ETH, need "
+                f"{(value_wei + estimated_gas_cost) / 1e18:.6f} ETH (value + gas)"
+            )
+
+        tx = {
+            "type": 2,
+            "nonce": nonce,
+            "to": to,
+            "value": value_wei,
+            "data": emit_data,
+            "gas": gas_limit,
+            "maxFeePerGas": max_fee,
+            "maxPriorityFeePerGas": max_priority,
+            "chainId": cid,
+        }
+        signed = account.sign_transaction(tx)
+        raw_bytes = getattr(signed, "raw_transaction", None) or getattr(
+            signed, "rawTransaction", None
+        )
+        if isinstance(raw_bytes, (bytes, bytearray)):
+            raw = raw_bytes.hex()
+        else:
+            raw = raw_bytes
+        safety_interlock(cid)
+        last_err = None
+        for rpc_url in rpc_urls:
+            single = None
+            try:
+                single = MultiRpcProvider(rpc_urls=[rpc_url], chain_id=cid)
+                tx_hash = await single.call("eth_sendRawTransaction", [raw])
+                logger.info(
+                    "on-chain send (per-user) ok: chain=%s type=2 to=%s value_wei=%d hash=%s via %s",
+                    cid, to, value_wei, tx_hash, rpc_url[:32],
+                )
+                break
+            except Exception as e:
+                last_err = e
+                logger.warning("broadcast to %s failed: %s", rpc_url[:32], str(e)[:60])
+            finally:
+                if single is not None:
+                    await single.close()
+        else:
+            raise RuntimeError(f"All RPCs failed to broadcast tx: {last_err}")
+        return tx_hash
+    finally:
+        await provider.close()
+
+
 async def _estimate_eip1559_fees(provider, max_gas_price_gwei):
     """Return (maxFeePerGas, maxPriorityFeePerGas) in wei for a type-2 tx."""
     try:
@@ -688,6 +843,34 @@ async def _estimate_eip1559_fees(provider, max_gas_price_gwei):
         max_fee = min(max_fee, cap)
         priority = min(priority, cap)
     return max_fee, priority
+
+
+async def _preflight_eth_balance(
+    provider: "MultiRpcProvider",
+    address: str,
+    est_gas_cost_wei: int,
+    label: str = "swap",
+) -> int:
+    """GUARDRAIL (P5 / fail-safe): refuse to broadcast when the signing
+    wallet cannot pay the estimated gas, so we never waste ETH on a tx that
+    would revert for lack of funds (rugging the user on gas).
+
+    Returns the live ETH balance (wei) on success, or raises RuntimeError
+    with a clear message when the balance is insufficient for the estimate.
+
+    `est_gas_cost_wei` should already include a safety buffer (e.g. approve
+    + swap limits). We deliberately do NOT deduct any transfer value here —
+    this guard only protects the *gas* leg of a swap; value-transfer legs are
+    guarded separately by send_native_transaction / the withdraw flow.
+    """
+    balance = await provider.eth_get_balance(address)
+    if balance < est_gas_cost_wei:
+        raise RuntimeError(
+            f"Guardrail: insufficient ETH for {label} gas — have "
+            f"{balance / 1e18:.6f} ETH, need >= {est_gas_cost_wei / 1e18:.6f} ETH. "
+            f"Skipping to avoid revert + wasted gas."
+        )
+    return balance
 
 
 async def _is_smart_contract(provider, address: str) -> bool:
@@ -1492,6 +1675,17 @@ async def swap_token_for_eth(
         except Exception:
             nonce = int(await provider.call("eth_getTransactionCount", [acct.address, "pending"]), 16)
         max_fee, max_priority = await _estimate_eip1559_fees(provider, max_gas_price_gwei)
+
+        # GUARDRAIL (P5 fail-safe): abort BEFORE signing/broadcasting if the
+        # vault cannot cover the swap's gas. Approve (80k) + swap (300k) +
+        # 20% buffer = 456k; we use 380k as a conservative estimate and let
+        # the broadcast fail cleanly instead of reverting on-chain (which
+        # would still burn the user's ETH on gas).
+        _swap_gas_limit = 380_000
+        _est_swap_gas_cost = max_fee * _swap_gas_limit
+        await _preflight_eth_balance(
+            provider, acct.address, _est_swap_gas_cost, label="swap"
+        )
 
         tx = {
             "type": 2, "nonce": nonce, "to": router, "value": 0,
