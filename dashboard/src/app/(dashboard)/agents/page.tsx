@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import { useDashboard, type AgentHealth } from "@/components/DashboardContext";
 import PageHeader from "@/components/PageHeader";
 import { Sparkline } from "@/components/ui/Sparkline";
-import { Bot, Shield, Activity, Zap, Clock, CheckCircle2, XCircle, ListChecks, Pause, Play, Link2, TrendingUp, Wallet, ArrowUpRight, Coins } from "lucide-react";
+import { Bot, Shield, Activity, Zap, Clock, CheckCircle2, XCircle, ListChecks, Pause, Play, Link2, TrendingUp, Wallet, ArrowUpRight, Coins, DollarSign, SlidersHorizontal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 
@@ -33,6 +33,117 @@ function Metric({ icon: Icon, label, value, color }: { icon: typeof Activity; la
         <p className="text-[11px]" style={{ color: "var(--color-body-subtle)" }}>{label}</p>
         <p className="text-sm font-semibold tabular-nums" style={{ color: "var(--color-heading)" }}>{value}</p>
       </div>
+    </div>
+  );
+}
+
+function SellModal({ token, onClose }: { token: any; onClose: () => void }) {
+  const [mode, setMode] = useState<"market" | "limit">("market");
+  const [limitPrice, setLimitPrice] = useState<string>("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string>("");
+  if (!token) return null;
+
+  const submit = async () => {
+    setBusy(true);
+    setMsg("");
+    try {
+      if (mode === "market") {
+        const r = await apiFetch<{ tx_hash: string }>("/api/manual-sell", {
+          method: "POST",
+          body: JSON.stringify({ token_address: token.token_address, type: "market" }),
+        });
+        setMsg("OK: Market sell broadcast — Tx: " + r.tx_hash.slice(0, 12) + "…");
+      } else {
+        const lp = parseFloat(limitPrice);
+        if (!(lp > 0)) { setMsg("Enter a valid limit price (USD)."); setBusy(false); return; }
+        const r = await apiFetch<{ order_id: number; status: string }>("/api/limit-sell", {
+          method: "POST",
+          body: JSON.stringify({ token_address: token.token_address, limit_price_usd: lp }),
+        });
+        setMsg("OK: Limit sell queued (order #" + r.order_id + ") @ $" + lp);
+      }
+      setTimeout(onClose, 1800);
+    } catch (e: any) {
+      setMsg("ERROR: " + (e?.message || "Sell failed"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const pnl = Number(token.pnl_pct) || 0;
+  const nowPrice = "$" + Number(token.current_price_usd || 0).toFixed(6);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }} onClick={onClose}>
+      <div className="card p-6 w-full max-w-md space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-2">
+          <DollarSign className="w-5 h-5" style={{ color: "var(--color-fg-warning)" }} />
+          <h3 className="text-base font-semibold" style={{ color: "var(--color-heading)", fontFamily: "var(--font-serif)" }}>
+            Sell {token.token_name}
+          </h3>
+        </div>
+        <div className="text-xs font-mono" style={{ color: "var(--color-body-subtle)" }}>{token.token_address}</div>
+        <div className="flex gap-4 text-sm">
+          <span>Now: <b style={{ color: "var(--color-body)" }}>{nowPrice}</b></span>
+          <span style={{ color: pnl >= 0 ? "var(--color-fg-success)" : "var(--color-fg-danger)" }}>
+            P&L: {pnl >= 0 ? "+" : ""}{pnl.toFixed(1)}%
+          </span>
+        </div>
+
+        <div className="flex gap-2">
+          <button onClick={() => setMode("market")} className="px-3 py-1.5 rounded-lg text-sm font-semibold"
+            style={{ background: mode === "market" ? "var(--color-fg-warning)" : "var(--color-neutral-secondary-medium)", color: mode === "market" ? "#1a0b2e" : "var(--color-body-subtle)" }}>
+            Market (instant)
+          </button>
+          <button onClick={() => setMode("limit")} className="px-3 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-1"
+            style={{ background: mode === "limit" ? "var(--color-fg-purple)" : "var(--color-neutral-secondary-medium)", color: mode === "limit" ? "#1a0b2e" : "var(--color-body-subtle)" }}>
+            <SlidersHorizontal className="w-3.5 h-3.5" /> Limit Order
+          </button>
+        </div>
+
+        {mode === "limit" && (
+          <div>
+            <label className="text-xs" style={{ color: "var(--color-body-subtle)" }}>Target sell price (USD)</label>
+            <input value={limitPrice} onChange={(e) => setLimitPrice(e.target.value)} inputMode="decimal" placeholder="e.g. 0.000123"
+              className="w-full mt-1 px-3 py-2 rounded-lg text-sm font-mono" style={{ background: "var(--color-neutral-secondary-soft)", border: "1px solid var(--color-border-soft)", color: "var(--color-heading)" }} />
+            <p className="text-[10px] mt-1" style={{ color: "var(--color-body-subtle)" }}>Fills automatically when live DexScreener price ≥ target (profit, breakeven, or cut-loss — your call).</p>
+          </div>
+        )}
+
+        {msg && <p className="text-xs" style={{ color: msg.startsWith("OK") ? "var(--color-fg-success)" : "var(--color-fg-danger)" }}>{msg}</p>}
+        <div className="flex gap-2 pt-1">
+          <button onClick={submit} disabled={busy}
+            className="flex-1 px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
+            style={{ background: "var(--color-fg-warning)", color: "#1a0b2e" }}>
+            {busy ? "Working…" : mode === "market" ? "Sell at Market" : "Place Limit Order"}
+          </button>
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm" style={{ background: "var(--color-neutral-secondary-medium)", color: "var(--color-body-subtle)" }}>
+            Cancel
+          </button>
+        </div>
+        <p className="text-[10px]" style={{ color: "var(--color-body-subtle)" }}>A 0.2% platform fee is applied to every sell execution.</p>
+      </div>
+    </div>
+  );
+}
+
+function LimitOrdersPanel({ orders, onCancel }: { orders: any[]; onCancel: (id: number) => void }) {
+  if (!orders || orders.length === 0) return null;
+  return (
+    <div className="pt-3 border-t" style={{ borderColor: "var(--color-border-soft)" }}>
+      <p className="text-[11px] font-semibold uppercase tracking-wide mb-2" style={{ color: "var(--color-body-subtle)" }}>Your Limit Orders</p>
+      {orders.map((o: any) => (
+        <div key={o.id} className="flex items-center justify-between py-1.5 text-sm">
+          <div className="flex items-center gap-2">
+            <SlidersHorizontal className="w-3.5 h-3.5" style={{ color: "var(--color-fg-purple)" }} />
+            <span style={{ color: "var(--color-heading)" }}>{o.token_name}</span>
+            <span className="text-xs tabular-nums" style={{ color: "var(--color-body-subtle)" }}>@${Number(o.limit_price_usd).toFixed(6)} · {o.status}</span>
+          </div>
+          {o.status === "OPEN" && (
+            <button onClick={() => onCancel(o.id)} className="text-[10px] font-semibold hover:underline" style={{ color: "var(--color-fg-danger)" }}>Cancel</button>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
@@ -101,12 +212,20 @@ export default function AgentsPage() {
   const { agentAStatus, agentBStatus, isPaused, setIsPaused, agentHealth, agentMessages } = useDashboard();
   const [holdings, setHoldings] = useState<any>(null);
   const [netMode, setNetMode] = useState<"mainnet" | "testnet">("mainnet");
+  const [sellToken, setSellToken] = useState<any>(null);
+  const [limitOrders, setLimitOrders] = useState<any[]>([]);
 
   useEffect(() => {
-    apiFetch(`/api/holdings?network=${netMode}`).then(setHoldings).catch(() => {});
-    const interval = setInterval(() => apiFetch(`/api/holdings?network=${netMode}`).then(setHoldings).catch(() => {}), 15000);
+    apiFetch("/api/holdings?network=" + netMode).then(setHoldings).catch(() => {});
+    const interval = setInterval(() => apiFetch("/api/holdings?network=" + netMode).then(setHoldings).catch(() => {}), 15000);
     return () => clearInterval(interval);
   }, [netMode]);
+
+  useEffect(() => {
+    apiFetch("/api/limit-orders").then((d: any) => setLimitOrders(Array.isArray(d) ? d : [])).catch(() => {});
+    const interval = setInterval(() => apiFetch("/api/limit-orders").then((d: any) => setLimitOrders(Array.isArray(d) ? d : [])).catch(() => {}), 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Real activity sparkline: count Agent A / B messages seen this session.
   const aActivity = agentMessages.filter((m) => m.sender === "agent_a").map((_, i) => i + 1);
@@ -249,9 +368,17 @@ export default function AgentsPage() {
                       </span>
                     </td>
                     <td className="py-2.5 px-3 text-right">
-                      <a href={`https://basescan.org/tx/${t.buy_tx_hash}`} target="_blank" rel="noopener noreferrer"
+                      <button
+                        onClick={() => setSellToken(t)}
                         className="inline-flex items-center gap-1 text-[11px] font-semibold hover:underline"
-                        style={{ color: "var(--color-fg-brand)" }}>
+                        style={{ color: "var(--color-fg-warning)" }}
+                      >
+                        Sell <ArrowUpRight className="w-3 h-3" />
+                      </button>
+                      <a href={"https://basescan.org/tx/" + t.buy_tx_hash} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold hover:underline ml-2"
+                        style={{ color: "var(--color-fg-brand)" }}
+                      >
                         View <ArrowUpRight className="w-3 h-3" />
                       </a>
                     </td>
@@ -283,13 +410,20 @@ export default function AgentsPage() {
                   </a>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </motion.div>
+              ))}
+              </div>
+              )}
 
-      <motion.div
-        className="card p-5 flex items-center gap-3"
+              <LimitOrdersPanel orders={limitOrders} onCancel={async (id) => {
+              try { await apiFetch("/api/limit-orders/cancel", { method: "POST", body: JSON.stringify({ order_id: id }) }); } catch { /* ignore */ }
+              setLimitOrders((prev) => prev.map((o) => o.id === id ? { ...o, status: "CANCELLED" } : o));
+              }} />
+
+              {sellToken && <SellModal token={sellToken} onClose={() => setSellToken(null)} />}
+              </motion.div>
+
+              <motion.div
+              className="card p-5 flex items-center gap-3"
         initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
       >

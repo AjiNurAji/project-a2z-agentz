@@ -901,34 +901,31 @@ async def process_task(task: dict[str, Any]) -> None:
 
 
 async def _check_take_profit() -> None:
-    """Check held tokens for take-profit opportunities and sell if target met."""
-    import aiohttp as _aiohttp
+    """Check held tokens for take-profit opportunities and sell if target met.
+
+    P2 (User Control): a token is only auto-sold when its OWNER has switched
+    the Auto-Sell Agent toggle ON (users.auto_sell_enabled). If OFF, the token
+    is skipped (user keeps full control of their vault). If the owner can't be
+    resolved (legacy global vault row with no user_id), we fall back to the
+    AGENT_B_AUTO_SELL env flag so historical behaviour is preserved.
+    """
+    from lib.dexscreener import get_prices_usd
+
     held = fetch_held_tokens("HOLDING")
     if not held:
         return
 
+    addrs = [t.get("token_address", "") for t in held if t.get("token_address")]
+    prices = await get_prices_usd(addrs) if addrs else {}
+
     for token in held:
-        addr = token.get("token_address", "")
+        addr = (token.get("token_address") or "").lower()
         name = token.get("token_name", "unknown")
         entry_price = float(token.get("entry_price_usd") or 0)
         if not addr or entry_price <= 0:
             continue
 
-        # Fetch current price via DexScreener
-        try:
-            url = f"https://api.dexscreener.com/latest/dex/tokens/{addr}"
-            async with _aiohttp.ClientSession() as sess:
-                async with sess.get(url, timeout=10) as resp:
-                    if resp.status != 200:
-                        continue
-                    data = await resp.json()
-            pairs = (data.get("pairs") or []) if isinstance(data, dict) else []
-            if not pairs:
-                continue
-            current_price = float(pairs[0].get("priceUsd") or 0)
-        except Exception:
-            continue
-
+        current_price = float(prices.get(addr, 0.0) or 0.0)
         if current_price <= 0:
             continue
 
@@ -937,29 +934,17 @@ async def _check_take_profit() -> None:
                     name, entry_price, current_price, profit_pct, AGENT_B_PROFIT_PCT)
 
         if profit_pct >= AGENT_B_PROFIT_PCT:
-            # P2: sell-approval toggle. Default (1) = autonomous sell (current
-            # behaviour, for custodial/demo). Set AGENT_B_AUTO_SELL=0 to route
-            # the sell into the ApprovalQueue instead of broadcasting.
-            auto_sell = os.getenv("AGENT_B_AUTO_SELL", "1") not in ("0", "false", "False")
+            # P2: respect the owner's per-user toggle.
+            owner = token.get("user_id")
+            if owner is not None:
+                auto_sell = database.get_sell_preference(int(owner))
+            else:
+                # Legacy global vault row: fall back to env flag.
+                auto_sell = os.getenv("AGENT_B_AUTO_SELL", "1") not in ("0", "false", "False")
             if not auto_sell:
-                try:
-                    from database import insert_sell_proposal
-                    insert_sell_proposal(
-                        addr,
-                        name,
-                        float(token.get("amount_wei") or 0),
-                        round(profit_pct, 2),
-                    )
-                    logger.info("SELL PROPOSAL queued (auto-sell off): %s +%.1f%%", name, profit_pct)
-                    append_audit_log(
-                        "agent_b.sell_proposal",
-                        f"Queued sell proposal for {name}: +{profit_pct:.1f}% profit (awaiting approval)",
-                        {"token": addr, "profit_pct": profit_pct},
-                    )
-                    continue
-                except Exception as exc:
-                    logger.error("Queue sell proposal failed for %s: %s", addr, exc)
-                    continue
+                logger.info("Auto-sell OFF for owner=%s — skipping %s", owner, name)
+                continue
+
             logger.info("TAKE PROFIT TRIGGERED: %s +%.1f%% — selling...", name, profit_pct)
             try:
                 result = await swap_token_for_eth(addr, int(token.get("amount_wei") or 0), chain_id=8453)
@@ -1011,6 +996,63 @@ async def _check_take_profit() -> None:
                 }))
             except Exception as exc:
                 logger.error("Take-profit sell failed for %s: %s", addr, exc)
+
+
+async def _check_limit_orders() -> None:
+    """P2: fill any OPEN user limit-sell orders whose target price is met.
+
+    Batches the DexScreener price lookup (lib.dexscreener caches per-token
+    for TTL seconds) so a large order book never hammers the API. Only
+    the user's own holdings are sold; the platform fee (PLATFORM_FEE_BPS)
+    is skimmed on every fill.
+    """
+    from lib.dexscreener import get_prices_usd
+
+    open_orders = database.fetch_limit_orders_open()  # NEW helper below
+    if not open_orders:
+        return
+
+    addrs = [o.get("token_address", "") for o in open_orders if o.get("token_address")]
+    prices = await get_prices_usd(addrs) if addrs else {}
+    for o in open_orders:
+        addr = (o.get("token_address") or "").lower()
+        oid = o.get("id")
+        uid = o.get("user_id")
+        name = o.get("token_name") or "unknown"
+        limit = float(o.get("limit_price_usd") or 0)
+        current = float(prices.get(addr, 0.0) or 0.0)
+        if current <= 0 or limit <= 0:
+            continue
+        # User may set a SELL limit at/above current (profit, breakeven, or
+        # even a cut-loss below entry — we fill when live price >= their limit.
+        if current < limit:
+            continue
+        logger.info("LIMIT ORDER FILL: %s @ $%.6f (limit $%.6f) for user %s",
+                    name, current, limit, uid)
+        try:
+            amount_wei = int(o.get("amount_wei") or 0)
+            if amount_wei <= 0:
+                continue
+            result = await swap_token_for_eth(addr, amount_wei, chain_id=8453)
+            tx_hash = result.get("tx_hash", "")
+            database.mark_token_sold(addr, tx_hash, user_id=uid)
+            database.mark_limit_filled(oid, tx_hash)
+            await collect_platform_fee(int(result.get("amount_out_wei") or 0), chain_id=8453)
+            database.append_audit_log(
+                "user.limit_fill",
+                f"Filled limit sell {name} @ ${current:.6f} (limit ${limit:.6f}) tx={tx_hash}",
+                {"user_id": uid, "token": addr, "tx_hash": tx_hash, "limit": limit},
+            )
+            await manager.broadcast(json.dumps({
+                "type": "AGENT_LOG",
+                "data": {
+                    "sender": "agent_b",
+                    "content": f"LIMIT FILL: Sold {name} @ ${current:.4f} (target ${limit:.4f}) | Tx: {tx_hash}",
+                    "metadata": {"txHash": tx_hash, "projectName": name, "limitFill": True},
+                },
+            }))
+        except Exception as exc:
+            logger.error("Limit order fill failed for user %s order %s: %s", uid, oid, exc)
 
 
 async def worker_loop(poll_interval: float = 2.0) -> None:
@@ -1087,9 +1129,13 @@ async def worker_loop(poll_interval: float = 2.0) -> None:
       try:
         await process_task(task)
         _poll_errors = 0
-        # After each task, check held tokens for take-profit
+        # After each task, check held tokens for take-profit + user limit orders
         try:
             await _check_take_profit()
+        except Exception:
+            pass
+        try:
+            await _check_limit_orders()
         except Exception:
             pass
       except Exception as exc:

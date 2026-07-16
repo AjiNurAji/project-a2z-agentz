@@ -763,6 +763,39 @@ def ensure_pipeline_tables() -> None:
                 )
             except psycopg2.Error as exc:
                 logger.warning("ensure_pipeline_tables: add wallet-gen cols failed (benign): %s", exc)
+            # Migration: P2 (User Control) — per-user auto-sell toggle + per-user
+            # vault linkage on held_tokens + limit-order table for manual sells.
+            try:
+                cur.execute(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS auto_sell_enabled BOOLEAN NOT NULL DEFAULT FALSE;"
+                )
+                cur.execute(
+                    "ALTER TABLE held_tokens ADD COLUMN IF NOT EXISTS user_id INTEGER;"
+                )
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS user_limit_orders (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER NOT NULL,
+                        token_address VARCHAR(42) NOT NULL,
+                        token_name VARCHAR(255),
+                        amount_wei NUMERIC(78) NOT NULL DEFAULT 0,
+                        limit_price_usd NUMERIC(20, 8) NOT NULL,
+                        side VARCHAR(8) NOT NULL DEFAULT 'sell'
+                            CHECK (side IN ('sell')),
+                        status VARCHAR(16) NOT NULL DEFAULT 'OPEN'
+                            CHECK (status IN ('OPEN','FILLED','CANCELLED','EXPIRED')),
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        filled_at TIMESTAMP,
+                        fill_tx_hash VARCHAR(66)
+                    );
+                    """
+                )
+                cur.execute(
+                    "CREATE INDEX IF NOT EXISTS user_limit_orders_user_idx ON user_limit_orders (user_id, status);"
+                )
+            except psycopg2.Error as exc:
+                logger.warning("ensure_pipeline_tables: add P2 user-control cols failed (benign): %s", exc)
     except psycopg2.Error as exc:
         if "duplicate key value violates unique constraint" in str(exc):
             logger.info('ensure_pipeline_tables race condition caught (tables already created)')
@@ -1088,7 +1121,7 @@ def get_daily_spend_usd() -> float:
 
 def insert_held_token(token_address: str, token_name: str, buy_tx_hash: str,
                       entry_price_usd: float, amount_wei: int,
-                      network: str | None = None) -> int | None:
+                      network: str | None = None, user_id: int | None = None) -> int | None:
     """Record a token purchase so Agent B can later take profit."""
     if not network:
         try:
@@ -1097,14 +1130,14 @@ def insert_held_token(token_address: str, token_name: str, buy_tx_hash: str,
         except Exception:
             network = "mainnet"
     query = """
-    INSERT INTO held_tokens (token_address, token_name, buy_tx_hash, entry_price_usd, amount_wei, status, network)
-    VALUES (%s, %s, %s, %s, %s, 'HOLDING', %s)
-    ON CONFLICT (token_address) DO NOTHING
+    INSERT INTO held_tokens (token_address, token_name, buy_tx_hash, entry_price_usd, amount_wei, status, network, user_id)
+    VALUES (%s, %s, %s, %s, %s, 'HOLDING', %s, %s)
+    ON CONFLICT (token_address) DO UPDATE SET status='HOLDING', user_id=EXCLUDED.user_id, amount_wei=EXCLUDED.amount_wei, entry_price_usd=EXCLUDED.entry_price_usd
     RETURNING id;
     """
     try:
         with _get_cursor() as cur:
-            cur.execute(query, (token_address, token_name, buy_tx_hash, entry_price_usd, amount_wei, network))
+            cur.execute(query, (token_address, token_name, buy_tx_hash, entry_price_usd, amount_wei, network, user_id))
             row = cur.fetchone()
             return row[0] if row else None
     except psycopg2.Error as exc:
@@ -1112,13 +1145,13 @@ def insert_held_token(token_address: str, token_name: str, buy_tx_hash: str,
         return None
 
 
-def fetch_held_tokens(status: str = "HOLDING", network: str | None = None) -> list[dict]:
-    """Return all tokens currently held (or sold).
-
-    If ``network`` is given, only rows for that network are returned so the
-    dashboard / take-profit logic never mixes mainnet and testnet positions.
-    """
-    if network:
+def fetch_held_tokens(status: str = "HOLDING", network: str | None = None,
+                      user_id: int | None = None) -> list[dict]:
+    """Return held (or sold) tokens, optionally scoped to one user's vault."""
+    if user_id is not None:
+        query = "SELECT * FROM held_tokens WHERE status = %s AND user_id = %s ORDER BY bought_at"
+        params = (status, user_id)
+    elif network:
         query = "SELECT * FROM held_tokens WHERE status = %s AND network = %s ORDER BY bought_at"
         params = (status, network)
     else:
@@ -1133,19 +1166,138 @@ def fetch_held_tokens(status: str = "HOLDING", network: str | None = None) -> li
         return []
 
 
-def mark_token_sold(token_address: str, sell_tx_hash: str) -> bool:
-    """Mark a held token as sold."""
-    query = """
-    UPDATE held_tokens SET status = 'SOLD', sell_tx_hash = %s, sold_at = CURRENT_TIMESTAMP
-    WHERE token_address = %s AND status = 'HOLDING'
-    """
+def mark_token_sold(token_address: str, sell_tx_hash: str, user_id: int | None = None) -> bool:
+    """Mark a held token as sold (scoped to user when given)."""
+    if user_id is not None:
+        query = """
+        UPDATE held_tokens SET status = 'SOLD', sell_tx_hash = %s, sold_at = CURRENT_TIMESTAMP
+        WHERE token_address = %s AND status = 'HOLDING' AND user_id = %s
+        """
+        params = (sell_tx_hash, token_address, user_id)
+    else:
+        query = """
+        UPDATE held_tokens SET status = 'SOLD', sell_tx_hash = %s, sold_at = CURRENT_TIMESTAMP
+        WHERE token_address = %s AND status = 'HOLDING'
+        """
+        params = (sell_tx_hash, token_address)
     try:
         with _get_cursor() as cur:
-            cur.execute(query, (sell_tx_hash, token_address))
+            cur.execute(query, params)
             return cur.rowcount > 0
     except psycopg2.Error as exc:
         logger.error("mark_token_sold failed: %s", exc)
         return False
+
+
+# ---------------------------------------------------------------------------
+# P2 (User Control): per-user auto-sell preference + limit orders
+# ---------------------------------------------------------------------------
+
+def get_sell_preference(user_id: int) -> bool:
+    """Return the user's auto-sell-agent toggle (default False)."""
+    try:
+        with _get_cursor() as cur:
+            cur.execute("SELECT auto_sell_enabled FROM users WHERE id = %s LIMIT 1;", (user_id,))
+            row = cur.fetchone()
+            if row:
+                return bool(row[0])
+            return False
+    except psycopg2.Error as exc:
+        logger.error("get_sell_preference failed: %s", exc)
+        return False
+
+
+def set_sell_preference(user_id: int, enabled: bool) -> bool:
+    """Set the user's auto-sell-agent toggle."""
+    try:
+        with _get_cursor() as cur:
+            cur.execute(
+                "UPDATE users SET auto_sell_enabled = %s WHERE id = %s;",
+                (bool(enabled), user_id),
+            )
+            return cur.rowcount > 0
+    except psycopg2.Error as exc:
+        logger.error("set_sell_preference failed: %s", exc)
+        return False
+
+
+def insert_limit_order(user_id: int, token_address: str, token_name: str,
+                       amount_wei: int, limit_price_usd: float) -> int | None:
+    """Queue a user limit-sell order (OPEN). Returns order id or None."""
+    query = """
+    INSERT INTO user_limit_orders (user_id, token_address, token_name, amount_wei, limit_price_usd, status)
+    VALUES (%s, %s, %s, %s, %s, 'OPEN')
+    RETURNING id;
+    """
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (user_id, token_address, token_name, amount_wei, limit_price_usd))
+            row = cur.fetchone()
+            return row[0] if row else None
+    except psycopg2.Error as exc:
+        logger.error("insert_limit_order failed: %s", exc)
+        return None
+
+
+def fetch_limit_orders(user_id: int, status: str | None = None) -> list[dict]:
+    """List a user's limit orders (all statuses by default)."""
+    if status:
+        query = "SELECT * FROM user_limit_orders WHERE user_id = %s AND status = %s ORDER BY created_at DESC;"
+        params = (user_id, status)
+    else:
+        query = "SELECT * FROM user_limit_orders WHERE user_id = %s ORDER BY created_at DESC;"
+        params = (user_id,)
+    try:
+        with _get_cursor(dict_rows=True) as cur:
+            cur.execute(query, params)
+            return [dict(r) for r in cur.fetchall()]
+    except psycopg2.Error as exc:
+        logger.error("fetch_limit_orders failed: %s", exc)
+        return []
+
+
+def fetch_limit_orders_open() -> list[dict]:
+    """Return ALL open limit orders across users (worker fill loop)."""
+    try:
+        with _get_cursor(dict_rows=True) as cur:
+            cur.execute(
+                "SELECT * FROM user_limit_orders WHERE status = 'OPEN' ORDER BY created_at ASC;"
+            )
+            return [dict(r) for r in cur.fetchall()]
+    except psycopg2.Error as exc:
+        logger.error("fetch_limit_orders_open failed: %s", exc)
+        return []
+
+
+def cancel_limit_order(order_id: int, user_id: int) -> bool:
+    """Cancel a user's OPEN limit order (only their own)."""
+    try:
+        with _get_cursor() as cur:
+            cur.execute(
+                "UPDATE user_limit_orders SET status = 'CANCELLED', resolved_at = CURRENT_TIMESTAMP "
+                "WHERE id = %s AND user_id = %s AND status = 'OPEN';",
+                (order_id, user_id),
+            )
+            return cur.rowcount > 0
+    except psycopg2.Error as exc:
+        logger.error("cancel_limit_order failed: %s", exc)
+        return False
+
+
+def mark_limit_filled(order_id: int, fill_tx_hash: str) -> bool:
+    """Mark a limit order FILLED once the sell broadcasts."""
+    try:
+        with _get_cursor() as cur:
+            cur.execute(
+                "UPDATE user_limit_orders SET status = 'FILLED', filled_at = CURRENT_TIMESTAMP, fill_tx_hash = %s "
+                "WHERE id = %s AND status = 'OPEN';",
+                (fill_tx_hash, order_id),
+            )
+            return cur.rowcount > 0
+    except psycopg2.Error as exc:
+        logger.error("mark_limit_filled failed: %s", exc)
+        return False
+
 
 
 def create_password_reset(email: str, code: str, expires_at) -> bool:

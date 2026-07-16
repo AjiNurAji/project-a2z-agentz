@@ -19,7 +19,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 import database
 from agent_a_chroma import check_semantic_similarity
 import web3_async as w3_async
-from web3_async import _rotated_rpc_urls, verify_usdc_payment, USDC_BASE
+from web3_async import _rotated_rpc_urls, verify_usdc_payment, USDC_BASE, swap_token_for_eth, collect_platform_fee
+from lib.dexscreener import get_prices_usd
 from eth_abi import encode as _encode, decode as _decode
 from eth_utils import to_checksum_address as _checksum
 
@@ -89,6 +90,26 @@ def require_auth(func):
 
     return wrapper
 
+
+def _get_uid(request: Request) -> int | None:
+    """Resolve the authenticated user_id from the bearer token (or admin)."""
+    auth_header = request.headers.get("Authorization", "")
+    token = ""
+    if auth_header.lower().startswith("bearer "):
+        token = auth_header[7:].strip()
+    if not token:
+        token = request.cookies.get("a2z-token", "")
+    if token and token != "guest":
+        try:
+            payload = verify_access_token(token)
+            if payload and "sub" in payload:
+                return int(payload["sub"])
+        except Exception:
+            pass
+    # Read-only admin token maps to the system owner (id=1) for scoped reads.
+    if ADMIN_TOKEN and token == ADMIN_TOKEN:
+        return 1
+    return None
 
 @require_auth
 async def get_stats(request: Request):
@@ -979,60 +1000,43 @@ async def get_holdings(request: Request):
     if network == "testnet":
         return JSONResponse(await _fetch_testnet_holdings())
 
-    held = database.fetch_held_tokens("HOLDING")
-    sold = database.fetch_held_tokens("SOLD")
+    _uid = _get_uid(request)
+    held = database.fetch_held_tokens("HOLDING", user_id=_uid)
+    sold = database.fetch_held_tokens("SOLD", user_id=_uid)
 
-    # Enrich held tokens with live market price + P&L
+    # Enrich held tokens with LIVE P&L from DexScreener (batched + cached so we
+    # hit the API once per token per cache window — rate-limit safe).
+    addrs = [t.get("token_address", "") for t in held if t.get("token_address")]
+    prices = await get_prices_usd(addrs) if addrs else {}
+
+    from decimal import Decimal as _Decimal
+    from datetime import datetime as _Dt, date as _Date
+
+    def _norm(v):
+        if isinstance(v, _Decimal):
+            return float(v)
+        if isinstance(v, (_Dt, _Date)):
+            return v.isoformat()
+        if isinstance(v, bytes):
+            return v.decode("utf-8", "replace")
+        return v
+
     enriched = []
     for token in held:
-        addr = token.get("token_address", "")
+        addr = (token.get("token_address") or "").lower()
         entry_price = float(token.get("entry_price_usd") or 0)
-        current_price = 0.0
+        current_price = float(prices.get(addr, 0.0) or 0.0)
         pnl_usd = 0.0
         pnl_pct = 0.0
 
-        if addr and entry_price > 0:
-            try:
-                async with _httpx.AsyncClient(timeout=8) as client:
-                    resp = await client.get(
-                        f"https://api.dexscreener.com/latest/dex/tokens/{addr}"
-                    )
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        pairs = (data.get("pairs") or []) if isinstance(data, dict) else []
-                        if pairs:
-                            current_price = float(pairs[0].get("priceUsd") or 0)
-            except Exception:
-                pass
-
         if current_price > 0 and entry_price > 0:
             pnl_pct = round((current_price - entry_price) / entry_price * 100, 2)
-            # P&L in USD: scale by the ACTUAL token amount held (from receipt),
-            # valued at entry vs current price. entry_price = per-token USD
-            # (real execution price), amount_wei = raw token units held.
             held_tokens = float(token.get("amount_wei") or 0) / 1e18
-            # entry_price is the REAL per-token USD execution price; amount_wei
-            # is the ACTUAL token amount held (from the Swap receipt).
             entry_value = entry_price * held_tokens
             current_value = current_price * held_tokens
             pnl_usd = round(current_value - entry_value, 4)
 
-        # Normalize Postgres types that are not JSON-serializable by default
-        # (Decimal -> float, datetime -> isoformat string, bytes -> utf-8 str).
-        from decimal import Decimal as _Decimal
-        from datetime import datetime as _Dt, date as _Date
-
-        def _norm(v):
-            if isinstance(v, _Decimal):
-                return float(v)
-            if isinstance(v, (_Dt, _Date)):
-                return v.isoformat()
-            if isinstance(v, bytes):
-                return v.decode("utf-8", "replace")
-            return v
-
         safe_token = {k: _norm(v) for k, v in token.items()}
-
         enriched.append({
             **safe_token,
             "current_price_usd": current_price,
@@ -1040,7 +1044,6 @@ async def get_holdings(request: Request):
             "pnl_usd": pnl_usd,
         })
 
-    # Normalize the SOLD list too (same Postgres types).
     safe_sold = [{k: _norm(v) for k, v in t.items()} for t in sold]
 
     payload = {
@@ -1049,9 +1052,167 @@ async def get_holdings(request: Request):
         "count_holding": len(held),
         "count_sold": len(sold),
     }
-    # All values are now JSON-native (float/str/int) thanks to _norm above,
-    # so Starlette can serialize the dict directly without a custom default.
     return JSONResponse(payload)
+
+
+# ---------------------------------------------------------------------------
+# P2 (User Control): per-user auto-sell toggle + Manual Sell + Limit Orders
+# All endpoints resolve user_id from the bearer token; users can ONLY act on
+# holdings/orders that belong to them. Platform fee (PLATFORM_FEE_BPS) is
+# always skimmed on every sell execution (manual + limit + auto when enabled).
+# ---------------------------------------------------------------------------
+
+@require_auth
+async def get_sell_preference(request: Request):
+    """GET — return the user's auto-sell-agent toggle."""
+    uid = _get_uid(request)
+    if uid is None:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    return JSONResponse({"auto_sell_enabled": database.get_sell_preference(uid)})
+
+
+@require_auth
+async def set_sell_preference(request: Request):
+    """POST {enabled: bool} — set the user's auto-sell-agent toggle."""
+    uid = _get_uid(request)
+    if uid is None:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+    enabled = bool(body.get("enabled", False))
+    ok = database.set_sell_preference(uid, enabled)
+    return JSONResponse({"auto_sell_enabled": enabled, "updated": ok})
+
+
+@require_auth
+async def manual_sell(request: Request):
+    """POST {token_address, amount_wei?, type:"market"} — sell now at market.
+
+    Fee (PLATFORM_FEE_BPS) is skimmed from proceeds. Only the user's own
+    HOLDING token can be sold.
+    """
+    uid = _get_uid(request)
+    if uid is None:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+
+    addr = (body.get("token_address") or "").strip()
+    if not addr:
+        return JSONResponse({"error": "token_address required"}, status_code=400)
+    addr = _checksum(addr)
+
+    # Must be a HOLDING token belonging to THIS user.
+    held = database.fetch_held_tokens("HOLDING", user_id=uid)
+    tok = next((t for t in held if (t.get("token_address") or "").lower() == addr.lower()), None)
+    if not tok:
+        return JSONResponse({"error": "No holding found for this token in your vault"}, status_code=404)
+
+    amount_wei = int(body.get("amount_wei") or tok.get("amount_wei") or 0)
+    if amount_wei <= 0:
+        return JSONResponse({"error": "amount_wei must be > 0"}, status_code=400)
+
+    try:
+        result = await swap_token_for_eth(addr, amount_wei, chain_id=8453)
+        tx_hash = result.get("tx_hash", "")
+        database.mark_token_sold(addr, tx_hash, user_id=uid)
+        # P1: always skim the platform fee on realized proceeds.
+        await collect_platform_fee(int(result.get("amount_out_wei") or 0), chain_id=8453)
+        database.append_audit_log(
+            "user.manual_sell",
+            f"User {uid} market-sold {tok.get('token_name')} tx={tx_hash}",
+            {"user_id": uid, "token": addr, "tx_hash": tx_hash},
+        )
+        return JSONResponse({"tx_hash": tx_hash, "token_address": addr})
+    except Exception as exc:
+        logger.error("manual_sell failed for user %s token %s: %s", uid, addr, exc)
+        return JSONResponse({"error": f"Sell failed: {exc}"}, status_code=500)
+
+
+@require_auth
+async def limit_sell(request: Request):
+    """POST {token_address, amount_wei?, limit_price_usd} — queue a limit sell.
+
+    The worker checks DexScreener live price; when it crosses the limit the
+    order fills (market sell) with the platform fee skimmed.
+    """
+    uid = _get_uid(request)
+    if uid is None:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+
+    addr = (body.get("token_address") or "").strip()
+    if not addr:
+        return JSONResponse({"error": "token_address required"}, status_code=400)
+    addr = _checksum(addr)
+    try:
+        limit_price = float(body.get("limit_price_usd") or 0)
+    except (TypeError, ValueError):
+        return JSONResponse({"error": "limit_price_usd must be numeric"}, status_code=400)
+    if limit_price <= 0:
+        return JSONResponse({"error": "limit_price_usd must be > 0"}, status_code=400)
+
+    held = database.fetch_held_tokens("HOLDING", user_id=uid)
+    tok = next((t for t in held if (t.get("token_address") or "").lower() == addr.lower()), None)
+    if not tok:
+        return JSONResponse({"error": "No holding found for this token in your vault"}, status_code=404)
+
+    amount_wei = int(body.get("amount_wei") or tok.get("amount_wei") or 0)
+    if amount_wei <= 0:
+        return JSONResponse({"error": "amount_wei must be > 0"}, status_code=400)
+
+    oid = database.insert_limit_order(uid, addr, tok.get("token_name") or "", amount_wei, limit_price)
+    if oid is None:
+        return JSONResponse({"error": "Failed to create limit order"}, status_code=500)
+    return JSONResponse({"order_id": oid, "status": "OPEN", "limit_price_usd": limit_price})
+
+
+@require_auth
+async def get_limit_orders(request: Request):
+    """GET — list the user's limit orders (optionally ?status=OPEN)."""
+    uid = _get_uid(request)
+    if uid is None:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    status = request.query_params.get("status")
+    orders = database.fetch_limit_orders(uid, status=status)
+    from decimal import Decimal as _Decimal
+    from datetime import datetime as _Dt, date as _Date
+
+    def _norm(v):
+        if isinstance(v, _Decimal):
+            return float(v)
+        if isinstance(v, (_Dt, _Date)):
+            return v.isoformat()
+        if isinstance(v, bytes):
+            return v.decode("utf-8", "replace")
+        return v
+
+    return JSONResponse([{k: _norm(v) for k, v in o.items()} for o in orders])
+
+
+@require_auth
+async def cancel_limit_order(request: Request):
+    """POST {order_id} — cancel the user's own OPEN limit order."""
+    uid = _get_uid(request)
+    if uid is None:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+    oid = int(body.get("order_id") or 0)
+    if oid <= 0:
+        return JSONResponse({"error": "order_id required"}, status_code=400)
+    ok = database.cancel_limit_order(oid, uid)
+    return JSONResponse({"cancelled": ok})
+
 
 
 @require_auth
@@ -1161,4 +1322,10 @@ routes = [
     Route("/plans", get_plans, methods=["GET"]),
     Route("/verify-payment", verify_payment, methods=["POST"]),
     Route("/holdings", get_holdings, methods=["GET"]),
+    Route("/sell-preference", get_sell_preference, methods=["GET"]),
+    Route("/sell-preference", set_sell_preference, methods=["POST"]),
+    Route("/manual-sell", manual_sell, methods=["POST"]),
+    Route("/limit-sell", limit_sell, methods=["POST"]),
+    Route("/limit-orders", get_limit_orders, methods=["GET"]),
+    Route("/limit-orders/cancel", cancel_limit_order, methods=["POST"]),
 ]
