@@ -2,15 +2,18 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "motion/react";
 import { Mail, Lock, Wallet, UserPlus, Loader2, Link2, KeyRound, ShieldAlert } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
+import { useToast } from "@/components/ui/Toast";
 import WalletConnectModal from "@/components/WalletConnectModal";
 
 export default function RegisterPage() {
-  const { register } = useAuth();
+  const { register, loginWithWallet } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const toast = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -18,6 +21,7 @@ export default function RegisterPage() {
   const [generateWallet, setGenerateWallet] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [siweLoading, setSiweLoading] = useState(false);
   const [walletModalOpen, setWalletModalOpen] = useState(false);
   const [seedResult, setSeedResult] = useState<{
     address: string;
@@ -64,6 +68,24 @@ export default function RegisterPage() {
       // Error toast shown by AuthProvider
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleSiwe = async () => {
+    setSiweLoading(true);
+    try {
+      const res = await loginWithWallet();
+      if (res.wallet?.seed_phrase) {
+        // Brand-new wallet via SIWE: reuse the same seed display as email signup.
+        setSeedResult(res.wallet);
+      } else {
+        router.push(searchParams.get("next") || "/dashboard");
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Wallet login failed";
+      toast.error("Wallet login failed", message);
+    } finally {
+      setSiweLoading(false);
     }
   };
 
@@ -408,6 +430,26 @@ export default function RegisterPage() {
         </form>
 
 
+
+        {/* SIWE — wallet-only sign in (no email/password) */}
+        <button
+          type="button"
+          onClick={handleSiwe}
+          disabled={siweLoading}
+          className="group relative w-full py-3 rounded-xl text-sm font-bold border transition-all duration-300 overflow-hidden focus-ring flex items-center justify-center gap-2 hover:border-[var(--color-border-brand)] hover:shadow-[0_0_15px_rgba(110,90,124,0.15)] active:scale-[0.98] disabled:opacity-50 mt-4"
+          style={{
+            borderColor: "var(--color-border-brand-subtle)",
+            color: "var(--color-heading)",
+            background: "color-mix(in srgb, var(--color-surface) 40%, transparent)",
+          }}
+          aria-label="Sign in with Ethereum wallet"
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-[var(--color-brand)]/10 via-[var(--color-accent-purple)]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <Wallet className="w-4 h-4 text-[var(--color-fg-brand)] group-hover:scale-110 transition-transform duration-300 relative z-10" aria-hidden="true" />
+          <span className="relative z-10">
+            {siweLoading ? "Waiting for signature…" : "Connect Wallet (SIWE)"}
+          </span>
+        </button>
 
         {/* Login link */}
         <p
