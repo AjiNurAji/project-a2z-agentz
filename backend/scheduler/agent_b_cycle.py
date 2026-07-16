@@ -32,6 +32,7 @@ from database import (
 )
 from routes.websockets import manager
 from web3_async import MultiRpcProvider, send_native_transaction, send_proof_of_execution, _usd_to_wei_real, swap_eth_for_token, swap_token_for_eth, WETH_BASE
+from eth_utils.address import to_checksum_address as _to_checksum
 
 load_dotenv()
 
@@ -936,10 +937,65 @@ async def _check_take_profit() -> None:
                     name, entry_price, current_price, profit_pct, AGENT_B_PROFIT_PCT)
 
         if profit_pct >= AGENT_B_PROFIT_PCT:
+            # P2: sell-approval toggle. Default (1) = autonomous sell (current
+            # behaviour, for custodial/demo). Set AGENT_B_AUTO_SELL=0 to route
+            # the sell into the ApprovalQueue instead of broadcasting.
+            auto_sell = os.getenv("AGENT_B_AUTO_SELL", "1") not in ("0", "false", "False")
+            if not auto_sell:
+                try:
+                    from database import insert_sell_proposal
+                    insert_sell_proposal(
+                        addr,
+                        name,
+                        float(token.get("amount_wei") or 0),
+                        round(profit_pct, 2),
+                    )
+                    logger.info("SELL PROPOSAL queued (auto-sell off): %s +%.1f%%", name, profit_pct)
+                    append_audit_log(
+                        "agent_b.sell_proposal",
+                        f"Queued sell proposal for {name}: +{profit_pct:.1f}% profit (awaiting approval)",
+                        {"token": addr, "profit_pct": profit_pct},
+                    )
+                    continue
+                except Exception as exc:
+                    logger.error("Queue sell proposal failed for %s: %s", addr, exc)
+                    continue
             logger.info("TAKE PROFIT TRIGGERED: %s +%.1f%% — selling...", name, profit_pct)
             try:
                 result = await swap_token_for_eth(addr, int(token.get("amount_wei") or 0), chain_id=8453)
                 mark_token_sold(addr, result["tx_hash"])
+                # P1: platform fee on realized ETH proceeds, routed to ADMIN_VAULT.
+                # Guardrails: skipped entirely when AGENT_B_DRY_RUN=1 (demo), when
+                # not mainnet, when PLATFORM_FEE_BPS is unset/0, or when the sell
+                # quote was unavailable (amount_out_wei == 0). Fee never exceeds
+                # the trade proceeds.
+                try:
+                    _dry_run = os.getenv("AGENT_B_DRY_RUN", "0") in ("1", "true", "True")
+                    _fee_bps = int(os.getenv("PLATFORM_FEE_BPS", "0") or "0")
+                    _vault = os.getenv("ADMIN_VAULT_ADDRESS")
+                    _proceeds = int(result.get("amount_out_wei") or 0)
+                    if (
+                        not _dry_run
+                        and _fee_bps > 0
+                        and _vault
+                        and _proceeds > 0
+                    ):
+                        _fee_wei = _proceeds * _fee_bps // 10_000
+                        if _fee_wei > 0:
+                            _fee_tx = await send_native_transaction(
+                                _to_checksum(_vault), _fee_wei, chain_id=8453
+                            )
+                            logger.info(
+                                "PLATFORM FEE: %d wei (%.4f%%) from %s -> %s tx=%s",
+                                _fee_wei, _fee_bps / 100.0, name, _vault, _fee_tx,
+                            )
+                            append_audit_log(
+                                "agent_b.platform_fee",
+                                f"Collected {_fee_wei} wei ({_fee_bps/100:.4f}%) platform fee from {name} sell",
+                                {"token": addr, "fee_wei": _fee_wei, "vault": _vault, "tx": _fee_tx},
+                            )
+                except Exception as fexc:
+                    logger.error("Platform fee transfer failed for %s: %s", addr, fexc)
                 append_audit_log(
                     "agent_b.take_profit",
                     f"Sold {name}: +{profit_pct:.1f}% profit, tx={result['tx_hash']}",

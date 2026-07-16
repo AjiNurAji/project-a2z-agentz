@@ -636,16 +636,30 @@ def ensure_pipeline_tables() -> None:
      CREATE INDEX IF NOT EXISTS transaction_proposals_status_idx ON transaction_proposals (status);
      CREATE INDEX IF NOT EXISTS audit_log_created_at_idx ON audit_log (created_at DESC);
      CREATE TABLE IF NOT EXISTS held_tokens (
-     id SERIAL PRIMARY KEY,
-     token_address VARCHAR(42) NOT NULL UNIQUE,
-     token_name VARCHAR(255),
-     buy_tx_hash VARCHAR(66),
-     entry_price_usd NUMERIC(20, 8),
-     amount_wei NUMERIC(78) NOT NULL DEFAULT 0,
-     bought_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-     sold_at TIMESTAMP,
-     sell_tx_hash VARCHAR(66),
-     status VARCHAR(16) NOT NULL DEFAULT 'HOLDING' CHECK (status IN ('HOLDING','SOLD'))
+         id SERIAL PRIMARY KEY,
+         token_address VARCHAR(42) NOT NULL UNIQUE,
+         token_name VARCHAR(255),
+         buy_tx_hash VARCHAR(66),
+         entry_price_usd NUMERIC(20, 8),
+         amount_wei NUMERIC(78) NOT NULL DEFAULT 0,
+         bought_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+         sold_at TIMESTAMP,
+         sell_tx_hash VARCHAR(66),
+         status VARCHAR(16) NOT NULL DEFAULT 'HOLDING' CHECK (status IN ('HOLDING','SOLD'))
+     );
+
+     # P2: sell-approval queue. When AGENT_B_AUTO_SELL=0, take-profit sells are
+     # held here for human approval instead of broadcasting immediately.
+     CREATE TABLE IF NOT EXISTS sell_proposals (
+         id SERIAL PRIMARY KEY,
+         token_address VARCHAR(42) NOT NULL,
+         token_name VARCHAR(255),
+         amount_wei NUMERIC(78) NOT NULL DEFAULT 0,
+         profit_pct NUMERIC(10, 4),
+         status VARCHAR(16) NOT NULL DEFAULT 'PENDING'
+             CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'EXECUTED')),
+         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+         resolved_at TIMESTAMP
      );
     """  # noqa: E501  (multi-statement DDL; executed statement-by-statement below)
     try:
@@ -990,6 +1004,31 @@ def insert_transaction_proposal(synthesis_id: int, amount_usd: float, gnosis_saf
             return None
     except psycopg2.Error as exc:
         logger.error('insert_transaction_proposal failed: %s', exc)
+        return None
+
+
+def insert_sell_proposal(
+    token_address: str,
+    token_name: str,
+    amount_wei: float,
+    profit_pct: float,
+) -> int | None:
+    """P2: queue a take-profit sell for human approval (used when
+    AGENT_B_AUTO_SELL=0). Returns the new proposal id or None on failure."""
+    query = """
+    INSERT INTO sell_proposals (token_address, token_name, amount_wei, profit_pct, status)
+    VALUES (%s, %s, %s, %s, 'PENDING')
+    RETURNING id;
+    """
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (token_address, token_name, amount_wei, profit_pct))
+            row = cur.fetchone()
+            if row:
+                return row[0] if isinstance(row, (tuple, list)) else row.get('id')
+            return None
+    except psycopg2.Error as exc:
+        logger.error('insert_sell_proposal failed: %s', exc)
         return None
 
 

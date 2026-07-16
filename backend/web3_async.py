@@ -1404,6 +1404,7 @@ async def swap_token_for_eth(
         selector = b'\xb6\xf9\xde\x95'
 
         _is_mainnet = (cid == 8453)
+        _expected_eth = 0
         _amount_out_min = 1
         try:
             _qparams = [token_amount_wei, path]
@@ -1496,7 +1497,16 @@ async def swap_token_for_eth(
                             tx_hash = data["result"]
                             logger.info("SELL swap broadcast: %s wei of %s -> ETH, tx=%s",
                                         token_amount_wei, token_address, tx_hash)
-                            return {"tx_hash": tx_hash, "token_address": token_address, "token_amount_wei": token_amount_wei}
+                            return {
+                                "tx_hash": tx_hash,
+                                "token_address": token_address,
+                                "token_amount_wei": token_amount_wei,
+                                # Best-effort expected ETH proceeds (from the live
+                                # getAmountsOut quote). Used by the caller to levy
+                                # the platform fee (P1). May be 0 if the quote was
+                                # unavailable (degraded mode) — fee is then skipped.
+                                "amount_out_wei": int(_expected_eth) if _expected_eth else 0,
+                            }
                         results.append(data)
             except Exception as exc:
                 results.append({"error": str(exc)})
