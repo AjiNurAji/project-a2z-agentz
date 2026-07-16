@@ -646,11 +646,9 @@ def ensure_pipeline_tables() -> None:
          sold_at TIMESTAMP,
          sell_tx_hash VARCHAR(66),
          status VARCHAR(16) NOT NULL DEFAULT 'HOLDING' CHECK (status IN ('HOLDING','SOLD'))
-     );
+         );
 
-     # P2: sell-approval queue. When AGENT_B_AUTO_SELL=0, take-profit sells are
-     # held here for human approval instead of broadcasting immediately.
-     CREATE TABLE IF NOT EXISTS sell_proposals (
+         CREATE TABLE IF NOT EXISTS sell_proposals (
          id SERIAL PRIMARY KEY,
          token_address VARCHAR(42) NOT NULL,
          token_name VARCHAR(255),
@@ -660,8 +658,8 @@ def ensure_pipeline_tables() -> None:
              CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'EXECUTED')),
          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
          resolved_at TIMESTAMP
-     );
-    """  # noqa: E501  (multi-statement DDL; executed statement-by-statement below)
+         );
+         """  # noqa: E501  (multi-statement DDL; executed statement-by-statement below)
     try:
         with _get_cursor() as cur:
             # The CREATE TABLE block above is one statement; run it first.
