@@ -19,7 +19,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 import database
 from agent_a_chroma import check_semantic_similarity
 import web3_async as w3_async
-from web3_async import _rotated_rpc_urls, verify_usdc_payment, USDC_BASE, swap_token_for_eth, collect_platform_fee
+from web3_async import _rotated_rpc_urls, verify_usdc_payment, USDC_BASE, swap_token_for_eth, collect_platform_fee, get_user_wallet_account, send_native_from_account
 from lib.dexscreener import get_prices_usd
 from eth_abi import encode as _encode, decode as _decode
 from eth_utils import to_checksum_address as _checksum
@@ -1214,6 +1214,151 @@ async def cancel_limit_order(request: Request):
     return JSONResponse({"cancelled": ok})
 
 
+@require_auth
+async def withdraw(request: Request):
+    """POST /withdraw — P5 "Sweep" (Withdraw All) of a user's OWN self-custodial
+    (P3) wallet. Flat 0.2% platform fee (PLATFORM_FEE_BPS), NO plan/tier logic.
+
+    Flow (per-user, never the shared global vault):
+      1. Resolve destination: body.destination (manual address) OR the user's
+         connected wallet (users.wallet_address). Reject if neither exists.
+      2. Load the user's OWN wallet account (decrypt AES-GCM blob in-memory).
+      3. Read its on-chain ETH balance.
+      4. fee_wei  = balance * PLATFORM_FEE_BPS // 10000  (0 when fee disabled)
+         gas_cost = estimated EIP-1559 cost for a 21000-gas transfer
+         net_withdraw = balance - fee_wei - gas_cost
+      5. HARD GUARD: if net_withdraw <= 0 -> 400 (balance too low to cover
+         fee + gas). We never broadcast a tx that would revert.
+      6. Tx #1 (user payout): send net_withdraw from USER wallet -> destination.
+      7. Tx #2 (platform fee): ONLY if fee_wei > 0 AND ADMIN_VAULT_ADDRESS set,
+         send fee_wei from USER wallet -> ADMIN_VAULT_ADDRESS.
+         Fail-closed: if Tx #1 fails, Tx #2 is NOT sent (user keeps funds).
+
+    Returns gross/fee/gas/net breakdown + tx hashes for transparency.
+    """
+    uid = _get_uid(request)
+    if uid is None:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    chain_id = int(body.get("chain_id") or os.environ.get("BASE_CHAIN_ID", "8453") or 8453)
+    dry_run = bool(body.get("dry_run", False))
+
+    # 1. Resolve destination.
+    dest = (body.get("destination") or "").strip()
+    if dest:
+        try:
+            dest = _checksum(dest)
+        except Exception:
+            return JSONResponse({"error": "Invalid destination address"}, status_code=400)
+    else:
+        user = database.get_user_by_id(uid)
+        if not user or not user.get("wallet_address"):
+            return JSONResponse(
+                {"error": "No destination provided and no connected wallet on file"},
+                status_code=400,
+            )
+        try:
+            dest = _checksum(user["wallet_address"])
+        except Exception:
+            return JSONResponse({"error": "Connected wallet address is invalid"}, status_code=400)
+
+    # 2. Load the USER's own wallet (raises if none / decrypt fails).
+    try:
+        account = get_user_wallet_account(uid)
+    except Exception as exc:
+        return JSONResponse({"error": f"Withdraw unavailable: {exc}"}, status_code=400)
+
+    # 3 + 4. Balance, fee, gas math.
+    rpc_urls = _rotated_rpc_urls([
+        os.environ.get("BASE_RPC_1", ""), os.environ.get("BASE_RPC_2", ""),
+        os.environ.get("BASE_RPC_3", ""), os.environ.get("BASE_RPC_4", ""),
+    ]) if chain_id != 84532 else _rotated_rpc_urls([
+        os.environ.get("BASE_SEPOLIA_RPC", ""), os.environ.get("BASE_SEPOLIA_RPC_1", ""),
+        os.environ.get("BASE_SEPOLIA_RPC_2", ""),
+    ])
+    if not rpc_urls:
+        return JSONResponse({"error": "No RPC configured for chain"}, status_code=500)
+    provider = w3_async.MultiRpcProvider(rpc_urls=rpc_urls, chain_id=chain_id)
+    try:
+        balance = await provider.eth_get_balance(account.address)
+        max_fee, _ = await w3_async._estimate_eip1559_fees(provider, None)
+        gas_cost = max_fee * 21000
+
+        _bps = int(os.environ.get("PLATFORM_FEE_BPS", "0") or "0")
+        fee_wei = balance * _bps // 10_000 if _bps > 0 else 0
+        net_withdraw = balance - fee_wei - gas_cost
+
+        if dry_run:
+            return JSONResponse({
+                "dry_run": True,
+                "address": account.address,
+                "destination": dest,
+                "chain_id": chain_id,
+                "gross_wei": str(balance),
+                "fee_bps": _bps,
+                "fee_wei": str(fee_wei),
+                "gas_wei": str(gas_cost),
+                "net_wei": str(net_withdraw),
+                "can_withdraw": net_withdraw > 0,
+            })
+
+        # 5. HARD GUARD.
+        if net_withdraw <= 0:
+            return JSONResponse({
+                "error": "Balance too low to cover platform fee + gas after withdraw",
+                "gross_wei": str(balance),
+                "fee_wei": str(fee_wei),
+                "gas_wei": str(gas_cost),
+                "net_wei": str(net_withdraw),
+            }, status_code=400)
+
+        # 6. Tx #1 — user payout (fail-closed: if this raises, we stop).
+        user_tx = await send_native_from_account(
+            account, dest, net_withdraw, chain_id=chain_id
+        )
+
+        # 7. Tx #2 — platform fee (only if configured).
+        fee_tx = None
+        vault = os.environ.get("ADMIN_VAULT_ADDRESS")
+        if fee_wei > 0 and vault:
+            try:
+                fee_tx = await send_native_from_account(
+                    account, vault, fee_wei, chain_id=chain_id
+                )
+            except Exception as fexc:
+                # User already paid out; fee is best-effort. Log, don't fail hard.
+                logger.error("Withdraw platform-fee tx failed for user %s: %s", uid, fexc)
+
+        database.append_audit_log(
+            "user.withdraw",
+            f"User {uid} swept {net_withdraw} wei (fee {fee_wei}) -> {dest}",
+            {"user_id": uid, "destination": dest, "gross_wei": str(balance),
+             "fee_wei": str(fee_wei), "gas_wei": str(gas_cost),
+             "net_wei": str(net_withdraw), "user_tx": user_tx, "fee_tx": fee_tx},
+        )
+        return JSONResponse({
+            "tx_hash": user_tx,
+            "fee_tx_hash": fee_tx,
+            "address": account.address,
+            "destination": dest,
+            "chain_id": chain_id,
+            "gross_wei": str(balance),
+            "fee_bps": _bps,
+            "fee_wei": str(fee_wei),
+            "gas_wei": str(gas_cost),
+            "net_wei": str(net_withdraw),
+        })
+    except Exception as exc:
+        logger.error("withdraw failed for user %s: %s", uid, exc)
+        return JSONResponse({"error": f"Withdraw failed: {exc}"}, status_code=500)
+    finally:
+        await provider.close()
+
+
 
 @require_auth
 async def get_gpu_metrics(request: Request):
@@ -1328,4 +1473,5 @@ routes = [
     Route("/limit-sell", limit_sell, methods=["POST"]),
     Route("/limit-orders", get_limit_orders, methods=["GET"]),
     Route("/limit-orders/cancel", cancel_limit_order, methods=["POST"]),
+    Route("/withdraw", withdraw, methods=["POST"]),
 ]

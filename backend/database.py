@@ -454,6 +454,27 @@ def get_user_by_id(user_id: int) -> dict:
     return None
 
 
+def get_user_encrypted_key(user_id: int) -> str | None:
+    """Return ONLY the AES-GCM encrypted private-key blob for a user's
+    self-custodial (P3) generated wallet.
+
+    Privacy: this returns the CIPHERTEXT blob, never the plaintext key, and
+    must never be logged. The caller (web3_async.get_user_wallet_account)
+    decrypts it in-memory with WALLET_ENC_SECRET. Returns None when the user
+    has no generated wallet (e.g. they only linked an external address).
+    """
+    query = "SELECT encrypted_private_key FROM users WHERE id = %s LIMIT 1;"
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (user_id,))
+            row = cur.fetchone()
+            if row and row[0]:
+                return row[0]
+    except psycopg2.Error as exc:
+        logger.error("get_user_encrypted_key failed for user %s: %s", user_id, exc)
+    return None
+
+
 def update_user_plan(user_id: int, plan: str, plan_active_until, payment_ref: str | None = None) -> bool:
     """Activate a subscription plan for a user. plan_active_until is a
     datetime (or None). Returns True on success."""
