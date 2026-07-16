@@ -61,6 +61,8 @@ async def lifespan(app: Starlette):
         # Self-heal the system/owner user (id=1) so Agent A's enqueue_target
         # FK (scraping_queue_user_fk) doesn't fail on fresh Railway databases.
         database.ensure_system_user()
+        # Self-heal SIWE nonce table (P6 wallet-only auth, anti-replay).
+        database.ensure_siwe_tables()
         # Startup guard: warn (not crash) if real execution is enabled but the
         # required secrets/RPCs are missing, so failures aren't silent.
         if os.getenv("AGENT_B_REAL_EXECUTION", "0") == "1":
