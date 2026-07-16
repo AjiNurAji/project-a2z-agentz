@@ -19,8 +19,9 @@ interface AuthContextValue {
   register: (
     email: string,
     password: string,
-    walletAddress?: string
-  ) => Promise<void>;
+    walletAddress?: string,
+    generateWallet?: boolean
+  ) => Promise<import("@/lib/auth").RegisterResult>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   loginAsGuest: () => void;
@@ -84,12 +85,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (
       email: string,
       password: string,
-      walletAddress?: string
+      walletAddress?: string,
+      generateWallet?: boolean
     ) => {
       try {
-        const u = await authLib.register(email, password, walletAddress);
-        setUser(u);
-        router.push("/dashboard");
+        const res = await authLib.register(email, password, walletAddress, generateWallet);
+        setUser(res.user);
+        return res;
       } catch (err: unknown) {
         const message =
           err instanceof Error ? err.message : "Registration failed";

@@ -79,15 +79,50 @@ async def register(request: Request):
     # Hash password
     hashed_pwd = hash_password(password)
 
+    # Optional self-custodial wallet generation (P3).
+    encrypted_blob = None
+    wallet_source = "linked"
+    generated_address = None
+    seed_phrase = None
+    if data.get("generate_wallet"):
+        try:
+            from lib.wallet_gen import generate_wallet
+
+            w = generate_wallet()
+            encrypted_blob = w["encrypted_blob"]
+            wallet_source = "generated"
+            generated_address = w["address"]
+            seed_phrase = w["seed_phrase"]  # shown ONCE, never stored
+            # Prefer the generated address unless the user also supplied one.
+            if not wallet_address:
+                wallet_address = generated_address
+        except Exception as exc:
+            logger.error("register wallet generation failed: %s", exc)
+            return JSONResponse(
+                {"error": "Wallet generation is currently unavailable."},
+                status_code=503,
+            )
+
     # Insert user
-    user = database.create_user(email, hashed_pwd, wallet_address)
+    user = database.create_user(
+        email, hashed_pwd, wallet_address, encrypted_blob, wallet_source
+    )
     if not user:
         return JSONResponse({"error": "Failed to create user"}, status_code=500)
-    
-    # Remove password_hash before returning
-    user.pop("password_hash", None)
 
-    return JSONResponse({"user": user}, status_code=201)
+    # Remove sensitive fields before returning
+    user.pop("password_hash", None)
+    user.pop("encrypted_private_key", None)
+
+    resp = {"user": user}
+    if generated_address:
+        # Seed phrase is returned exactly once and only at registration.
+        resp["wallet"] = {
+            "address": generated_address,
+            "seed_phrase": seed_phrase,
+            "warning": "Save this seed phrase now. It will not be shown again.",
+        }
+    return JSONResponse(resp, status_code=201)
 
 async def login(request: Request):
     try:

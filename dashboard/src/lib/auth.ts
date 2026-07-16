@@ -19,23 +19,35 @@ export async function login(email: string, password: string): Promise<User> {
   return data.user;
 }
 
+export interface RegisterResult {
+  user: User;
+  token: string;
+  wallet?: {
+    address: string;
+    seed_phrase: string;
+    warning: string;
+  };
+}
+
 export async function register(
   email: string,
   password: string,
-  walletAddress?: string
-): Promise<User> {
-  const data = await apiFetch<{ user: User; token: string }>("/api/auth/register", {
+  walletAddress?: string,
+  generateWallet?: boolean
+): Promise<RegisterResult> {
+  const data = await apiFetch<RegisterResult>("/api/auth/register", {
     method: "POST",
     body: JSON.stringify({
       email,
       password,
       ...(walletAddress ? { wallet_address: walletAddress } : {}),
+      ...(generateWallet ? { generate_wallet: true } : {}),
     }),
   });
   if (data.token && typeof window !== "undefined") {
     localStorage.setItem("a2z-token", data.token);
   }
-  return data.user;
+  return data;
 }
 
 export async function me(): Promise<User | null> {

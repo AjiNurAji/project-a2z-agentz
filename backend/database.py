@@ -335,23 +335,34 @@ if __name__ == "__main__":  # pragma: no cover
 # User Auth Operations
 # ==============================================================================
 
-def create_user(email: str, password_hash: str, wallet_address: str = None) -> dict:
+def create_user(
+    email: str,
+    password_hash: str,
+    wallet_address: str = None,
+    encrypted_private_key: str = None,
+    wallet_source: str = "linked",
+) -> dict:
     query = """
-    INSERT INTO users (email, password_hash, wallet_address)
-    VALUES (%s, %s, %s)
-    RETURNING id, email, wallet_address, created_at, last_login_at;
+    INSERT INTO users (email, password_hash, wallet_address, encrypted_private_key, wallet_source)
+    VALUES (%s, %s, %s, %s, %s)
+    RETURNING id, email, wallet_address, encrypted_private_key, wallet_source, created_at, last_login_at;
     """
     try:
         with _get_cursor() as cur:
-            cur.execute(query, (email, password_hash, wallet_address))
+            cur.execute(
+                query,
+                (email, password_hash, wallet_address, encrypted_private_key, wallet_source),
+            )
             row = cur.fetchone()
             if row:
                 return {
-                    'id': row[0],
-                    'email': row[1],
-                    'wallet_address': row[2],
-                    'created_at': row[3].strftime('%Y-%m-%d %H:%M:%S') if row[3] else None,
-                    'last_login_at': row[4].strftime('%Y-%m-%d %H:%M:%S') if row[4] else None
+                    "id": row[0],
+                    "email": row[1],
+                    "wallet_address": row[2],
+                    "encrypted_private_key": row[3],
+                    "wallet_source": row[4],
+                    "created_at": row[5].strftime("%Y-%m-%d %H:%M:%S") if row[5] else None,
+                    "last_login_at": row[6].strftime("%Y-%m-%d %H:%M:%S") if row[6] else None,
                 }
     except psycopg2.IntegrityError:
         return None
@@ -727,6 +738,19 @@ def ensure_pipeline_tables() -> None:
                 )
             except psycopg2.Error as exc:
                 logger.warning("ensure_pipeline_tables: create password_resets failed (benign): %s", exc)
+
+            # Migration: P3 self-custodial wallet generation. Store only the
+            # AES-encrypted private key + a marker of wallet origin. Plaintext
+            # keys/seed phrases are NEVER persisted (shown to user once).
+            try:
+                cur.execute(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS encrypted_private_key TEXT;"
+                )
+                cur.execute(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS wallet_source VARCHAR(16) NOT NULL DEFAULT 'linked';"
+                )
+            except psycopg2.Error as exc:
+                logger.warning("ensure_pipeline_tables: add wallet-gen cols failed (benign): %s", exc)
     except psycopg2.Error as exc:
         if "duplicate key value violates unique constraint" in str(exc):
             logger.info('ensure_pipeline_tables race condition caught (tables already created)')

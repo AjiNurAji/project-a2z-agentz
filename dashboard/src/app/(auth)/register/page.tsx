@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import { Mail, Lock, Wallet, UserPlus, Loader2, Link2 } from "lucide-react";
+import { Mail, Lock, Wallet, UserPlus, Loader2, Link2, KeyRound, ShieldAlert } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import WalletConnectModal from "@/components/WalletConnectModal";
 
@@ -15,9 +15,15 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [walletAddress, setWalletAddress] = useState("");
+  const [generateWallet, setGenerateWallet] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [walletModalOpen, setWalletModalOpen] = useState(false);
+  const [seedResult, setSeedResult] = useState<{
+    address: string;
+    seed_phrase: string;
+    warning: string;
+  } | null>(null);
 
   const validate = (): boolean => {
     const e: Record<string, string> = {};
@@ -42,11 +48,18 @@ export default function RegisterPage() {
     if (!validate()) return;
     setSubmitting(true);
     try {
-      await register(
+      const res = await register(
         email.trim().toLowerCase(),
         password,
-        walletAddress.trim() || undefined
+        walletAddress.trim() || undefined,
+        generateWallet
       );
+      if (res.wallet?.seed_phrase) {
+        // Show seed phrase ONCE. Do NOT navigate away.
+        setSeedResult(res.wallet);
+      } else {
+        router.push("/dashboard");
+      }
     } catch {
       // Error toast shown by AuthProvider
     } finally {
@@ -316,6 +329,55 @@ export default function RegisterPage() {
             )}
           </div>
 
+          {/* Generate wallet toggle (P3 self-custodial) */}
+          <div
+            className="flex items-start gap-3 rounded-xl p-3 border"
+            style={{
+              background: "var(--color-neutral-secondary-medium)",
+              borderColor: "var(--color-border-default)",
+            }}
+          >
+            <div className="mt-0.5">
+              <KeyRound
+                className="w-4 h-4"
+                style={{ color: "var(--color-fg-brand)" }}
+                aria-hidden="true"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="flex items-center justify-between cursor-pointer gap-3">
+                <span className="text-sm" style={{ color: "var(--color-body)" }}>
+                  Generate a new wallet for me
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={generateWallet}
+                  onClick={() => setGenerateWallet((v) => !v)}
+                  className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0"
+                  style={{
+                    background: generateWallet
+                      ? "var(--color-fg-brand)"
+                      : "var(--color-border-default)",
+                  }}
+                >
+                  <span
+                    className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+                    style={{
+                      transform: generateWallet
+                        ? "translateX(22px)"
+                        : "translateX(2px)",
+                    }}
+                  />
+                </button>
+              </label>
+              <p className="text-xs mt-1" style={{ color: "var(--color-body-subtle)" }}>
+                We'll create a self-custodial wallet and show you the seed phrase
+                once. Leave off to link your own wallet address instead.
+              </p>
+            </div>
+          </div>
+
           {/* Submit */}
           <button
             type="submit"
@@ -370,6 +432,71 @@ export default function RegisterPage() {
       onConnected={(session) => setWalletAddress(session.address)}
       onContinue={() => router.push("/dashboard")}
     />
+
+    {seedResult && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style={{ background: "rgba(0,0,0,0.7)" }}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Your new wallet seed phrase"
+      >
+        <div
+          className="w-full max-w-md rounded-2xl p-6 border shadow-2xl"
+          style={{
+            background: "var(--color-surface)",
+            borderColor: "var(--color-border-default)",
+          }}
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <ShieldAlert
+              className="w-5 h-5"
+              style={{ color: "var(--color-fg-danger)" }}
+            />
+            <h2
+              className="text-lg font-bold"
+              style={{ color: "var(--color-heading)" }}
+            >
+              Save your seed phrase
+            </h2>
+          </div>
+          <p className="text-sm mb-3" style={{ color: "var(--color-body-subtle)" }}>
+            This is the <strong>only</strong> time you'll see it. Write it down
+            and store it safely. Anyone with this phrase controls your wallet.
+          </p>
+          <div
+            className="rounded-lg p-3 font-mono text-sm break-words select-all"
+            style={{
+              background: "var(--color-neutral-secondary-medium)",
+              color: "var(--color-body)",
+            }}
+          >
+            {seedResult.seed_phrase}
+          </div>
+          <p
+            className="text-xs mt-3 mb-4"
+            style={{ color: "var(--color-body-subtle)" }}
+          >
+            Wallet address:{" "}
+            <span className="font-mono">{seedResult.address}</span>
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setSeedResult(null);
+              router.push("/dashboard");
+            }}
+            className="w-full py-2.5 rounded-xl font-semibold text-sm transition-all hover:opacity-90"
+            style={{
+              background: "var(--color-fg-brand)",
+              color: "#ffffff",
+            }}
+          >
+            I've saved it — continue
+          </button>
+        </div>
+      </div>
+    )}
     </>
   );
 }
