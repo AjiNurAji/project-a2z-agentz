@@ -1648,18 +1648,27 @@ async def swap_token_for_eth(
             )
         except Exception as exc:
             if _is_mainnet:
-                # MAINNET: getAmountsOut blocked by shared RPC (Alchemy policy).
-                # NOT a liquidity problem — fall back to documented slippage
-                # floor + WARN; the pre-flight swap SIMULATION is the real gate.
-                logger.warning(
-                    "MAINNET getAmountsOut (sell) unavailable for %s (%s). Falling "
-                    "back to degraded slippage protection (amountOutMin=1). The "
-                    "pre-flight swap simulation remains the authoritative gate.", token, exc,
+                # MAINNET: getAmountsOut MUST succeed — it is the authoritative
+                # price quote that drives amountOutMin. If the quote is
+                # unavailable/invalid we CANNOT safely bound slippage, so we
+                # HARD-REJECT (never broadcast with amountOutMin=1). Raising
+                # here aborts the swap BEFORE signing/broadcasting, protecting
+                # the user from MEV/sandwich (amountOutMin=1 = instant rug).
+                logger.error(
+                    "MAINNET getAmountsOut (sell) FAILED for %s (%s). Strict "
+                    "reject: refusing to build tx with degraded slippage.",
+                    token, exc,
+                )
+                raise RuntimeError(
+                    f"MAINNET slippage protection unavailable for {token}: "
+                    f"getAmountsOut quote failed ({exc}). Swap REJECTED to "
+                    f"prevent MEV exposure."
                 )
             else:
                 logger.warning(
-                    "TESTNET getAmountsOut (sell) unavailable for %s (%s). Proceeding "
-                    "with degraded slippage protection (amountOutMin=1).", token, exc,
+                    "TESTNET getAmountsOut (sell) unavailable for %s (%s). "
+                    "Proceeding with degraded slippage protection (amountOutMin=1).",
+                    token, exc,
                 )
 
         encoded_params = encode(
@@ -1671,7 +1680,11 @@ async def swap_token_for_eth(
         # Read nonce via a direct fresh RPC call (avoids stale MultiRpcProvider cache).
         import urllib.request as _urllib
         import json as _json
-        _rpc_url = (os.environ.get("BASE_SEPOLIA_RPC_1") or rpc_urls[0])
+        _rpc_url = (
+            rpc_urls[0]
+            if rpc_urls
+            else (provider._endpoints[0].url if provider._endpoints else None)
+        )
         _nonce_body = _json.dumps({"jsonrpc": "2.0", "method": "eth_getTransactionCount",
                                   "params": [acct.address, "pending"], "id": 1}).encode()
         try:
@@ -1702,15 +1715,14 @@ async def swap_token_for_eth(
         raw_bytes = getattr(signed, "raw_transaction", None) or getattr(signed, "rawTransaction", None)
         raw = raw_bytes.hex() if isinstance(raw_bytes, (bytes, bytearray)) else raw_bytes
 
-        # Broadcast to the first available Sepolia RPC (Alchemy proven reliable).
-        # We use a direct POST (same path as the manual test that succeeds) and
-        # return as soon as one endpoint accepts the tx.
+        # Broadcast to the CORRECT network's RPC endpoints. Routing is driven
+        # by `rpc_urls` — resolved from network_config for the active chain id
+        # (mainnet BASE_RPC_* / testnet BASE_SEPOLIA_RPC_*) — NEVER hardcoded
+        # testnet env vars. This guarantees a mainnet swap hits mainnet RPCs
+        # and a testnet swap hits testnet RPCs. The HARD SAFETY INTERLOCK
+        # (safety_interlock) below is the final gate before any broadcast.
         results = []
-        broadcast_urls = [u for u in [
-            os.environ.get("BASE_SEPOLIA_RPC_1", ""),
-            os.environ.get("BASE_SEPOLIA_RPC_2", ""),
-            os.environ.get("BASE_SEPOLIA_RPC", ""),
-        ] if u]
+        broadcast_urls = list(rpc_urls)
         if not broadcast_urls:
             broadcast_urls = [e.url for e in provider._endpoints]
         # HARD SAFETY INTERLOCK: never broadcast without the mainnet gate.
