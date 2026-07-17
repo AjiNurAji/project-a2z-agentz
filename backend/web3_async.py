@@ -1546,11 +1546,17 @@ async def swap_token_for_eth(
     *,
     chain_id: int | None = None,
     max_gas_price_gwei: float | None = None,
+    account: "Any | None" = None,
 ) -> dict:
     """Swap token -> ETH via Uniswap V2 on Base (Agent B take-profit exit).
 
     Approves the router first, then calls swapExactTokensForETHSupportingFeeOnTransferTokens.
     Returns dict with tx_hash, token_address, token_amount_wei.
+
+    P7 Dual Execution Mode: `account` selects the signing key.
+      - account=None (default) -> global vault via get_account() [custodial].
+      - account=LocalAccount   -> caller-supplied P3 wallet [self_custodial].
+    The ETH recipient follows the signing account automatically.
     """
     from eth_abi import encode
     from eth_abi import decode as abi_decode
@@ -1576,7 +1582,7 @@ async def swap_token_for_eth(
 
     provider = MultiRpcProvider(rpc_urls=rpc_urls, chain_id=cid)
     try:
-        acct = get_account()
+        acct = account or get_account()
         router = _to_checksum(_router_for_cid(cid))
         token = _to_checksum(token_address)
         weth = _to_checksum(WETH_BASE)

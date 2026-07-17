@@ -125,7 +125,7 @@ function LandingContent() {
 
               <div className="text-[11px] text-[var(--color-body-subtle)] font-mono flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-[var(--color-success)] animate-pulse" />
-                <span>Base Sepolia mainnet-sync</span>
+                <span>Base Mainnet — live</span>
               </div>
             </div>
 

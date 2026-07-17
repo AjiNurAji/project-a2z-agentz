@@ -9,7 +9,7 @@ This document covers the *deployment* steps for A2Z Agentz on **AMD Developer Cl
 - Docker & Docker Compose.
 - Node.js (v18+) for the Web Dashboard.
 - Python (3.10+) for LangGraph, Agent A, and Agent B.
-- An EOA wallet on **Base Mainnet** (for Agent B) + Base Sepolia (for testing).
+- An EOA wallet on **Base Mainnet** (for Agent B).
 
 ## Step 1: Set Up AMD AI Workbench
 

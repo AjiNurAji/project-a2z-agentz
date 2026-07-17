@@ -40,7 +40,7 @@ export function useWalletConnect() {
       const nextSession: WalletSession = {
         address: mockAddress.toLowerCase(),
         walletName: wallet.name + " (Demo)",
-        chainId: "0x2105", // Base Sepolia chain ID
+        chainId: "0x2105", // Base Mainnet chain ID (8453)
         connectedAt: new Date().toISOString(),
         frontendOnly: true,
       };

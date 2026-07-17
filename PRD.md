@@ -323,7 +323,7 @@ AGENT_A_PUBLIC_KEY=public_key_verification
 - [ ] LangGraph state + retry policy
 
 ### Phase 3: Transaction Execution & Security (Upcoming)
-- [ ] Solidity smart contract (Pausable + onlyOwner) deployed on Base Sepolia
+- [ ] Solidity smart contract (Pausable + onlyOwner) deployed on Base Mainnet
 - [ ] Agent B: KMS abstraction, multi-RPC manager, signer
 - [ ] End-to-end ECDSA signature verification
 - [ ] PostgreSQL idempotency check

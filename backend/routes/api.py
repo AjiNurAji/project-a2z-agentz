@@ -19,7 +19,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 import database
 from agent_a_chroma import check_semantic_similarity
 import web3_async as w3_async
-from web3_async import _rotated_rpc_urls, verify_usdc_payment, USDC_BASE, swap_token_for_eth, collect_platform_fee, get_user_wallet_account, send_native_from_account
+from web3_async import _rotated_rpc_urls, swap_token_for_eth, collect_platform_fee, get_user_wallet_account, send_native_from_account
 from lib.dexscreener import get_prices_usd
 from eth_abi import encode as _encode, decode as _decode
 from eth_utils import to_checksum_address as _checksum
@@ -57,7 +57,7 @@ def check_auth(request: Request) -> bool:
 
     token = bearer or request.cookies.get("a2z-token")
     if token == "guest":
-        return False
+        return True  # guest demo mode: read-only mock access, no real user
     if token and verify_access_token(token):
         return True
 
@@ -91,8 +91,12 @@ def require_auth(func):
     return wrapper
 
 
-def _get_uid(request: Request) -> int | None:
-    """Resolve the authenticated user_id from the bearer token (or admin)."""
+def _get_uid(request: Request) -> "int | str | None":
+    """Resolve the authenticated user_id from the bearer token (or admin).
+
+    Returns an int user_id, the guest sentinel string "__guest__" for demo
+    mode, or None if unauthenticated.
+    """
     auth_header = request.headers.get("Authorization", "")
     token = ""
     if auth_header.lower().startswith("bearer "):
@@ -109,11 +113,24 @@ def _get_uid(request: Request) -> int | None:
     # Read-only admin token maps to the system owner (id=1) for scoped reads.
     if ADMIN_TOKEN and token == ADMIN_TOKEN:
         return 1
+    if token == "guest":
+        return "__guest__"  # sentinel: demo mode, serve mock data (no DB)
     return None
+
+
+GUEST_SENTINEL = "__guest__"
+
+
+def _is_guest(uid) -> bool:
+    """True when the caller is the demo/guest sentinel (mock-only access)."""
+    return uid == GUEST_SENTINEL
 
 @require_auth
 async def get_stats(request: Request):
     """Returns global statistics for the dashboard."""
+    if _is_guest(_get_uid(request)):
+        from routes.mock_demo import GUEST_STATS
+        return JSONResponse(GUEST_STATS)
     try:
         with database._get_cursor(dict_rows=True) as cur:
             # Total transactions
@@ -995,6 +1012,11 @@ async def get_holdings(request: Request):
     """
     import httpx as _httpx
 
+    uid = _get_uid(request)
+    if _is_guest(uid):
+        from routes.mock_demo import GUEST_PORTFOLIO
+        return JSONResponse(GUEST_PORTFOLIO)
+
     # Testnet mode: bypass the DB entirely, read on-chain state live.
     network = (request.query_params.get("network") or "mainnet").strip().lower()
     if network == "testnet":
@@ -1068,6 +1090,9 @@ async def get_sell_preference(request: Request):
     uid = _get_uid(request)
     if uid is None:
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    if _is_guest(uid):
+        from routes.mock_demo import GUEST_SETTINGS
+        return JSONResponse({"auto_sell_enabled": GUEST_SETTINGS["auto_sell_enabled"]})
     return JSONResponse({"auto_sell_enabled": database.get_sell_preference(uid)})
 
 
@@ -1077,6 +1102,8 @@ async def set_sell_preference(request: Request):
     uid = _get_uid(request)
     if uid is None:
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    if _is_guest(uid):
+        return JSONResponse({"demo": True, "message": "Demo Mode: Action Simulated", "updated": True})
     try:
         body = await request.json()
     except Exception:
@@ -1084,6 +1111,69 @@ async def set_sell_preference(request: Request):
     enabled = bool(body.get("enabled", False))
     ok = database.set_sell_preference(uid, enabled)
     return JSONResponse({"auto_sell_enabled": enabled, "updated": ok})
+
+
+# ---------------------------------------------------------------------------
+# P7 Dual Execution Mode — per-user custodial vs self-custodial selection
+# ---------------------------------------------------------------------------
+
+async def _resolve_swap_account(uid: int):
+    """Return the signing account for a swap based on the user's execution_mode.
+
+    - 'custodial'      -> None (caller uses the global vault via get_account())
+    - 'self_custodial' -> the user's OWN decrypted P3 wallet (LocalAccount)
+
+    Returns (account_or_none, mode). Raises ValueError if self_custodial is
+    selected but the user has no P3 wallet (should be prevented at set time).
+    """
+    mode = database.get_user_execution_mode(uid)
+    if mode == "self_custodial":
+        try:
+            return get_user_wallet_account(uid), mode
+        except Exception as exc:
+            raise ValueError(f"self_custodial swap unavailable: {exc}")
+    return None, mode
+
+
+@require_auth
+async def get_execution_mode(request: Request):
+    """GET — return the user's current execution mode."""
+    uid = _get_uid(request)
+    if uid is None:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    if _is_guest(uid):
+        from routes.mock_demo import GUEST_SETTINGS
+        return JSONResponse({"execution_mode": GUEST_SETTINGS["execution_mode"]})
+    return JSONResponse({"execution_mode": database.get_user_execution_mode(uid)})
+
+
+@require_auth
+async def set_execution_mode(request: Request):
+    """POST {mode: 'custodial'|'self_custodial'} — switch execution mode.
+
+    Fail-closed: switching to self_custodial requires a P3 wallet (set in DB).
+    """
+    uid = _get_uid(request)
+    if uid is None:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    if _is_guest(uid):
+        return JSONResponse({"demo": True, "message": "Demo Mode: Action Simulated", "updated": True})
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+    mode = (body.get("mode") or "").strip()
+    if mode not in ("custodial", "self_custodial"):
+        return JSONResponse({"error": "mode must be 'custodial' or 'self_custodial'"}, status_code=400)
+    if mode == "self_custodial" and not database.get_user_encrypted_key(uid):
+        return JSONResponse(
+            {"error": "Generate your self-custodial wallet first (P3) before enabling self-custodial mode"},
+            status_code=400,
+        )
+    ok = database.set_user_execution_mode(uid, mode)
+    if not ok:
+        return JSONResponse({"error": "Failed to update execution mode"}, status_code=500)
+    return JSONResponse({"execution_mode": mode, "updated": True})
 
 
 @require_auth
@@ -1117,7 +1207,8 @@ async def manual_sell(request: Request):
         return JSONResponse({"error": "amount_wei must be > 0"}, status_code=400)
 
     try:
-        result = await swap_token_for_eth(addr, amount_wei, chain_id=8453)
+        swap_account, _mode = await _resolve_swap_account(uid)
+        result = await swap_token_for_eth(addr, amount_wei, chain_id=8453, account=swap_account)
         tx_hash = result.get("tx_hash", "")
         database.mark_token_sold(addr, tx_hash, user_id=uid)
         # P1: always skim the platform fee on realized proceeds.
@@ -1212,6 +1303,131 @@ async def cancel_limit_order(request: Request):
         return JSONResponse({"error": "order_id required"}, status_code=400)
     ok = database.cancel_limit_order(oid, uid)
     return JSONResponse({"cancelled": ok})
+
+
+# ---------------------------------------------------------------------------
+# P-OpsiA: Smart Buy Engine (LLM-driven limit buys)
+# ---------------------------------------------------------------------------
+
+@require_auth
+async def list_smart_buys(request: Request):
+    """GET — list the caller's smart-buy orders (all statuses)."""
+    uid = _get_uid(request)
+    if uid is None:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    if _is_guest(uid):
+        from routes.mock_demo import GUEST_SMART_ORDERS
+        return JSONResponse([_smart_buy_dto(o) for o in GUEST_SMART_ORDERS])
+    orders = database.fetch_smart_buy_orders(uid)
+    return JSONResponse([_smart_buy_dto(o) for o in orders])
+
+
+@require_auth
+async def create_smart_buy(request: Request):
+    """POST {token_address, amount_usd, target_entry_usd, ttl_hours?} — queue a smart-buy.
+
+    Normally the LLM (Agent A) creates these; this endpoint supports source='manual'
+    for future UX but mirrors the same guards (ownership, budget, expiry).
+    """
+    uid = _get_uid(request)
+    if uid is None:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    if _is_guest(uid):
+        return JSONResponse({"demo": True, "message": "Demo Mode: Action Simulated", "id": 999, "status": "PENDING"})
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+
+    token = (body.get("token_address") or "").strip()
+    if not token or not token.startswith("0x") or len(token) != 42:
+        return JSONResponse({"error": "valid token_address required"}, status_code=400)
+    try:
+        amount_usd = float(body.get("amount_usd") or 0)
+        target = float(body.get("target_entry_usd") or 0)
+    except (TypeError, ValueError):
+        return JSONResponse({"error": "amount_usd and target_entry_usd must be numeric"}, status_code=400)
+    if amount_usd <= 0 or target <= 0:
+        return JSONResponse({"error": "amount_usd and target_entry_usd must be > 0"}, status_code=400)
+    # Budget guard (aligned with Agent B buy size).
+    _cap = float(os.getenv("AGENT_B_MAX_TX_USD", "2.0"))
+    if amount_usd > _cap:
+        return JSONResponse({"error": f"amount_usd exceeds cap {_cap}"}, status_code=400)
+    ttl = float(body.get("ttl_hours") or os.getenv("SMART_BUY_TTL_HOURS", "4"))
+    try:
+        from datetime import datetime, timedelta, timezone
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=ttl)
+    except Exception:
+        return JSONResponse({"error": "invalid ttl_hours"}, status_code=400)
+
+    oid = database.insert_smart_buy_order(
+        user_id=uid, token_address=token, token_name=body.get("token_name") or "Unknown",
+        amount_wei=_usd_to_wei_real(amount_usd), target_entry_usd=target,
+        expires_at=expires_at, source="manual",
+    )
+    if not oid:
+        return JSONResponse({"error": "failed to queue order"}, status_code=500)
+    return JSONResponse({"id": oid, "status": "PENDING", "target_entry_usd": target, "expires_at": expires_at.isoformat()})
+
+
+@require_auth
+async def cancel_smart_buy(request: Request):
+    """POST {order_id} — cancel the caller's own PENDING smart-buy order."""
+    uid = _get_uid(request)
+    if uid is None:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    if _is_guest(uid):
+        return JSONResponse({"demo": True, "message": "Demo Mode: Action Simulated", "cancelled": True})
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+    oid = int(body.get("order_id") or 0)
+    if oid <= 0:
+        return JSONResponse({"error": "order_id required"}, status_code=400)
+    ok = database.cancel_smart_buy_order(oid, uid)
+    return JSONResponse({"cancelled": ok})
+
+
+@require_auth
+async def admin_list_smart_buys(request: Request):
+    """GET (?status=) — admin view of ALL smart-buy orders across users."""
+    admin = request.headers.get("X-Admin-Token")
+    if not ADMIN_TOKEN or not admin or admin != ADMIN_TOKEN:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    status = request.query_params.get("status")
+    # Admin sees everything: reuse open-fetch when filtered, else scan via per-user.
+    if status == "PENDING":
+        rows = database.fetch_smart_buy_orders_open()
+    else:
+        # No global list helper; aggregate via open + a lightweight scan.
+        rows = database.fetch_smart_buy_orders_open()
+        if not status:
+            # include non-pending too (best-effort admin visibility)
+            try:
+                with database._get_cursor(dict_rows=True) as cur:
+                    cur.execute("SELECT * FROM user_smart_buy_orders ORDER BY created_at DESC LIMIT 500;")
+                    rows = [dict(r) for r in cur.fetchall()]
+            except Exception:
+                pass
+    return JSONResponse([_smart_buy_dto(o) for o in rows])
+
+
+def _smart_buy_dto(o: dict) -> dict:
+    return {
+        "id": o.get("id"),
+        "token_address": o.get("token_address"),
+        "token_name": o.get("token_name"),
+        "amount_wei": str(o.get("amount_wei")),
+        "target_entry_usd": o.get("target_entry_usd"),
+        "status": o.get("status"),
+        "source": o.get("source"),
+        "created_at": o.get("created_at").isoformat() if o.get("created_at") else None,
+        "expires_at": o.get("expires_at").isoformat() if o.get("expires_at") else None,
+        "executed_at": o.get("executed_at").isoformat() if o.get("executed_at") else None,
+        "buy_tx_hash": o.get("buy_tx_hash"),
+        "executed_price_usd": o.get("executed_price_usd"),
+    }
 
 
 @require_auth
@@ -1369,91 +1585,6 @@ async def get_gpu_metrics(request: Request):
     return JSONResponse({"gpu": gpu, "available": True}, status_code=200)
 
 
-# ---------------------------------------------------------------------------
-# Subscription / Payment verification (P4: crypto-native, TxHash flow)
-# ---------------------------------------------------------------------------
-
-# Static plan catalog (business config — future: move to runtime config store).
-PLAN_PRICES_USDC = {
-    "free": 0.0,
-    "pro": 29.0,
-    "enterprise": 199.0,
-}
-PLAN_DURATION_DAYS = {
-    "free": 0,
-    "pro": 30,
-    "enterprise": 30,
-}
-PAYMENT_VAULT_ADDRESS = os.getenv("PAYMENT_VAULT_ADDRESS", "")
-
-
-async def verify_payment(request: Request):
-    """Verify a user-submitted USDC payment TxHash and activate the plan.
-
-    Body: {"user_id": int, "tx_hash": str, "plan": "pro"|"enterprise"}
-    Checks the tx receipt for a USDC Transfer to PAYMENT_VAULT_ADDRESS of the
-    correct amount, then activates the plan for 30 days.
-    """
-    try:
-        data = await request.json()
-    except Exception:
-        return JSONResponse({"ok": False, "error": "Invalid JSON"}, status_code=400)
-
-    user_id = data.get("user_id")
-    tx_hash = (data.get("tx_hash") or "").strip()
-    plan = (data.get("plan") or "").strip().lower()
-
-    if not user_id or not tx_hash or plan not in PLAN_PRICES_USDC:
-        return JSONResponse(
-            {"ok": False, "error": "user_id, tx_hash, and valid plan required"},
-            status_code=422,
-        )
-    if plan == "free":
-        return JSONResponse({"ok": False, "error": "free plan needs no payment"}, status_code=400)
-
-    if not PAYMENT_VAULT_ADDRESS:
-        return JSONResponse({"ok": False, "error": "PAYMENT_VAULT_ADDRESS not configured"}, status_code=500)
-
-    expected = PLAN_PRICES_USDC[plan]
-    # Resolve chain from active network (testnet -> sepolia USDC check skipped; mainnet only)
-    cid = int(os.getenv("BASE_CHAIN_ID", "8453"))
-    result = await verify_usdc_payment(
-        tx_hash, PAYMENT_VAULT_ADDRESS, expected, chain_id=cid
-    )
-    if not result.get("ok"):
-        return JSONResponse(
-            {"ok": False, "error": f"payment verification failed: {result.get('reason')}"},
-            status_code=402,
-        )
-
-    # Activate plan
-    from datetime import datetime, timedelta
-    active_until = datetime.utcnow() + timedelta(days=PLAN_DURATION_DAYS[plan])
-    ok = database.update_user_plan(user_id, plan, active_until, payment_ref=tx_hash)
-    if not ok:
-        return JSONResponse({"ok": False, "error": "failed to update user plan"}, status_code=500)
-
-    return JSONResponse({
-        "ok": True,
-        "plan": plan,
-        "plan_active_until": active_until.strftime("%Y-%m-%d %H:%M:%S"),
-        "amount_usdc": result.get("amount_usdc"),
-    })
-
-
-async def get_plans(request: Request):
-    """Return the public plan catalog (prices in USDC)."""
-    return JSONResponse({
-        "plans": [
-            {"id": "free", "name": "Free", "price_usdc": PLAN_PRICES_USDC["free"], "duration_days": 0},
-            {"id": "pro", "name": "Pro", "price_usdc": PLAN_PRICES_USDC["pro"], "duration_days": PLAN_DURATION_DAYS["pro"]},
-            {"id": "enterprise", "name": "Enterprise", "price_usdc": PLAN_PRICES_USDC["enterprise"], "duration_days": PLAN_DURATION_DAYS["enterprise"]},
-        ],
-        "payment_vault_address": PAYMENT_VAULT_ADDRESS,
-        "usdc_address": USDC_BASE,
-    })
-
-
 routes = [
     Route("/health", health, methods=["GET"]),
     Route("/stats", get_stats, methods=["GET"]),
@@ -1464,8 +1595,6 @@ routes = [
     Route("/gpu-metrics", get_gpu_metrics, methods=["GET"]),
     Route("/analyze", analyze_target, methods=["POST"]),
     Route("/status", get_execution_status, methods=["GET"]),
-    Route("/plans", get_plans, methods=["GET"]),
-    Route("/verify-payment", verify_payment, methods=["POST"]),
     Route("/holdings", get_holdings, methods=["GET"]),
     Route("/sell-preference", get_sell_preference, methods=["GET"]),
     Route("/sell-preference", set_sell_preference, methods=["POST"]),
@@ -1474,4 +1603,10 @@ routes = [
     Route("/limit-orders", get_limit_orders, methods=["GET"]),
     Route("/limit-orders/cancel", cancel_limit_order, methods=["POST"]),
     Route("/withdraw", withdraw, methods=["POST"]),
+    Route("/smart-buy", list_smart_buys, methods=["GET"]),
+    Route("/smart-buy", create_smart_buy, methods=["POST"]),
+    Route("/smart-buy/cancel", cancel_smart_buy, methods=["POST"]),
+    Route("/admin/smart-buy", admin_list_smart_buys, methods=["GET"]),
+    Route("/execution-mode", get_execution_mode, methods=["GET"]),
+    Route("/execution-mode", set_execution_mode, methods=["POST"]),
 ]

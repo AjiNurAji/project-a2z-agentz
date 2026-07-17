@@ -590,7 +590,7 @@ def save_user_encrypted_wallet(user_id: int, encrypted_blob: str, generated_addr
     return False
 
 def get_user_by_id(user_id: int) -> dict:
-    query = "SELECT id, email, wallet_address, plan, plan_active_until, payment_ref, created_at, last_login_at FROM users WHERE id = %s LIMIT 1;"
+    query = "SELECT id, email, wallet_address, plan, plan_active_until, payment_ref, created_at, last_login_at, execution_mode FROM users WHERE id = %s LIMIT 1;"
     try:
         with _get_cursor() as cur:
             cur.execute(query, (user_id,))
@@ -604,12 +604,44 @@ def get_user_by_id(user_id: int) -> dict:
                     'plan_active_until': row[4].strftime('%Y-%m-%d %H:%M:%S') if row[4] else None,
                     'payment_ref': row[5],
                     'created_at': row[6].strftime('%Y-%m-%d %H:%M:%S') if row[6] else None,
-                    'last_login_at': row[7].strftime('%Y-%m-%d %H:%M:%S') if row[7] else None
+                    'last_login_at': row[7].strftime('%Y-%m-%d %H:%M:%S') if row[7] else None,
+                    'execution_mode': row[8] or 'custodial',
                 }
     except psycopg2.Error as exc:
         logger.error("get_user_by_id failed: %s", exc)
         return None
     return None
+
+
+def get_user_execution_mode(user_id: int) -> str:
+    """Return the user's execution mode: 'custodial' (default) or 'self_custodial'."""
+    user = get_user_by_id(user_id)
+    if not user:
+        return 'custodial'
+    return user.get('execution_mode') or 'custodial'
+
+
+def set_user_execution_mode(user_id: int, mode: str) -> bool:
+    """Persist the user's execution mode.
+
+    Only accepts 'custodial' or 'self_custodial'. Rejects switching to
+    self_custodial when the user has no encrypted (P3) wallet yet — they must
+    generate one first (P3). Fail-closed.
+    """
+    if mode not in ('custodial', 'self_custodial'):
+        return False
+    if mode == 'self_custodial':
+        # Guard: require a P3 wallet before allowing self-custodial execution.
+        if not get_user_encrypted_key(user_id):
+            return False
+    query = "UPDATE users SET execution_mode = %s WHERE id = %s;"
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (mode, user_id))
+            return cur.rowcount > 0
+    except psycopg2.Error as exc:
+        logger.error("set_user_execution_mode failed for user %s: %s", user_id, exc)
+        return False
 
 
 def get_user_encrypted_key(user_id: int) -> str | None:
@@ -633,87 +665,13 @@ def get_user_encrypted_key(user_id: int) -> str | None:
     return None
 
 
-def update_user_plan(user_id: int, plan: str, plan_active_until, payment_ref: str | None = None) -> bool:
-    """Activate a subscription plan for a user. plan_active_until is a
-    datetime (or None). Returns True on success."""
-    query = """
-        UPDATE users SET plan = %s, plan_active_until = %s, payment_ref = %s
-        WHERE id = %s;
-    """
-    try:
-        with _get_cursor() as cur:
-            cur.execute(query, (plan, plan_active_until, payment_ref, user_id))
-            return cur.rowcount > 0
-    except psycopg2.Error as exc:
-        logger.error("update_user_plan failed: %s", exc)
-        return False
+# --- P4 subscription plan helpers REMOVED (AaaS zero-friction pivot) ---
+# update_user_plan / get_user_plan / is_plan_active / count_user_daily_trades
+# were dropped when the subscription/plan-gate model was retired. Monetization
+# is now via the P1 platform fee only. The users.plan / plan_active_until /
+# payment_ref columns are intentionally LEFT IN PLACE (no destructive migration)
+# for stability and backward data compatibility; they are simply unused.
 
-
-def get_user_plan(user_id: int) -> str:
-    """Return the user's current plan string (default 'free')."""
-    try:
-        with _get_cursor() as cur:
-            cur.execute("SELECT plan FROM users WHERE id = %s LIMIT 1;", (user_id,))
-            row = cur.fetchone()
-            return row[0] if row else "free"
-    except psycopg2.Error as exc:
-        logger.error("get_user_plan failed: %s", exc)
-        return "free"
-
-
-def is_plan_active(user_id: int) -> bool:
-    """Return True if the user's paid plan (pro/enterprise) is currently
-    within its active window (plan_active_until is set AND in the future).
-
-    Free users, users with a NULL/empty plan_active_until, or an expired
-    window all return False. Used by the plan gate to deny real execution
-    to non-paying users on mainnet.
-    """
-    try:
-        with _get_cursor() as cur:
-            cur.execute(
-                "SELECT plan, plan_active_until FROM users WHERE id = %s LIMIT 1;",
-                (user_id,),
-            )
-            row = cur.fetchone()
-            if not row:
-                return False
-            _plan, _until = row[0], row[1]
-            # Free tier is never "active" for real-exec purposes.
-            if _plan in (None, "", "free"):
-                return False
-            if _until is None:
-                return False
-            # plan_active_until is a datetime; compare to server NOW().
-            return _until > datetime.utcnow()
-    except psycopg2.Error as exc:
-        logger.error("is_plan_active failed: %s", exc)
-        # Fail closed: if we cannot verify the plan is paid+active, deny.
-        return False
-
-
-def count_user_daily_trades(user_id: int, network: str = "mainnet") -> int:
-    """Count the number of SUCCESS execution_logs for a user since UTC midnight
-    today. Used to enforce the free-plan daily trade cap. Returns 0 on error
-    (fail closed -> cap is effectively hit, which is safe).
-    """
-    try:
-        with _get_cursor() as cur:
-            cur.execute(
-                """
-                SELECT COUNT(*) FROM execution_logs
-                WHERE user_id = %s
-                  AND UPPER(status) = 'SUCCESS'
-                  AND network = %s
-                  AND created_at >= date_trunc('day', CURRENT_TIMESTAMP AT TIME ZONE 'UTC');
-                """,
-                (user_id, network),
-            )
-            row = cur.fetchone()
-            return int(row[0]) if row else 0
-    except psycopg2.Error as exc:
-        logger.error("count_user_daily_trades failed: %s", exc)
-        return 0
 
 def update_last_login(user_id: int) -> None:
     query = "UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = %s;"
@@ -949,6 +907,9 @@ def ensure_pipeline_tables() -> None:
                     "ALTER TABLE users ADD COLUMN IF NOT EXISTS auto_sell_enabled BOOLEAN NOT NULL DEFAULT FALSE;"
                 )
                 cur.execute(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS execution_mode VARCHAR(16) NOT NULL DEFAULT 'custodial';"
+                )
+                cur.execute(
                     "ALTER TABLE held_tokens ADD COLUMN IF NOT EXISTS user_id INTEGER;"
                 )
                 cur.execute(
@@ -967,6 +928,27 @@ def ensure_pipeline_tables() -> None:
                         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                         filled_at TIMESTAMP,
                         fill_tx_hash VARCHAR(66)
+                    );
+                    """
+                )
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS user_smart_buy_orders (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER NOT NULL,
+                        token_address VARCHAR(42) NOT NULL,
+                        token_name VARCHAR(255),
+                        amount_wei NUMERIC(78) NOT NULL DEFAULT 0,
+                        target_entry_usd NUMERIC(20, 8) NOT NULL,
+                        status VARCHAR(16) NOT NULL DEFAULT 'PENDING'
+                            CHECK (status IN ('PENDING','EXECUTED','CANCELLED','EXPIRED')),
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        expires_at TIMESTAMP NOT NULL,
+                        executed_at TIMESTAMP,
+                        buy_tx_hash VARCHAR(66),
+                        executed_price_usd NUMERIC(20, 8),
+                        source VARCHAR(16) DEFAULT 'llm'
+                            CHECK (source IN ('llm','manual'))
                     );
                     """
                 )
@@ -1476,6 +1458,106 @@ def mark_limit_filled(order_id: int, fill_tx_hash: str) -> bool:
     except psycopg2.Error as exc:
         logger.error("mark_limit_filled failed: %s", exc)
         return False
+
+
+
+# ---------------------------------------------------------------------------
+# P-OpsiA: Smart Buy Orders (LLM-driven limit-buy engine)
+# ---------------------------------------------------------------------------
+
+def insert_smart_buy_order(user_id: int, token_address: str, token_name: str,
+                           amount_wei: int, target_entry_usd: float,
+                           expires_at, source: str = "llm") -> int | None:
+    """Queue an LLM-driven smart-buy order (PENDING). Returns order id or None."""
+    query = """
+    INSERT INTO user_smart_buy_orders
+        (user_id, token_address, token_name, amount_wei, target_entry_usd, expires_at, source)
+    VALUES (%s, %s, %s, %s, %s, %s, %s)
+    RETURNING id;
+    """
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (user_id, token_address, token_name, amount_wei,
+                                target_entry_usd, expires_at, source))
+            row = cur.fetchone()
+            return row[0] if row else None
+    except psycopg2.Error as exc:
+        logger.error("insert_smart_buy_order failed: %s", exc)
+        return None
+
+
+def fetch_smart_buy_orders(user_id: int, status: str | None = None) -> list[dict]:
+    """List a user's smart-buy orders (all statuses by default)."""
+    if status:
+        query = "SELECT * FROM user_smart_buy_orders WHERE user_id = %s AND status = %s ORDER BY created_at DESC;"
+        params = (user_id, status)
+    else:
+        query = "SELECT * FROM user_smart_buy_orders WHERE user_id = %s ORDER BY created_at DESC;"
+        params = (user_id,)
+    try:
+        with _get_cursor(dict_rows=True) as cur:
+            cur.execute(query, params)
+            return [dict(r) for r in cur.fetchall()]
+    except psycopg2.Error as exc:
+        logger.error("fetch_smart_buy_orders failed: %s", exc)
+        return []
+
+
+def fetch_smart_buy_orders_open() -> list[dict]:
+    """Return ALL pending smart-buy orders across users (worker poll loop)."""
+    try:
+        with _get_cursor(dict_rows=True) as cur:
+            cur.execute(
+                "SELECT * FROM user_smart_buy_orders WHERE status = 'PENDING' ORDER BY created_at ASC;"
+            )
+            return [dict(r) for r in cur.fetchall()]
+    except psycopg2.Error as exc:
+        logger.error("fetch_smart_buy_orders_open failed: %s", exc)
+        return []
+
+
+def cancel_smart_buy_order(order_id: int, user_id: int) -> bool:
+    """Cancel a user's own PENDING smart-buy order (idempotent, ownership-scoped)."""
+    try:
+        with _get_cursor() as cur:
+            cur.execute(
+                "UPDATE user_smart_buy_orders SET status = 'CANCELLED', executed_at = CURRENT_TIMESTAMP "
+                "WHERE id = %s AND user_id = %s AND status = 'PENDING';",
+                (order_id, user_id),
+            )
+            return cur.rowcount > 0
+    except psycopg2.Error as exc:
+        logger.error("cancel_smart_buy_order failed: %s", exc)
+        return False
+
+
+def mark_smart_buy_executed(order_id: int, tx_hash: str, executed_price_usd: float) -> bool:
+    """Mark a PENDING smart-buy order as EXECUTED with the real on-chain fill price."""
+    try:
+        with _get_cursor() as cur:
+            cur.execute(
+                "UPDATE user_smart_buy_orders SET status = 'EXECUTED', executed_at = CURRENT_TIMESTAMP, "
+                "buy_tx_hash = %s, executed_price_usd = %s WHERE id = %s AND status = 'PENDING';",
+                (tx_hash, executed_price_usd, order_id),
+            )
+            return cur.rowcount > 0
+    except psycopg2.Error as exc:
+        logger.error("mark_smart_buy_executed failed: %s", exc)
+        return False
+
+
+def expire_smart_buy_orders() -> int:
+    """Flip overdue PENDING smart-buy orders to EXPIRED. Returns count expired."""
+    try:
+        with _get_cursor() as cur:
+            cur.execute(
+                "UPDATE user_smart_buy_orders SET status = 'EXPIRED', executed_at = CURRENT_TIMESTAMP "
+                "WHERE status = 'PENDING' AND expires_at < CURRENT_TIMESTAMP;"
+            )
+            return cur.rowcount
+    except psycopg2.Error as exc:
+        logger.error("expire_smart_buy_orders failed: %s", exc)
+        return 0
 
 
 

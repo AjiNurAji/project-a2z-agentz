@@ -99,6 +99,7 @@ class AIResult:
     category: str             # "defi" | "nft" | "social" | "gaming" | "infrastructure" | "airdrop" | "other"
     reason: str               # <= 200 chars
     amount_usd: float         # 0.10..2.00
+    target_entry_usd: float | None  # LLM-suggested BUY limit price (USD). None = immediate market buy.
     model: str                # which model produced this (e.g. "mock-llama3-8b", "meta-llama/...")
     latency_ms: int           # wall-clock for inference
 
@@ -260,7 +261,7 @@ _AI_SYSTEM_PROMPT = (
     "- If ANY red flag (no liquidity, no volume, brand new, extreme pump) → cap score at 40.\n\n"
     "Respond with ONLY a valid JSON object, no prose, no markdown. Schema:\n"
     '{"score": <int 1-100>, "category": <one of defi|nft|social|gaming|infrastructure|airdrop|other>, '
-    '"reason": <string <=200 chars citing specific DEX data>, "amount_usd": <float 0.10-2.00>}\n\n'
+    '"reason": <string <=200 chars citing specific DEX data>, "amount_usd": <float 0.10-2.00>, "target_entry_usd": <float|null, USD price at/below which to BUY; null = buy at market now>}\n\n'
     "Rules:\n"
     "- score>=85 AND liquidity>$200K AND volume>$10K → amount_usd=2.00 (strong signal)\n"
     "- score>=60 AND no red flags → amount_usd=0.50 (eligible for micro execution)\n"
@@ -354,6 +355,11 @@ def _openai_compat_infer(
     category = str(parsed.get("category", "other"))[:32]
     reason = str(parsed.get("reason", ""))[:200]
     amount_usd = _clamp_amount(parsed.get("amount_usd", 0.0))
+    _raw_target = parsed.get("target_entry_usd", None)
+    try:
+        target_entry_usd = float(_raw_target) if _raw_target not in (None, "", 0) else None
+    except (TypeError, ValueError):
+        target_entry_usd = None
 
     logger.info(
         "[AMD MI300X COMPUTE] vLLM returned | model=%s latency=%dms score=%d category=%s",
@@ -361,7 +367,7 @@ def _openai_compat_infer(
     )
     return AIResult(
         score=score, category=category, reason=reason,
-        amount_usd=amount_usd, model=model,
+        amount_usd=amount_usd, target_entry_usd=target_entry_usd, model=model,
         latency_ms=int((time.time() - t0) * 1000),
     )
 

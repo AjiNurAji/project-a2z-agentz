@@ -42,6 +42,7 @@ async def lifespan(app: Starlette):
     else:
         start_scheduler()
         task = asyncio.create_task(poll_and_broadcast())
+        smart_buy_task = None  # created below; guarded on shutdown
         # Agent B runs as a dedicated daemon (continuous queue poll) so it
         # never hits APScheduler's max_instances cap. worker_loop is a pure
         # coroutine (await poll + await process_task + await broadcast) so it
@@ -58,6 +59,15 @@ async def lifespan(app: Starlette):
             print("[STARTUP] Agent B daemon task created:", agent_b_task)
         except Exception as exc:
             print(f"[STARTUP-ERROR] Agent B daemon failed to start: {exc}")
+        # P-OpsiA: Smart Buy Engine daemon (LLM-driven limit buys). Runs as a
+        # dedicated asyncio task polling PENDING orders; fills when market hits
+        # the LLM's target_entry_usd, expires stale orders after SMART_BUY_TTL_HOURS.
+        from scheduler.agent_smart_buy import run_smart_buy_daemon
+        try:
+            smart_buy_task = asyncio.create_task(run_smart_buy_daemon())
+            print("[STARTUP] Smart-Buy daemon task created:", smart_buy_task)
+        except Exception as exc:
+            print(f"[STARTUP-ERROR] Smart-Buy daemon failed to start: {exc}")
         # Self-heal the system/owner user (id=1) so Agent A's enqueue_target
         # FK (scraping_queue_user_fk) doesn't fail on fresh Railway databases.
         database.ensure_system_user()
@@ -85,6 +95,8 @@ async def lifespan(app: Starlette):
         stop_scheduler()
         task.cancel()
         agent_b_task.cancel()
+        if smart_buy_task is not None:
+            smart_buy_task.cancel()
         return
     yield
 

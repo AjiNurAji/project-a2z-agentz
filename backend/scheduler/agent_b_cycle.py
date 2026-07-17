@@ -11,6 +11,7 @@ import logging
 import os
 import re
 import time
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import aiohttp
@@ -31,12 +32,34 @@ from database import (
     update_task_status,
 )
 from routes.websockets import manager
-from web3_async import MultiRpcProvider, send_native_transaction, send_proof_of_execution, _usd_to_wei_real, swap_eth_for_token, swap_token_for_eth, WETH_BASE
+from web3_async import MultiRpcProvider, send_native_transaction, send_proof_of_execution, _usd_to_wei_real, swap_eth_for_token, swap_token_for_eth, WETH_BASE, get_user_wallet_account
 from eth_utils.address import to_checksum_address as _to_checksum
 
 load_dotenv()
 
 logger = logging.getLogger("a2z.agent_b")
+
+
+def _b_swap_account(user_id: "int | None"):
+    """P7 Dual Execution Mode: pick the swap signing key for a user.
+
+    - user_id None (legacy global-vault row) -> None (custodial vault)
+    - mode 'custodial'      -> None (swap_token_for_eth uses the global vault)
+    - mode 'self_custodial' -> the user's OWN decrypted P3 wallet
+
+    Returns the LocalAccount (or None). On any failure (no wallet, decrypt
+    error) it falls back to None (custodial) so the swap still executes from
+    the vault rather than blocking the agent loop. The set_execution_mode
+    guard already prevents selecting self_custodial without a P3 wallet.
+    """
+    if not user_id:
+        return None
+    try:
+        if database.get_user_execution_mode(user_id) == "self_custodial":
+            return get_user_wallet_account(user_id)
+    except Exception as exc:
+        logger.warning("P7 swap-account resolve failed for user %s (fallback vault): %s", user_id, exc)
+    return None
 
 AGENT_B_ENDPOINT = os.getenv("AGENT_B_ENDPOINT", "")
 AGENT_B_MODEL = os.getenv("AGENT_B_MODEL", "accounts/fireworks/models/deepseek-v4-pro")
@@ -390,73 +413,11 @@ async def process_task(task: dict[str, Any]) -> None:
   source = task.get("source") or "unknown"
   _is_testnet = os.getenv("ACTIVE_NETWORK", "base").strip().lower() == "base_sepolia"
 
-  # --- Subscription plan gate (P4 enforcement) ---
-  # Determine the owning user's plan and enforce free-plan limits.
+  # --- AaaS zero-friction: no subscription plan gate ---
+  # Monetization is via P1 platform fee (skimmed on realized sells) — not
+  # access gating. Every user runs real execution, governed globally by the
+  # P7 safety gates (AGENT_B_REAL_EXECUTION / AGENT_B_DRY_RUN / MAINNET_CONFIRM).
   _owner_id = task.get("user_id") or 1
-  try:
-    _plan = database.get_user_plan(_owner_id)
-  except Exception:
-    _plan = "free"
-  _free_allow_real = os.getenv("FREE_PLAN_ALLOW_REAL_EXECUTION", "0") == "1"
-  _free_daily_cap = int(os.getenv("FREE_PLAN_DAILY_TRADE_CAP", "0") or "0")
-  _network_flag = "testnet" if _is_testnet else "mainnet"
-
-  # Admin bypass: user IDs listed in ADMIN_USER_IDS (comma-separated) are
-  # operators/owners. They bypass the plan gate entirely (real execution
-  # allowed even without an active paid plan). The operator accepts all risk.
-  _admin_ids_raw = os.getenv("ADMIN_USER_IDS", "")
-  _admin_ids: set[int] = set()
-  for _aid in _admin_ids_raw.split(","):
-    _aid = _aid.strip()
-    if _aid.isdigit():
-      _admin_ids.add(int(_aid))
-  _is_admin = _owner_id in _admin_ids
-
-  # Tier-0 (free) gate state, default = blocked.
-  _plan_blocked_real = False
-  _plan_blocked_cap = False
-  _paid = False
-  try:
-    _paid = bool(database.is_plan_active(_owner_id))
-  except Exception:
-    _paid = False
-
-  if _is_testnet:
-    # Testnet sandbox ALWAYS runs (free or paid) — it is the judge/demo surface.
-    pass
-  elif _is_admin:
-    # Operator/owner bypass: admin runs real execution regardless of plan.
-    # The operator explicitly accepts the EIP-7702 / execution risk.
-    logger.info(
-      "Plan gate: user %s is ADMIN -> bypassing plan gate (real execution allowed).",
-      _owner_id,
-    )
-  else:
-    # MAINNET gate:
-    # 1) Real execution is reserved for paid (active) plans. Free users may
-    #    only run in demo mode unless explicitly allowed via env override.
-    if not _paid and not _free_allow_real:
-      _plan_blocked_real = True
-    # 2) Free-plan daily trade cap (count of SUCCESS logs since UTC midnight).
-    if not _paid and _free_daily_cap > 0:
-      try:
-        _used = database.count_user_daily_trades(_owner_id, network=_network_flag)
-      except Exception:
-        _used = _free_daily_cap  # fail closed -> treat cap as hit
-      if _used >= _free_daily_cap:
-        _plan_blocked_cap = True
-
-  if _plan_blocked_real:
-    logger.info(
-      "Plan gate [HARD-BLOCK]: user %s plan='%s' (paid=%s) -> mainnet REAL execution DENIED (demo/sim only).",
-      _owner_id, _plan, _paid,
-    )
-  if _plan_blocked_cap:
-    logger.info(
-      "Plan gate [HARD-BLOCK]: user %s hit free daily trade cap (%d) -> further real trades DENIED on mainnet.",
-      _owner_id, _free_daily_cap,
-    )
-  # (Paid/Pro/Enterprise pass through; AGENT_B_REAL_EXECUTION still governs globally.)
 
   # Agent B's prompt so the vault scores with full A2Z agent-to-agent context.
   dex_context = ""
@@ -724,34 +685,46 @@ async def process_task(task: dict[str, Any]) -> None:
         print(f"DEBUG_EXEC: Conditions FAILED. Score status: {score >= MAX_SCORE_FOR_AUTO}, Health status: {rpc_health}")
 
     if score >= MAX_SCORE_FOR_AUTO and rpc_health:
-        # ---- Plan gate (P4 HARD-BLOCK) ----
-        # If this is a mainnet run and the user's plan is NOT paid/active
-        # (free tier, expired, or never subscribed), DENY real on-chain
-        # execution absolutely. They only ever get demo/simulation output.
-        # Testnet sandbox is exempt (judge/demo surface, never real value).
-        _gate_denied = False
-        if not _is_testnet and (_plan_blocked_real or _plan_blocked_cap):
-            _gate_denied = True
-            logger.warning(
-                "Plan gate [HARD-BLOCK]: SKIPPING real execution for queue_id=%s "
-                "(user=%s, paid=%s, blocked_real=%s, blocked_cap=%s). "
-                "Falling back to demo/mock execution only.",
-                queue_id, _owner_id, _paid, _plan_blocked_real, _plan_blocked_cap,
-            )
-            append_audit_log(
-                "agent_b.plan_gate_denied",
-                "Real execution blocked by plan gate (free tier / cap hit)",
-                {
-                    "queue_id": queue_id, "user_id": _owner_id, "paid": _paid,
-                    "blocked_real": _plan_blocked_real, "blocked_cap": _plan_blocked_cap,
-                },
-            )
-
         # ---- Real on-chain execution (A2Z Agent B gatekeeper) ----
         # Gated by AGENT_B_REAL_EXECUTION so a demo never accidentally spends.
         # EXECUTION ENFORCEMENT: insert proposal but DON'T let a failed insert
         # kill the thread -- log it and continue to send_native_transaction.
         try:
+            # P-OpsiA: LLM-driven limit-buy. If Agent A supplied a target_entry_usd,
+            # QUEUE a PENDING smart-buy order instead of buying immediately. The
+            # dedicated worker (scheduler/agent_smart_buy.py) polls price and fills
+            # when the market hits the LLM's entry. Anti-hallucination + expiry are
+            # enforced in the worker; here we only persist the intent.
+            _raw_target = (payload.get("target_entry_usd") or 0) or 0
+            try:
+                _target_entry = float(_raw_target)
+            except (TypeError, ValueError):
+                _target_entry = 0.0
+            if _target_entry > 0 and amount_usd > 0:
+                _ttl_hours = float(os.getenv("SMART_BUY_TTL_HOURS", "4"))
+                _expires = datetime.now(timezone.utc) + timedelta(hours=_ttl_hours)
+                _order_id = database.insert_smart_buy_order(
+                    user_id=_owner_id,
+                    token_address=contract_address,
+                    token_name=token_name,
+                    amount_wei=_usd_to_wei_real(amount_usd),
+                    target_entry_usd=_target_entry,
+                    expires_at=_expires,
+                    source="llm",
+                )
+                if _order_id:
+                    logger.info(
+                        "P-OpsiA smart-buy QUEUED order=%s user=%s token=%s target=$%.8f ttl=%.1fh",
+                        _order_id, _owner_id, contract_address, _target_entry, _ttl_hours,
+                    )
+                    append_audit_log(
+                        "agent_b.smart_buy_queued",
+                        f"LLM limit-buy queued order={_order_id} target=${_target_entry:.8f}",
+                        {"queue_id": queue_id, "order_id": _order_id, "user_id": _owner_id},
+                    )
+                    proposal_id = insert_transaction_proposal(synthesis_id, amount_usd, None)
+                    return  # queued; worker handles execution. Skip immediate buy.
+
             proposal_id = insert_transaction_proposal(synthesis_id, amount_usd, None)
             append_audit_log(
                 "agent_b.proposal_created",
@@ -764,7 +737,7 @@ async def process_task(task: dict[str, Any]) -> None:
             proposal_id = None
 
         try:
-            if os.getenv("AGENT_B_REAL_EXECUTION", "0") == "1" and not _gate_denied:
+            if os.getenv("AGENT_B_REAL_EXECUTION", "0") == "1":
                 _active = os.getenv("ACTIVE_NETWORK", "base")
                 if _active == "base_sepolia":
                     # --- Base Sepolia REAL SWAP (strict-mirroring testnet) ---
@@ -947,7 +920,10 @@ async def _check_take_profit() -> None:
 
             logger.info("TAKE PROFIT TRIGGERED: %s +%.1f%% — selling...", name, profit_pct)
             try:
-                result = await swap_token_for_eth(addr, int(token.get("amount_wei") or 0), chain_id=8453)
+                result = await swap_token_for_eth(
+                    addr, int(token.get("amount_wei") or 0), chain_id=8453,
+                    account=_b_swap_account(owner),
+                )
                 mark_token_sold(addr, result["tx_hash"])
                 # P1: platform fee on realized ETH proceeds, routed to ADMIN_VAULT.
                 # Guardrails: skipped entirely when AGENT_B_DRY_RUN=1 (demo), when
@@ -1033,7 +1009,10 @@ async def _check_limit_orders() -> None:
             amount_wei = int(o.get("amount_wei") or 0)
             if amount_wei <= 0:
                 continue
-            result = await swap_token_for_eth(addr, amount_wei, chain_id=8453)
+            result = await swap_token_for_eth(
+                addr, amount_wei, chain_id=8453,
+                account=_b_swap_account(uid),
+            )
             tx_hash = result.get("tx_hash", "")
             database.mark_token_sold(addr, tx_hash, user_id=uid)
             database.mark_limit_filled(oid, tx_hash)

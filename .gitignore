@@ -92,8 +92,9 @@ SUBMISSION_TEXT.md
 # Ignore ALL root-level .md except the official repo docs below.
 /*.md
 !README.md
-!memory.md
 !SUBMISSION.md
+# Internal dev-log / on-chain proof history — local only, NEVER push (stealth)
+docs/session-25-delivery-track.md
 AaaS_PLAN.md
 *_PLAN.md
 PLAN_*.md
