@@ -172,16 +172,18 @@ async def login(request: Request):
     return response
 
 async def me(request: Request):
-    # Prefer Authorization header (dashboard forwards JWT from localStorage),
-    # fall back to the cookie, then to the server-side API key (the dashboard
-    # already sends X-API-Key on every request, so this keeps /me working
-    # even when the JWT is not present in localStorage).
+    # SECURITY (M3): only the dashboard's JWT (Authorization Bearer) or the
+    # `a2z-token` cookie may resolve a real user. The server-side API_KEY is an
+    # INFRASTRUCTURE credential — it must NEVER impersonate a user (especially
+    # the system/admin user id=1). Any request that only carries X-API-Key and
+    # no valid user token is rejected with 401, so a stray API_KEY on an
+    # arbitrary request cannot masquerade as any account.
     auth_header = request.headers.get("Authorization", "")
     token = ""
     if auth_header.lower().startswith("bearer "):
         token = auth_header[7:].strip()
     if not token:
-        token = request.cookies.get("a2z-token")
+        token = request.cookies.get("a2z-token") or ""
 
     if token and token != "guest":
         payload = verify_access_token(token)
@@ -191,15 +193,8 @@ async def me(request: Request):
             if user:
                 return JSONResponse({"user": user})
 
-    # Fallback: server-side API key (dev/demo). Never accepts the raw guest
-    # cookie as a real user.
-    api_key = request.headers.get("X-API-Key")
-    if api_key and api_key == API_KEY:
-        # Return the system/demo user so the dashboard can render.
-        user = database.get_user_by_id(1)
-        if user:
-            return JSONResponse({"user": user})
-
+    # NOTE: X-API-Key is intentionally NOT accepted as a user credential here.
+    # It is infrastructure-only; resolving a real user requires a valid JWT.
     return JSONResponse({"error": "Not authenticated"}, status_code=401)
 
 async def logout(request: Request):

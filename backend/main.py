@@ -260,11 +260,12 @@ frontend_origin = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
 # often live on a different host than localhost). When allow_credentials is
 # True Starlette forbids "*", so we expand the env into an explicit list.
 allow_origins = [o.strip() for o in frontend_origin.split(",") if o.strip()]
-# Always allow the known Vercel dashboard host so judges can open the live
-# demo without a CORS block. Add more hosts via FRONTEND_ORIGIN (comma list).
+# Always allow the production Vercel dashboard host(s) so judges can open
+# the live demo without a CORS block. Add more hosts via FRONTEND_ORIGIN
+# (comma list). Legacy/stale preview hosts removed.
 _known_hosts = [
-    "https://project-a2z-agentz-m7ojk8ih3-axzss-projects.vercel.app",
     "https://project-a2z-agentz-gamma.vercel.app",
+    "https://archbusins.web.id",
 ]
 for _h in _known_hosts:
     if _h not in allow_origins:
