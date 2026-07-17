@@ -10,7 +10,7 @@ Pipeline position (final stage of Agent A):
 
 Responsibilities:
   1. Hybrid AI inference:
-       - If AI_ENDPOINT is set to a real URL, POST to it using the
+       - If AGENT_A_ENDPOINT is set to a real URL, POST to it using the
          OpenAI-compatible /v1/chat/completions schema (works against
          vLLM, OpenAI, TGI, etc.).
        - Otherwise (empty, unset, or "mock"), use a deterministic local
@@ -27,7 +27,7 @@ Responsibilities:
      through for observability but will not be POSTed.
 
 Env:
-    AI_ENDPOINT - OpenAI-compatible base URL, e.g. http://sgilang-rocm:30000/v1
+    AGENT_A_ENDPOINT - OpenAI-compatible base URL, e.g. http://sgilang-rocm:30000/v1
                          Empty / unset / "mock" -> use local mock inference.
     AI_API_KEY         - Bearer token. vLLM accepts any non-empty value when
                          the server is started with --api-key disabled.
@@ -371,7 +371,7 @@ def generate_testnet_narrative(ca: str, token_name: str, ticker: str) -> str:
 
     Testnet strict-mirroring: the Factory hands us a randomized token identity,
     and Agent A's LLM wraps it in a convincing alpha callout. Provider-agnostic
-    (any OpenAI-compatible AI_ENDPOINT). Falls back to a varied template if the
+    (any OpenAI-compatible AGENT_A_ENDPOINT). Falls back to a varied template if the
     endpoint is unset or errors, so the pipeline never breaks.
     """
     system_prompt = (
@@ -388,7 +388,7 @@ def generate_testnet_narrative(ca: str, token_name: str, ticker: str) -> str:
         f"CONTRACT: {ca}\n"
         f"NETWORK: Base Sepolia"
     )
-    endpoint = os.getenv("AI_ENDPOINT", "").strip()
+    endpoint = os.getenv("AGENT_A_ENDPOINT", "").strip()
     api_key = os.getenv("AI_API_KEY", "").strip()
     model = os.getenv("AI_MODEL", "").strip()
 
@@ -433,16 +433,16 @@ def generate_testnet_narrative(ca: str, token_name: str, ticker: str) -> str:
 def run_ai_inference(description: str, target_address: str, model: str) -> AIResult:
     """Dispatch to the configured AI endpoint (submission build: AMD ROCm vLLM).
 
-    Strict mode: if AI_ENDPOINT is unset, or the endpoint errors / times out,
+    Strict mode: if AGENT_A_ENDPOINT is unset, or the endpoint errors / times out,
     we RAISE so the caller can REJECT — never silently fall back to the
     deterministic mock (that would fail the accuracy gate under unseen input).
     """
-    endpoint = os.getenv("AI_ENDPOINT", "").strip()
+    endpoint = os.getenv("AGENT_A_ENDPOINT", "").strip()
     api_key = os.getenv("AI_API_KEY", "").strip()
 
     if not endpoint or endpoint.lower() == "mock":
         # Submission build requires a real endpoint; refuse mock fallback.
-        raise RuntimeError("AI_ENDPOINT not configured — refusing mock fallback in submission build")
+        raise RuntimeError("AGENT_A_ENDPOINT not configured — refusing mock fallback in submission build")
 
     temperature = float(os.getenv("AI_TEMPERATURE", "0.0"))
     max_tokens = int(os.getenv("AI_MAX_TOKENS", "1024"))
@@ -591,7 +591,7 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     p.add_argument("--threshold", type=int, default=DEFAULT_THRESHOLD,
                    help=f"Score >= threshold becomes APPROVED (default: {DEFAULT_THRESHOLD})")
     p.add_argument("--model", default=os.getenv("AI_MODEL", DEFAULT_MODEL),
-                   help="Model name to request from AI_ENDPOINT (default: env AI_MODEL or Llama-3-8B-Instruct)")
+                   help="Model name to request from AGENT_A_ENDPOINT (default: env AI_MODEL or Llama-3-8B-Instruct)")
     p.add_argument("--file", default="-",
                    help="Read JSONL from path (default: stdin, '-' = stdin)")
     p.add_argument("--strict-ai", action="store_true",

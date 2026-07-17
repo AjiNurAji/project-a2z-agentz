@@ -22,6 +22,7 @@ interface AuthContextValue {
     walletAddress?: string,
     generateWallet?: boolean
   ) => Promise<import("@/lib/auth").RegisterResult>;
+  loginWithWallet: () => Promise<import("@/lib/auth").SiweVerifyResult>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   loginAsGuest: () => void;
@@ -113,6 +114,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push("/dashboard");
   }, [router]);
 
+  const handleWalletLogin = useCallback(async () => {
+    const res = await authLib.siweLogin();
+    setUser(res.user);
+    return res;
+  }, []);
+
   const handleLogout = useCallback(async () => {
     try {
       await authLib.logout();
@@ -135,6 +142,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         login: handleLogin,
         register: handleRegister,
+        loginWithWallet: handleWalletLogin,
         logout: handleLogout,
         refresh,
         loginAsGuest,

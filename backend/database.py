@@ -431,6 +431,164 @@ def get_user_by_email(email: str) -> dict:
         return None
     return None
 
+
+# ----------------------------------------------------------------------------
+# SIWE (Sign-In-With-Ethereum) — P6 wallet-only auth (no email/password)
+# ----------------------------------------------------------------------------
+
+def get_user_by_wallet(wallet_address: str) -> dict | None:
+    """Resolve a user by their connected wallet address (case-insensitive)."""
+    if not wallet_address:
+        return None
+    query = (
+        "SELECT id, email, password_hash, wallet_address, created_at, last_login_at "
+        "FROM users WHERE LOWER(wallet_address) = LOWER(%s) LIMIT 1;"
+    )
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (wallet_address,))
+            row = cur.fetchone()
+            if row:
+                return {
+                    'id': row[0],
+                    'email': row[1],
+                    'password_hash': row[2],
+                    'wallet_address': row[3],
+                    'created_at': row[4].strftime('%Y-%m-%d %H:%M:%S') if row[4] else None,
+                    'last_login_at': row[5].strftime('%Y-%m-%d %H:%M:%S') if row[5] else None,
+                }
+    except psycopg2.Error as exc:
+        logger.error("get_user_by_wallet failed: %s", exc)
+        return None
+    return None
+
+
+def create_siwe_user(wallet_address: str) -> dict | None:
+    """Create a wallet-only (SIWE) user. No email/password — email uses the
+    addr@siwe.local convention so the NOT-NULL email column is satisfied
+    without a real inbox. wallet_source = 'linked' (external wallet).
+
+    Returns the new user dict, or None on collision/error.
+    """
+    fake_email = f"{wallet_address.lower()}@siwe.local"
+    query = """
+        INSERT INTO users (email, password_hash, wallet_address, wallet_source)
+        VALUES (%s, NULL, %s, 'linked')
+        RETURNING id, email, wallet_address, wallet_source, created_at, last_login_at;
+    """
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (fake_email, wallet_address))
+            row = cur.fetchone()
+            if row:
+                return {
+                    'id': row[0],
+                    'email': row[1],
+                    'wallet_address': row[2],
+                    'wallet_source': row[3],
+                    'created_at': row[4].strftime('%Y-%m-%d %H:%M:%S') if row[4] else None,
+                    'last_login_at': row[5].strftime('%Y-%m-%d %H:%M:%S') if row[5] else None,
+                }
+    except psycopg2.IntegrityError:
+        # Race: wallet already registered between nonce and verify.
+        return get_user_by_wallet(wallet_address)
+    except psycopg2.Error as exc:
+        logger.error("create_siwe_user failed: %s", exc)
+        return None
+    return None
+
+
+def ensure_siwe_tables() -> None:
+    """Self-healing schema for SIWE anti-replay nonces. Called from lifespan
+    alongside ensure_pipeline_tables so a fresh DB needs no manual migration.
+    """
+    query = """
+        CREATE TABLE IF NOT EXISTS siwe_nonces (
+            wallet_address VARCHAR(42) NOT NULL,
+            nonce TEXT NOT NULL,
+            expires_at TIMESTAMP NOT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (wallet_address, nonce)
+        );
+    """
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query)
+    except psycopg2.Error as exc:
+        logger.error("ensure_siwe_tables failed: %s", exc)
+
+
+def upsert_siwe_nonce(wallet_address: str, nonce: str, ttl_seconds: int = 600) -> bool:
+    """Store a fresh SIWE nonce for an address (overwrites any prior nonce)."""
+    from datetime import datetime, timedelta
+    expires = datetime.utcnow() + timedelta(seconds=ttl_seconds)
+    query = """
+        INSERT INTO siwe_nonces (wallet_address, nonce, expires_at)
+        VALUES (%s, %s, %s)
+        ON CONFLICT (wallet_address, nonce) DO UPDATE SET expires_at = EXCLUDED.expires_at;
+    """
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (wallet_address.lower(), nonce, expires))
+            return True
+    except psycopg2.Error as exc:
+        logger.error("upsert_siwe_nonce failed: %s", exc)
+        return False
+    return False
+
+
+def consume_siwe_nonce(wallet_address: str, nonce: str) -> bool:
+    """Atomically verify + delete a SIWE nonce. Returns True only if the nonce
+    exists, matches, and is unexpired (anti-replay). Consumed once.
+    """
+    from datetime import datetime
+    query_sel = (
+        "SELECT expires_at FROM siwe_nonces "
+        "WHERE LOWER(wallet_address) = LOWER(%s) AND nonce = %s LIMIT 1;"
+    )
+    query_del = (
+        "DELETE FROM siwe_nonces WHERE LOWER(wallet_address) = LOWER(%s) AND nonce = %s;"
+    )
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query_sel, (wallet_address, nonce))
+            row = cur.fetchone()
+            if not row:
+                return False
+            expires = row[0]
+            if expires.tzinfo is not None:
+                expires = expires.replace(tzinfo=None)
+            if expires < datetime.utcnow():
+                # Expired: clean up and refuse.
+                cur.execute(query_del, (wallet_address, nonce))
+                return False
+            cur.execute(query_del, (wallet_address, nonce))
+            return True
+    except psycopg2.Error as exc:
+        logger.error("consume_siwe_nonce failed: %s", exc)
+        return False
+    return False
+
+
+def save_user_encrypted_wallet(user_id: int, encrypted_blob: str, generated_address: str) -> bool:
+    """Persist a P3 self-custodial wallet (encrypted blob) onto an existing
+    user (used by SIWE auto-provisioning). Idempotent-ish: only writes when
+    the user has no key yet.
+    """
+    query = """
+        UPDATE users
+        SET encrypted_private_key = %s, wallet_address = COALESCE(wallet_address, %s), wallet_source = 'generated'
+        WHERE id = %s AND encrypted_private_key IS NULL;
+    """
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (encrypted_blob, generated_address, user_id))
+            return cur.rowcount > 0
+    except psycopg2.Error as exc:
+        logger.error("save_user_encrypted_wallet failed for user %s: %s", user_id, exc)
+        return False
+    return False
+
 def get_user_by_id(user_id: int) -> dict:
     query = "SELECT id, email, wallet_address, plan, plan_active_until, payment_ref, created_at, last_login_at FROM users WHERE id = %s LIMIT 1;"
     try:

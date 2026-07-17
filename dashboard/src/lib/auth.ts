@@ -102,3 +102,56 @@ export async function resetPassword(
   }
   return { ok: data.ok, message: data.message };
 }
+
+export interface SiweVerifyResult {
+  user: User;
+  token: string;
+  is_new?: boolean;
+  wallet?: {
+    address: string;
+    seed_phrase: string;
+    warning: string;
+  };
+}
+
+/**
+ * Sign-In-With-Ethereum (P6): pure wallet-signature login, no email/password.
+ * 1. Request the connected address from window.ethereum.
+ * 2. POST /api/auth/siwe/nonce {address} -> {message} (EIP-4361 string).
+ * 3. personal_sign the message with the wallet.
+ * 4. POST /api/auth/siwe/verify {message, signature} -> {token, user, wallet?}.
+ * The seed phrase only appears when the wallet is brand new (first SIWE login).
+ */
+export async function siweLogin(): Promise<SiweVerifyResult> {
+  const eth = (window as any).ethereum;
+  if (!eth || !eth.request) {
+    throw new Error("No Ethereum wallet found. Install MetaMask.");
+  }
+  const accounts: string[] = await eth.request({ method: "eth_requestAccounts" });
+  if (!accounts || accounts.length === 0) {
+    throw new Error("No account connected.");
+  }
+  const address = accounts[0];
+
+  const nonceRes = await apiFetch<{ message: string }>("/api/auth/siwe/nonce", {
+    method: "POST",
+    body: JSON.stringify({ address }),
+  });
+
+  const signature: string = await eth.request({
+    method: "personal_sign",
+    params: [nonceRes.message, address],
+  });
+  if (!signature) {
+    throw new Error("Signature was rejected.");
+  }
+
+  const data = await apiFetch<SiweVerifyResult>("/api/auth/siwe/verify", {
+    method: "POST",
+    body: JSON.stringify({ message: nonceRes.message, signature }),
+  });
+  if (data.token && typeof window !== "undefined") {
+    localStorage.setItem("a2z-token", data.token);
+  }
+  return data;
+}

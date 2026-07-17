@@ -19,6 +19,7 @@ import database
 # Also add backend directory so we can import auth module
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from auth import hash_password, verify_password, create_access_token, verify_access_token
+from eth_account import Account as _EthAccountSIWE
 
 API_KEY = os.getenv("API_KEY", "")
 
@@ -289,7 +290,152 @@ async def reset_password(request: Request):
     return JSONResponse({"ok": True, "message": "Password updated. Please log in."})
 
 
+# ---------------------------------------------------------------------------
+# SIWE (Sign-In-With-Ethereum) — P6 wallet-only auth (no email/password)
+# ---------------------------------------------------------------------------
+
+def _siwe_parse_field(message: str, field: str) -> str:
+    """Extract a single EIP-4361 field (e.g. 'Address:', 'Nonce:', 'Chain ID:')
+    from a signed SIWE message. Returns '' if not found."""
+    for line in message.splitlines():
+        if line.startswith(field + ":"):
+            return line[len(field) + 1:].strip()
+    return ""
+
+
+async def siwe_nonce(request: Request):
+    """POST {address} — issue a fresh anti-replay nonce for the wallet.
+
+    The frontend signs an EIP-4361 message containing this nonce; the nonce is
+    single-use and expires in 10 minutes.
+    """
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+    address = (data.get("address") or "").strip()
+    if not address or not address.startswith("0x") or len(address) != 42:
+        return JSONResponse({"error": "Valid wallet address required"}, status_code=400)
+    nonce = secrets.token_urlsafe(32)
+    if not database.upsert_siwe_nonce(address, nonce, ttl_seconds=600):
+        return JSONResponse({"error": "Failed to issue nonce"}, status_code=500)
+    # EIP-4361 chain id must match our active network.
+    chain_id = int(os.getenv("BASE_CHAIN_ID", "8453"))
+    issued_at = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    # Return a ready-to-sign EIP-4361 message (frontend just signs `message`).
+    # SIWE domain resolution (best-practice order):
+    #   1. Origin header (frontend URL the browser actually called from) — automatic
+    #   2. SIWE_DOMAIN env var (explicit override)
+    #   3. request.url.hostname (API host, last-resort fallback)
+    domain = (
+        request.headers.get("origin")
+        or os.getenv("SIWE_DOMAIN")
+        or request.url.hostname
+        or "a2z.agentz"
+    )
+    # URI in the EIP-4361 message must match the frontend origin (domain),
+    # not the backend API URL, so the wallet shows a consistent sign-in target.
+    uri = domain
+    message = (
+        f"{domain} wants you to sign in with your Ethereum account:\n"
+        f"{address}\n\n"
+        f"Sign in to A2Z Agentz. This request will not trigger a blockchain transaction.\n\n"
+        f"URI: {uri}\n"
+        f"Version: 1\n"
+        f"Chain ID: {chain_id}\n"
+        f"Nonce: {nonce}\n"
+        f"Issued At: {issued_at}"
+    )
+    return JSONResponse({"nonce": nonce, "message": message, "chain_id": chain_id})
+
+
+async def siwe_verify(request: Request):
+    """POST {message, signature} — verify SIWE signature and issue a session JWT.
+
+    Flow:
+      1. Recover signer address from (message, signature). MUST match the
+         address claimed in the message — we never trust a client-supplied addr.
+      2. Consume the nonce (single-use + expiry check).
+      3. Resolve existing wallet user, else auto-register a new SIWE user.
+      4. P3 auto-provision: if the user has no encrypted wallet yet, generate
+         one (AES-GCM) and persist it; return the seed phrase ONCE.
+      5. Issue JWT session token (sub = user id). No email/password involved.
+    """
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+    message = (data.get("message") or "").strip()
+    signature = (data.get("signature") or "").strip()
+    if not message or not signature:
+        return JSONResponse({"error": "message and signature required"}, status_code=400)
+
+    # 1. Recover signer from signature (EIP-191 personal_sign / EIP-4361).
+    try:
+        recovered = _EthAccountSIWE._recover_message(
+            message.encode("utf-8"), signature=signature
+        )
+    except Exception as exc:
+        return JSONResponse({"error": f"Signature recovery failed: {exc}"}, status_code=400)
+
+    claimed_addr = _siwe_parse_field(message, "Address")
+    if not claimed_addr:
+        return JSONResponse({"error": "Malformed SIWE message (no Address)"}, status_code=400)
+    if recovered.lower() != claimed_addr.lower():
+        return JSONResponse(
+            {"error": "Recovered address does not match message address"},
+            status_code=401,
+        )
+
+    # 2. Consume nonce (anti-replay + expiry).
+    nonce = _siwe_parse_field(message, "Nonce")
+    if not database.consume_siwe_nonce(claimed_addr, nonce):
+        return JSONResponse({"error": "Invalid or expired nonce"}, status_code=401)
+
+    # 3. Resolve or register (v1-simple: wallet-centric, separate account).
+    user = database.get_user_by_wallet(claimed_addr)
+    is_new = False
+    if not user:
+        user = database.create_siwe_user(claimed_addr)
+        is_new = True
+        if not user:
+            return JSONResponse({"error": "Failed to create SIWE user"}, status_code=500)
+
+    resp = {"user": {"id": user["id"], "wallet_address": user["wallet_address"]}}
+    if is_new:
+        resp["user"]["is_new"] = True
+
+    # 4. P3 auto-provision (only if no key yet). Fail-closed: if WALLET_ENC_SECRET
+    #    is unset, generation raises — we still log the user in, just without a
+    #    self-custodial wallet. The frontend prompting for the seed is FE's job.
+    wallet = database.get_user_by_id(user["id"])
+    if wallet and not wallet.get("encrypted_private_key"):
+        try:
+            from lib.wallet_gen import generate_wallet
+
+            w = generate_wallet()
+            saved = database.save_user_encrypted_wallet(
+                user["id"], w["encrypted_blob"], w["address"]
+            )
+            if saved and is_new:
+                # Seed phrase shown exactly once, at first registration.
+                resp["wallet"] = {
+                    "address": w["address"],
+                    "seed_phrase": w["seed_phrase"],
+                    "warning": "Save this seed phrase now. It will not be shown again.",
+                }
+        except Exception as exc:
+            logger.error("SIWE P3 wallet auto-provision failed for user %s: %s",
+                         user["id"], exc)
+            # Non-fatal: user is logged in, just without a generated wallet.
+    token = create_access_token({"sub": str(user["id"])})
+    resp["token"] = token
+    return JSONResponse(resp, status_code=200 if not is_new else 201)
+
+
 routes = [
+    Route("/siwe/nonce", siwe_nonce, methods=["POST"]),
+    Route("/siwe/verify", siwe_verify, methods=["POST"]),
     Route("/register", register, methods=["POST"]),
     Route("/login", login, methods=["POST"]),
     Route("/me", me, methods=["GET"]),
