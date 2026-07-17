@@ -323,8 +323,19 @@ async def siwe_nonce(request: Request):
     chain_id = int(os.getenv("BASE_CHAIN_ID", "8453"))
     issued_at = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
     # Return a ready-to-sign EIP-4361 message (frontend just signs `message`).
-    domain = os.getenv("SIWE_DOMAIN", request.url.hostname or "a2z.agentz")
-    uri = str(request.url).split("?")[0].rsplit("/siwe/nonce", 1)[0] or domain
+    # SIWE domain resolution (best-practice order):
+    #   1. Origin header (frontend URL the browser actually called from) — automatic
+    #   2. SIWE_DOMAIN env var (explicit override)
+    #   3. request.url.hostname (API host, last-resort fallback)
+    domain = (
+        request.headers.get("origin")
+        or os.getenv("SIWE_DOMAIN")
+        or request.url.hostname
+        or "a2z.agentz"
+    )
+    # URI in the EIP-4361 message must match the frontend origin (domain),
+    # not the backend API URL, so the wallet shows a consistent sign-in target.
+    uri = domain
     message = (
         f"{domain} wants you to sign in with your Ethereum account:\n"
         f"{address}\n\n"
