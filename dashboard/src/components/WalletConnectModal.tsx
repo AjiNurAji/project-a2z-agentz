@@ -10,6 +10,10 @@ interface WalletConnectModalProps {
   onClose: () => void;
   onConnected?: (session: WalletSession) => void;
   onContinue?: () => void;
+  /** Zero-Friction: when supplied, selecting a wallet immediately triggers
+   *  the full SIWE sign+verify flow (connect -> sign -> dashboard),
+   *  collapsing the separate login/register barrier into one tap. */
+  onSiweConnect?: () => void;
 }
 
 function statusLabel(status: WalletStatus) {
@@ -25,7 +29,7 @@ function statusClass(status: WalletStatus) {
   return "text-[var(--color-fg-warning)] bg-[var(--color-bg-warning-subtle)] border-[var(--color-border-warning)]";
 }
 
-export default function WalletConnectModal({ open, onClose, onConnected, onContinue }: WalletConnectModalProps) {
+export default function WalletConnectModal({ open, onClose, onConnected, onContinue, onSiweConnect }: WalletConnectModalProps) {
   const wallet = useWalletConnect();
 
   useEffect(() => {
@@ -77,6 +81,11 @@ export default function WalletConnectModal({ open, onClose, onConnected, onConti
             <button
               key={option.id}
               onClick={async () => {
+                if (onSiweConnect) {
+                  // Zero-Friction: one tap -> connect + SIWE sign + verify + dashboard.
+                  onSiweConnect();
+                  return;
+                }
                 const session = await wallet.connect(option);
                 if (session) onConnected?.(session);
               }}
@@ -110,7 +119,9 @@ export default function WalletConnectModal({ open, onClose, onConnected, onConti
         )}
 
         <div className="mt-4 rounded-xl p-3 text-xs leading-relaxed" style={{ color: "var(--color-body-subtle)", border: "1px solid var(--color-border-default)", background: "color-mix(in srgb, var(--color-neutral-secondary-soft) 50%, transparent)" }}>
-          Wallet login currently creates a frontend-only session until backend SIWE is implemented.
+          One tap connects your wallet, signs the SIWE message, and drops you
+          straight into the dashboard — a self-custodial wallet is created
+          automatically for new addresses.
         </div>
 
         {wallet.session && (

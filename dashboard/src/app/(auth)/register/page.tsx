@@ -473,6 +473,7 @@ export default function RegisterPage() {
       onClose={() => setWalletModalOpen(false)}
       onConnected={(session) => setWalletAddress(session.address)}
       onContinue={() => router.push("/dashboard")}
+      onSiweConnect={handleSiwe}
     />
 
     {seedResult && (

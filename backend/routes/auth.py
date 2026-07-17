@@ -293,14 +293,109 @@ async def reset_password(request: Request):
 # ---------------------------------------------------------------------------
 # SIWE (Sign-In-With-Ethereum) — P6 wallet-only auth (no email/password)
 # ---------------------------------------------------------------------------
+def _siwe_parse_all(message: str) -> dict:
+    """Parse ALL EIP-4361 fields from a signed SIWE message into a dict.
 
-def _siwe_parse_field(message: str, field: str) -> str:
-    """Extract a single EIP-4361 field (e.g. 'Address:', 'Nonce:', 'Chain ID:')
-    from a signed SIWE message. Returns '' if not found."""
+    Keys: address, chain_id, nonce, issued_at, expiration_time,
+    not_before, uri, domain, version.
+    """
+    out: dict = {}
     for line in message.splitlines():
-        if line.startswith(field + ":"):
-            return line[len(field) + 1:].strip()
-    return ""
+        if ":" not in line:
+            continue
+        k, _, v = line.partition(":")
+        out[k.strip().lower()] = v.strip()
+    return out
+
+
+def _siwe_verify_strict(message: str, request) -> str:
+    """EIP-4361 strict validation. Returns the claimed address (lower)
+    on success, or raises ValueError with a clear reason on any violation.
+    MUST be called before signature recovery so a malformed/mismatched
+    message is rejected regardless of signature validity.
+    """
+    from datetime import datetime, timezone
+
+    f = _siwe_parse_all(message)
+    addr = (f.get("address") or "").lower()
+    if not addr:
+        raise ValueError("Malformed SIWE message (no Address)")
+
+    # Chain ID must match our active network (no cross-chain replay).
+    try:
+        msg_cid = int(f.get("chain id", f.get("chain_id", "0")) or 0)
+    except ValueError:
+        raise ValueError("Malformed SIWE Chain ID")
+    expected_cid = int(os.getenv("BASE_CHAIN_ID", "8453"))
+    if msg_cid != expected_cid:
+        raise ValueError(
+            f"SIWE Chain ID mismatch: message={msg_cid} expected={expected_cid}"
+        )
+
+    # URI must match the request origin (no cross-domain replay).
+    msg_uri = (f.get("uri") or "").strip().lower()
+    origin = (request.headers.get("origin") or "").strip().lower()
+    if not msg_uri:
+        raise ValueError("Malformed SIWE message (no URI)")
+    if origin:
+        # Compare scheme+host (ignore trailing slash / port quirks handled by browser).
+        if msg_uri.rstrip("/") != origin.rstrip("/"):
+            raise ValueError(
+                f"SIWE URI mismatch: message={msg_uri} origin={origin}"
+            )
+    else:
+        # Fall back to explicit SIWE_DOMAIN when no Origin header.
+        dom = (os.getenv("SIWE_DOMAIN") or "").strip().lower()
+        if dom and msg_uri.rstrip("/") != dom.rstrip("/"):
+            raise ValueError(
+                f"SIWE URI mismatch: message={msg_uri} domain={dom}"
+            )
+
+    # Issued-At must not be in the future (allow 5m clock skew).
+    ia = f.get("issued at", f.get("issued_at"))
+    if ia:
+        try:
+            # ISO format with Z / offset.
+            parsed = datetime.fromisoformat(ia.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            skew = datetime.now(timezone.utc) - parsed
+            if skew.total_seconds() < -300:  # issued more than 5 min in the future
+                raise ValueError(f"SIWE Issued-At is in the future: {ia}")
+        except ValueError as exc:
+            if "SIWE" in str(exc):
+                raise
+            raise ValueError(f"Malformed SIWE Issued-At: {ia}")
+
+    # Expiration-Time (if present) must be in the past already -> reject.
+    exp = f.get("expiration time")
+    if exp:
+        try:
+            ep = datetime.fromisoformat(exp.replace("Z", "+00:00"))
+            if ep.tzinfo is None:
+                ep = ep.replace(tzinfo=timezone.utc)
+            if ep < datetime.now(timezone.utc):
+                raise ValueError(f"SIWE message expired at {exp}")
+        except ValueError as exc:
+            if "SIWE" in str(exc):
+                raise
+            raise ValueError(f"Malformed SIWE Expiration-Time: {exp}")
+
+    # Not-Before (if present) must be in the future -> reject.
+    nb = f.get("not before")
+    if nb:
+        try:
+            nb2 = datetime.fromisoformat(nb.replace("Z", "+00:00"))
+            if nb2.tzinfo is None:
+                nb2 = nb2.replace(tzinfo=timezone.utc)
+            if nb2 > datetime.now(timezone.utc):
+                raise ValueError(f"SIWE Not-Before in the future: {nb}")
+        except ValueError as exc:
+            if "SIWE" in str(exc):
+                raise
+            raise ValueError(f"Malformed SIWE Not-Before: {nb}")
+
+    return addr
 
 
 async def siwe_nonce(request: Request):
@@ -370,6 +465,15 @@ async def siwe_verify(request: Request):
     if not message or not signature:
         return JSONResponse({"error": "message and signature required"}, status_code=400)
 
+    # 0. STRICT EIP-4361 validation BEFORE signature recovery.
+    # A malformed/mismatched message (wrong chain/URI/future-issued) is
+    # rejected outright, regardless of signature validity -> no cross-chain
+    # or cross-domain replay surface.
+    try:
+        claimed_addr = _siwe_verify_strict(message, request)
+    except ValueError as exc:
+        return JSONResponse({"error": f"SIWE validation failed: {exc}"}, status_code=400)
+
     # 1. Recover signer from signature (EIP-191 personal_sign / EIP-4361).
     try:
         recovered = _EthAccountSIWE._recover_message(
@@ -378,9 +482,6 @@ async def siwe_verify(request: Request):
     except Exception as exc:
         return JSONResponse({"error": f"Signature recovery failed: {exc}"}, status_code=400)
 
-    claimed_addr = _siwe_parse_field(message, "Address")
-    if not claimed_addr:
-        return JSONResponse({"error": "Malformed SIWE message (no Address)"}, status_code=400)
     if recovered.lower() != claimed_addr.lower():
         return JSONResponse(
             {"error": "Recovered address does not match message address"},

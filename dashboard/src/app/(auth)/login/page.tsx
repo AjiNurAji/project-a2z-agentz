@@ -366,6 +366,7 @@ export default function LoginPage() {
       open={walletModalOpen}
       onClose={() => setWalletModalOpen(false)}
       onContinue={() => router.push("/dashboard")}
+      onSiweConnect={handleSiwe}
     />
     </>
   );
