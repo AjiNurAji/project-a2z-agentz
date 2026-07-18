@@ -2,7 +2,7 @@
 
 import { getDefaultConfig } from "@rainbow-me/rainbowkit";
 import { base } from "wagmi/chains";
-import { type Chain } from "viem";
+import { http, type Chain } from "viem";
 
 /**
  * WalletConnect projectId is NOT inlined by Vercel (NEXT_PUBLIC_ Sensitive
@@ -39,5 +39,14 @@ export function buildWagmiConfig(projectId: string) {
     projectId,
     chains: [base as Chain],
     ssr: true,
+    // CRITICAL: provide an explicit RPC transport for `base`. Without this,
+    // wagmi/viem generate a transport from the chain definition, and on some
+    // setups (esp. WalletConnect mobile webviews) that resolves to `undefined`,
+    // causing signMessageAsync to internally call fetch(undefined) →
+    // "Failed to execute 'fetch' on 'Window': Invalid value". Pinning a known
+    // public Base RPC guarantees a valid transport for signing.
+    transports: {
+      [base.id]: http("https://mainnet.base.org"),
+    },
   });
 }

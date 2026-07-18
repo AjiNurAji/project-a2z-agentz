@@ -61,7 +61,14 @@ export async function siweLoginWithWagmi(
   signMessageAsync: (args: { message: SignableMessage }) => Promise<`0x${string}`>
 ): Promise<SiweVerifyResult> {
   const { message } = await siweNonce(address);
-  const signature = await signMessageAsync({ message: message as SignableMessage });
+  console.log("[SIWE] nonce received, signing message for", address);
+  let signature: `0x${string}`;
+  try {
+    signature = await signMessageAsync({ message: message as SignableMessage });
+  } catch (err) {
+    console.error("[SIWE] signMessageAsync FAILED (this is the wallet/sign step, not verify):", err);
+    throw err instanceof Error ? err : new Error("Wallet sign rejected");
+  }
   if (!signature) throw new Error("Signature was rejected.");
   return siweVerify(message, signature);
 }
