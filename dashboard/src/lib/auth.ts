@@ -134,33 +134,9 @@ export async function siweFetchVerify(message: string, signature: string): Promi
 }
 
 /**
- * Sign-In-With-Ethereum (P6): pure wallet-signature login, no email/password.
- * 1. Request the connected address from window.ethereum.
- * 2. POST /api/auth/siwe/nonce {address} -> {message} (EIP-4361 string).
- * 3. personal_sign the message with the wallet.
- * 4. POST /api/auth/siwe/verify {message, signature} -> {token, user, wallet?}.
- * The seed phrase only appears when the wallet is brand new (first SIWE login).
+ * NOTE: Injected-wallet (MetaMask window.ethereum) SIWE has been removed.
+ * All wallet sign-in now goes through the RainbowKit/Wagmi WalletModal, which
+ * supports MetaMask, OKX, Trust, Binance, Coinbase, Rainbow, and WalletConnect
+ * QR — no browser extension is required. See components/WalletModal.tsx and
+ * lib/siwe-wagmi.ts.
  */
-export async function siweLogin(): Promise<SiweVerifyResult> {
-  const eth = (window as any).ethereum;
-  if (!eth || !eth.request) {
-    throw new Error("No Ethereum wallet found. Install MetaMask.");
-  }
-  const accounts: string[] = await eth.request({ method: "eth_requestAccounts" });
-  if (!accounts || accounts.length === 0) {
-    throw new Error("No account connected.");
-  }
-  const address = accounts[0];
-
-  const { message } = await siweFetchNonce(address);
-
-  const signature: string = await eth.request({
-    method: "personal_sign",
-    params: [message, address],
-  });
-  if (!signature) {
-    throw new Error("Signature was rejected.");
-  }
-
-  return siweFetchVerify(message, signature);
-}

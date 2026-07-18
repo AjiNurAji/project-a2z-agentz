@@ -10,7 +10,7 @@ import { useToast } from "@/components/ui/Toast";
 import WalletModal from "@/components/WalletModal";
 
 export default function RegisterPage() {
-  const { register, loginWithWallet } = useAuth();
+  const { register } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const toast = useToast();
@@ -73,23 +73,7 @@ export default function RegisterPage() {
     }
   };
 
-  const handleSiwe = async () => {
-    setSiweLoading(true);
-    try {
-      const res = await loginWithWallet();
-      if (res.wallet?.seed_phrase) {
-        // Brand-new wallet via SIWE: reuse the same seed display as email signup.
-        setSeedResult(res.wallet);
-      } else {
-        router.push(searchParams.get("next") || "/dashboard");
-      }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Wallet login failed";
-      toast.error("Wallet login failed", message);
-    } finally {
-      setSiweLoading(false);
-    }
-  };
+  const handleSiwe = () => setWalletModalOpen(true);
 
   return (
     <>
@@ -436,7 +420,7 @@ export default function RegisterPage() {
         {/* SIWE — wallet-only sign in (no email/password) */}
         <button
           type="button"
-          onClick={handleSiwe}
+          onClick={() => setWalletModalOpen(true)}
           disabled={siweLoading}
           className="group relative w-full py-3 rounded-xl text-sm font-bold border transition-all duration-300 overflow-hidden focus-ring flex items-center justify-center gap-2 hover:border-[var(--color-border-brand)] hover:shadow-[0_0_15px_rgba(110,90,124,0.15)] active:scale-[0.98] disabled:opacity-50 mt-4"
           style={{
