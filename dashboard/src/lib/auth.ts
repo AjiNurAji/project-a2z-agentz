@@ -164,13 +164,3 @@ export async function siweLogin(): Promise<SiweVerifyResult> {
 
   return siweFetchVerify(message, signature);
 }
-
-/**
- * WalletConnect v2 SIWE login. Reuses the same nonce/verify backend so the
- * database upsert path is identical to injected-wallet SIWE.
- */
-export async function siweLoginWalletConnect(): Promise<SiweVerifyResult> {
-  const wc = await import("./walletconnect");
-  const { address, message, signature } = await wc.walletConnectSiweLogin();
-  return siweFetchVerify(message, signature);
-}

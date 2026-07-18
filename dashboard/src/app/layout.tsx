@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Inter, IBM_Plex_Serif, Geist_Mono } from "next/font/google";
+import "@rainbow-me/rainbowkit/styles.css";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
 import { AuthProvider } from "@/components/AuthProvider";

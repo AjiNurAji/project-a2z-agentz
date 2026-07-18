@@ -7,10 +7,10 @@ import { motion } from "motion/react";
 import { Mail, Lock, LogIn, Loader2, Wallet, User } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/ui/Toast";
-import WalletConnectModal from "@/components/WalletConnectModal";
+import WalletModal from "@/components/WalletModal";
 
 export default function LoginPage() {
-  const { login, loginAsGuest, loginWithWallet, loginWithWalletConnect } = useAuth();
+  const { login, loginAsGuest, loginWithWallet } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const toast = useToast();
@@ -59,30 +59,17 @@ export default function LoginPage() {
       const res = await loginWithWallet();
       if (res.wallet?.seed_phrase) {
         // Brand-new wallet: show seed ONCE, do NOT navigate.
-        setSiweSeed(res.wallet);
+        setSiweSeed({
+          address: res.wallet.address || "",
+          seed_phrase: res.wallet.seed_phrase,
+          warning: "",
+        });
       } else {
         router.push(searchParams.get("next") || "/dashboard");
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Wallet login failed";
       toast.error("Wallet login failed", message);
-    } finally {
-      setSiweLoading(false);
-    }
-  };
-
-  const handleSiweWalletConnect = async () => {
-    setSiweLoading(true);
-    try {
-      const res = await loginWithWalletConnect();
-      if (res.wallet?.seed_phrase) {
-        setSiweSeed(res.wallet);
-      } else {
-        router.push(searchParams.get("next") || "/dashboard");
-      }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "WalletConnect login failed";
-      toast.error("WalletConnect login failed", message);
     } finally {
       setSiweLoading(false);
     }
@@ -381,12 +368,18 @@ export default function LoginPage() {
       </div>
     </motion.div>
 
-    <WalletConnectModal
+    <WalletModal
       open={walletModalOpen}
       onClose={() => setWalletModalOpen(false)}
-      onContinue={() => router.push("/dashboard")}
-      onSiweConnect={handleSiwe}
-      onWalletConnect={handleSiweWalletConnect}
+      onSiweSuccess={(res) => {
+        if (res.wallet?.seed_phrase) setSiweSeed({
+          address: res.wallet.address || "",
+          seed_phrase: res.wallet.seed_phrase,
+          warning: "",
+        });
+        else router.push(searchParams.get("next") || "/dashboard");
+      }}
+      onSiweError={(msg) => toast.error("Wallet login failed", msg)}
     />
     </>
   );
