@@ -66,5 +66,6 @@ export default function A2AIdentityReadiness({ wsStatus, user }: Props) {
       <p className="mt-4 rounded-xl border p-3 text-xs leading-relaxed" style={{ color: "var(--color-fg-cyan)", borderColor: "var(--color-border-brand)", background: "var(--color-bg-info-subtle)" }}>
         Wallet connect (SIWE) is live on both frontend and backend. Sign in with MetaMask or scan the WalletConnect QR from any mobile wallet — both issue the same JWT session as email login.
       </p>
+    </section>
   );
 }
