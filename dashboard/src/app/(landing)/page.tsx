@@ -96,9 +96,9 @@ function LandingContent() {
             <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-[var(--color-heading)] leading-[1.15] md:leading-[1.1]" style={{ fontFamily: "var(--font-serif)" }}>
               Autonomous <br />
               <span className="bg-gradient-to-r from-[var(--color-fg-cyan)] via-[var(--color-fg-brand)] to-[#b9a6c6] bg-clip-text text-transparent">
-                Agent-to-Agent
+                DeFi Trading
               </span>
-              <br />Web3 Airdrop Scavenger
+              <br />Agent on Base
             </h2>
 
             {/* Description */}
@@ -167,7 +167,7 @@ function LandingContent() {
             </div>
           </div>
 
-          {/* Right Column: Live Agent-to-Agent Execution Console (GIF Showcase) */}
+          {/* Right Column: Live DeFi Trading Execution Console (GIF Showcase) */}
           <div className="lg:col-span-6 flex flex-col items-center justify-center relative select-none">
             {/* Ambient behind-card glow */}
             <div className="absolute inset-0 bg-gradient-to-r from-[var(--color-fg-cyan)]/5 to-[var(--color-fg-purple)]/10 blur-3xl opacity-60 rounded-full" />
@@ -205,7 +205,7 @@ function LandingContent() {
                 {/* The GIF Animation */}
                 <img 
                   src="/gif/A2Z-animation.gif" 
-                  alt="Autonomous Agent-to-Agent Web3 Scavenger Interaction" 
+                  alt="Autonomous DeFi Trading Agent Interaction" 
                   className="w-full h-full object-cover pointer-events-none select-none opacity-90 group-hover:opacity-100 transition-opacity duration-500"
                 />
 

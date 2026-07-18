@@ -33,7 +33,7 @@ export default function A2AIdentityReadiness({ wsStatus, user }: Props) {
     <section className="rounded-2xl border p-5" style={{ background: "color-mix(in srgb, var(--color-surface) 84%, transparent)", borderColor: "var(--color-border-default)" }}>
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <p className="text-xs uppercase tracking-[0.18em]" style={{ color: "var(--color-fg-purple)" }}>Agent-to-Agent Backend</p>
+          <p className="text-xs uppercase tracking-[0.18em]" style={{ color: "var(--color-fg-purple)" }}>Trading Backend</p>
           <h2 className="mt-1 text-xl font-bold" style={{ color: "var(--color-heading)" }}>Identity Handshake Status</h2>
           <p className="mt-1 text-sm" style={{ color: "var(--color-body-subtle)" }}>Tracks wallet session, backend auth readiness, and A2A WebSocket state.</p>
         </div>

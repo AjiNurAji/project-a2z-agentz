@@ -1,7 +1,7 @@
 {
   "name": "A2Z Agent - Web3 Dashboard",
   "short_name": "A2Z Agent",
-  "description": "Autonomous Web3 Scavenger Dashboard",
+  "description": "Autonomous DeFi Trading Agent Dashboard",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#13111C",

@@ -1,6 +1,6 @@
 import { ImageResponse } from 'next/og'
 
-export const alt = 'A2Z Agent — Autonomous Web3 Scavenger Dashboard'
+export const alt = 'A2Z Agentz — Autonomous DeFi Trading Agent'
 export const size = {
   width: 1200,
   height: 630,
@@ -83,7 +83,7 @@ export default async function Image() {
               marginTop: 8,
             }}
           >
-            Autonomous Web3 Scavenger Dashboard
+            Autonomous DeFi Trading Agent
           </div>
         </div>
 

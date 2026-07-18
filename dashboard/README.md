@@ -1,6 +1,6 @@
 # A2Z Agentz — Web Dashboard
 
-Frontend dashboard for **A2Z Agentz** (Autonomous A2A Payment Agent) — submission for **AMD Developer Hackathon: ACT II**.
+Frontend dashboard for **A2Z Agentz** (Autonomous DeFi Trading Agent) — submission for **AMD Developer Hackathon: ACT II**.
 
 Built with **Next.js 16** + **React 19** + **Tailwind CSS v4** + **TypeScript**.
 
