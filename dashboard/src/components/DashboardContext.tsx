@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { useAgentWebSocket } from "@/hooks/useAgentWebSocket";
 import { apiFetch } from "@/lib/api";
 import { mapLogToAgentMessage, mapRawTxToTransaction } from "@/lib/mappers";
+import { isGuestSession, MOCK_TRANSACTIONS, MOCK_APPROVAL_QUEUE, MOCK_AGENT_MESSAGES, MOCK_LOGS, MOCK_VECTOR_MEMORY, MOCK_KPI, MOCK_GAS_HISTORY, MOCK_TVL_HISTORY, MOCK_SUCCESS_HISTORY } from "@/lib/mockData";
 import { KpiGridSkeleton, ChartSkeleton, TableSkeleton } from "@/components/ui/Skeleton";
 import { Skeleton } from "@/components/ui/Skeleton";
 
@@ -271,7 +272,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   // X-API-Key / JWT on every fetch). The WebSocket is an enhancement, not a
   // gate — if it can't connect from the browser we still show live data
   // polled from /api/status (which carries the agent log buffer).
-  const usingReal = true;
+  const usingReal = !isGuestSession();
 
   const logCountRef = useRef(0);
 
@@ -314,6 +315,21 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const fetchDashboardData = useCallback(async () => {
+    // Guest / Demo mode: serve mock data only, never hit the real backend.
+    if (isGuestSession()) {
+      setTransactions(MOCK_TRANSACTIONS as any);
+      setApprovalQueue(MOCK_APPROVAL_QUEUE as any);
+      setAgentMessages(MOCK_AGENT_MESSAGES as any);
+      setLogs(MOCK_LOGS as any);
+      setVectorMemory(MOCK_VECTOR_MEMORY as any);
+      setKpiMetrics(MOCK_KPI as any);
+      setGasHistory(MOCK_GAS_HISTORY);
+      setTvlHistory(MOCK_TVL_HISTORY);
+      setSuccessHistory(MOCK_SUCCESS_HISTORY);
+      setAgentAStatus("online");
+      setAgentBStatus("online");
+      return;
+    }
     try {
       const [statusData, statsData, sysData] = await Promise.all([
         apiFetch<{ logs?: Array<{ tx_hash_id: string; project_target_address: string; amount_usd: number; status: string; created_at: string }>; agent_logs?: Array<{ type: string; data: { sender?: string; content?: string; level?: string; message?: string; metadata?: Record<string, unknown> } }> }>("/api/status"),
