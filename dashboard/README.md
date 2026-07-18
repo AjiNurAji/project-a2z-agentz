@@ -1,22 +1,22 @@
 # A2Z Agentz — Web Dashboard
 
-Frontend dashboard for **A2Z Agentz** (Autonomous DeFi Trading Agent) — submission for **AMD Developer Hackathon: ACT II**.
+Frontend dashboard for **A2Z Agentz** (Autonomous DeFi Trading Agent).
 
 Built with **Next.js 16** + **React 19** + **Tailwind CSS v4** + **TypeScript**.
 
-> **Powered by AMD Instinct / Radeon Pro™ MI300X** — Agent A backend runs on AMD GPU via **vLLM** with a **vLLM** inference service, fine-tuned using **AMD AI Workbench**.
+> **Powered by Cloud GPU Inference** — Agent A backend runs on cloud GPU infrastructure via an **LLM serving stack** with a **vLLM** inference service.
 
 ## Getting Started (Local Dev)
 
-This dashboard consumes APIs from Agent A & Agent B running on AMD Developer Cloud. For local development:
+This dashboard consumes APIs from Agent A & Agent B running on cloud GPU infrastructure. For local development:
 
 ```bash
 # 1. Install dependencies
 npm install
 
-# 2. (Optional) Configure env to point at AMD Cloud endpoints
-echo "NEXT_PUBLIC_AGENT_A_API=https://your-amd-cloud/a2z-agent-a" > .env.local
-echo "NEXT_PUBLIC_AGENT_B_API=https://your-amd-cloud/a2z-agent-b" >> .env.local
+# 2. (Optional) Configure env to point at your cloud inference endpoints
+echo "NEXT_PUBLIC_AGENT_A_API=https://your-cloud/a2z-agent-a" > .env.local
+echo "NEXT_PUBLIC_AGENT_B_API=https://your-cloud/a2z-agent-b" >> .env.local
 
 # 3. Run dev server
 npm run dev
@@ -141,7 +141,7 @@ Current behavior:
 ### Core Components
 - `DashboardContext.tsx` — Global state + real-time data simulator
 - `Sidebar.tsx` — Collapsible sidebar navigation
-- `Navbar.tsx` — Context-aware top bar + AMD badge
+- `Navbar.tsx` — Context-aware top bar + cloud inference badge
 - `PageHeader.tsx` — Consistent page header
 - `AgentCommPanel.tsx` — Agent communication panel
 - `WalletConnectModal.tsx` — Wallet selector modal with frontend-only/demo session flow
@@ -201,7 +201,7 @@ Current behavior:
 
 ## Deployment
 
-For production, deploy to Vercel or another Next.js-compatible platform. Set environment variables to point to AMD Cloud Agent A & Agent B endpoints.
+For production, deploy to Vercel or another Next.js-compatible platform. Set environment variables to point to your cloud Agent A & Agent B inference endpoints.
 
 ```bash
 # Deploy to Vercel
@@ -215,4 +215,4 @@ See full documentation in [`/docs/`](https://github.com/axzss/project-a2z-agentz
 
 ---
 
-*Built for AMD Developer Hackathon: ACT II.*
+*Built as an autonomous DeFi trading agent on Base Network.*

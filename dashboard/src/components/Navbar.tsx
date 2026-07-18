@@ -51,7 +51,7 @@ export default function Navbar() {
             style={{ background: "var(--color-neutral-secondary-medium)", border: "1px solid var(--color-border-default)" }}
           >
             <Cpu className="w-3.5 h-3.5 text-[var(--color-fg-brand)]" aria-hidden="true" />
-            <span>AMD MI300X · ROCm · vLLM</span>
+            <span>Cloud GPU · LLM Stack</span>
           </div>
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs text-[var(--color-body-subtle)]"
             style={{ background: "var(--color-neutral-secondary-medium)", border: "1px solid var(--color-border-default)" }}

@@ -7,9 +7,9 @@ const COOKIE_NAME = "a2z-token";
 const PUBLIC_PATHS = ["/", "/login", "/register"];
 
 export function proxy(request: NextRequest) {
-  // Auth guard disabled for the hackathon demo: the dashboard authenticates
-  // against the backend via X-API-Key / JWT on each fetch, and the cross-site
-  // cookie is unreliable on Vercel -> Railway. Let every route through; the
+  // Auth guard: the dashboard authenticates against the backend via
+  // X-API-Key / JWT on each fetch, and the cross-site cookie is
+  // unreliable on Vercel -> Railway. Let every route through; the
   // backend still enforces auth on protected API calls.
   return NextResponse.next();
 }

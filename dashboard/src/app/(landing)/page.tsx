@@ -221,7 +221,7 @@ function LandingContent() {
                 {/* HUD Overlay Elements - Top Right */}
                 <div className="absolute top-3 right-4 font-mono text-[8px] md:text-[9px] text-[var(--color-fg-brand)]/70 tracking-wider text-right flex flex-col gap-0.5">
                   <span>NETWORK: BASE_MAINNET_SYNC</span>
-                  <span>ROUTING: AIM_INSTINCT_ENGINE</span>
+                  <span>ROUTING: CLOUD_INFERENCE_ENGINE</span>
                 </div>
 
                 {/* Interactive labels matching robot position in the GIF */}
@@ -268,7 +268,7 @@ function LandingContent() {
       {/* Tech Stack / Bottom Footer */}
       <footer className="relative z-20 w-full py-6 md:py-8 border-t border-[var(--color-border-default)] backdrop-blur-md px-4 md:px-6 flex flex-col lg:flex-row gap-5 lg:gap-6 items-center justify-between text-[10px] md:text-xs" style={{ background: "color-mix(in srgb, var(--color-surface) 40%, transparent)" }}>
         <div className="text-[var(--color-body-subtle)] font-mono text-center lg:text-left w-full lg:w-auto">
-          Powered by <br className="md:hidden" /> <span className="text-[var(--color-heading)] font-semibold">AMD Instinct MI300X</span> &amp; <span className="text-[var(--color-heading)] font-semibold">Base L2</span> — production-grade autonomous execution.
+          Powered by <br className="md:hidden" /> <span className="text-[var(--color-heading)] font-semibold">Cloud GPU Inference</span> &amp; <span className="text-[var(--color-heading)] font-semibold">Base L2</span> — production-grade autonomous execution.
         </div>
 
         {/* Contact */}
@@ -279,9 +279,9 @@ function LandingContent() {
 
         {/* Tech StackBadges */}
         <div className="flex flex-wrap justify-center lg:justify-end items-center gap-2 md:gap-3 w-full lg:w-auto">
-          <span className="px-2 md:px-2.5 py-1 rounded border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]" style={{ background: "color-mix(in srgb, var(--color-neutral-secondary-strong) 50%, transparent)" }}>AIM (AMD Inference Microservice)</span>
-          <span className="px-2 md:px-2.5 py-1 rounded border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]" style={{ background: "color-mix(in srgb, var(--color-neutral-secondary-strong) 50%, transparent)" }}>ROCm 6.x</span>
-          <span className="px-2 md:px-2.5 py-1 rounded border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]" style={{ background: "color-mix(in srgb, var(--color-neutral-secondary-strong) 50%, transparent)" }}>vLLM on ROCm</span>
+          <span className="px-2 md:px-2.5 py-1 rounded border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]" style={{ background: "color-mix(in srgb, var(--color-neutral-secondary-strong) 50%, transparent)" }}>Cloud GPU Inference</span>
+          <span className="px-2 md:px-2.5 py-1 rounded border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]" style={{ background: "color-mix(in srgb, var(--color-neutral-secondary-strong) 50%, transparent)" }}>Optimized Runtime</span>
+          <span className="px-2 md:px-2.5 py-1 rounded border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]" style={{ background: "color-mix(in srgb, var(--color-neutral-secondary-strong) 50%, transparent)" }}>LLM Serving Stack</span>
           <span className="px-2 md:px-2.5 py-1 rounded border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]" style={{ background: "color-mix(in srgb, var(--color-neutral-secondary-strong) 50%, transparent)" }}>LangGraph Python</span>
           <span className="px-2 md:px-2.5 py-1 rounded border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]" style={{ background: "color-mix(in srgb, var(--color-neutral-secondary-strong) 50%, transparent)" }}>ChromaDB</span>
         </div>

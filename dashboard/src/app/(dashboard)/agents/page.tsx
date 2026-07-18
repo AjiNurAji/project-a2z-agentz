@@ -217,7 +217,7 @@ function AgentHero({ name, role, icon: Icon, color, bg, status, health, spark, i
       {health.gpu && (
         <div className="rounded-xl p-4 space-y-3" style={{ background: "var(--color-neutral-secondary-soft)", border: `1px solid var(--color-border-soft)` }}>
           <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--color-fg-purple)" }}>
-            AMD MI300X GPU · {health.gpu.source}
+            Cloud GPU Inference · {health.gpu.source}
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <Metric icon={Activity} label="GPU Util" value={`${health.gpu.gpuCacheUsagePct}%`} color="var(--color-fg-purple)" />
