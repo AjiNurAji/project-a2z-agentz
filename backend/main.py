@@ -2,6 +2,7 @@ from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.routing import Mount, Route
+from starlette.requests import Request
 from starlette.responses import JSONResponse, HTMLResponse
 import asyncio
 import os
@@ -280,8 +281,23 @@ assert allow_origins, "FRONTEND_ORIGIN must list at least one explicit origin"
 middleware = [
     Middleware(CORSMiddleware, allow_origins=allow_origins, allow_methods=["*"], allow_headers=["*"], allow_credentials=True)
 ]
-
 debug = os.getenv("DEBUG", "false").lower() == "true"
+
+
+async def public_config(request: Request) -> JSONResponse:
+    """Public, non-secret deployment config for the frontend.
+
+    Exposes the WalletConnect projectId (which is NOT a secret — it is meant
+    to be public client-side) so the dashboard can bootstrap WalletConnect
+    even when NEXT_PUBLIC_WC_PROJECT_ID is not inlined at build time.
+    """
+    wc_project_id = (
+        os.getenv("WALLETCONNECT_PROJECT_ID")
+        or os.getenv("NEXT_PUBLIC_WC_PROJECT_ID")
+        or ""
+    ).strip()
+    return JSONResponse({"wc_project_id": wc_project_id})
+
 
 app = Starlette(
     debug=debug,
@@ -289,6 +305,7 @@ app = Starlette(
         Route("/", read_root, methods=["GET"]),
         Route("/docs", get_docs, methods=["GET"]),
         Route("/openapi.json", get_openapi, methods=["GET"]),
+        Route("/api/config", public_config, methods=["GET"]),
         Mount("/api/auth", routes=auth_routes),
         Mount("/api", routes=api_routes),
     ] + ([Mount("/", routes=ws_routes)] if not IS_SERVERLESS else []),
