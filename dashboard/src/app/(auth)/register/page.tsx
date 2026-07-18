@@ -64,8 +64,10 @@ export default function RegisterPage() {
       } else {
         router.push("/dashboard");
       }
-    } catch {
-      // Error toast shown by AuthProvider
+    } catch (err: unknown) {
+      // Surface the failure explicitly so the user is never left on a dead form.
+      const message = err instanceof Error ? err.message : "Registration failed";
+      toast.error("Registration failed", message);
     } finally {
       setSubmitting(false);
     }

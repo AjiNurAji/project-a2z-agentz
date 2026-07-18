@@ -44,8 +44,10 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       await login(email.trim().toLowerCase(), password);
-    } catch {
-      // Error toast shown by AuthProvider
+    } catch (err: unknown) {
+      // Surface the failure explicitly so the user is never left on a dead form.
+      const message = err instanceof Error ? err.message : "Login failed";
+      toast.error("Login failed", message);
     } finally {
       setSubmitting(false);
     }

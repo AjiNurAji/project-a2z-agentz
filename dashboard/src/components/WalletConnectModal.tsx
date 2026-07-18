@@ -129,9 +129,9 @@ export default function WalletConnectModal({ open, onClose, onConnected, onConti
             <div className="flex items-start gap-2">
               <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
               <div>
-                <h3 className="font-semibold text-sm">Wallet login is frontend-only</h3>
+                <h3 className="font-semibold text-sm">Wallet login is live</h3>
                 <p className="mt-1 text-xs leading-relaxed text-[var(--color-fg-warning)]/80">
-                  Connected as <span className="font-mono font-bold">{wallet.formattedAddress}</span>. Backend SIWE is not ready yet, so protected backend auth still requires email/password.
+                  Connected as <span className="font-mono font-bold">{wallet.formattedAddress}</span>. Backend SIWE is ready — your signature authenticates you and a self-custodial vault is created automatically.
                 </p>
               </div>
             </div>
