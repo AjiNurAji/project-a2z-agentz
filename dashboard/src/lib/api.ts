@@ -2,7 +2,14 @@
 // /api/* to the Railway backend same-origin. Only use an absolute API_URL
 // when explicitly provided (e.g. local dev against a running backend).
 const RAW_API_URL = (process.env.NEXT_PUBLIC_API_URL || "").trim();
-const API_URL = RAW_API_URL.replace(/\/+$/, ""); // strip trailing slashes
+// Vercel sometimes injects the literal string "undefined"/"null" when an env
+// var is unset — treat those as "unset" so we fall back to the relative path
+// instead of building an invalid URL (which throws "Failed to execute fetch:
+// Invalid value").
+const API_URL =
+  RAW_API_URL && RAW_API_URL !== "undefined" && RAW_API_URL !== "null"
+    ? RAW_API_URL.replace(/\/+$/, "")
+    : "";
 const API_KEY = (process.env.NEXT_PUBLIC_API_KEY || "").trim();
 const ADMIN_TOKEN = (process.env.NEXT_PUBLIC_ADMIN_TOKEN || "").trim();
 

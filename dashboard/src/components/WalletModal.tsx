@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { RainbowKitProvider, ConnectButton, darkTheme } from "@rainbow-me/rainbowkit";
 import { WagmiProvider, useAccount, useSignMessage, useConnect } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { base } from "wagmi/chains";
 import { getDefaultConfig } from "@rainbow-me/rainbowkit";
 import { buildWagmiConfig, getWalletConnectProjectId } from "@/lib/web3";
 import { siweLoginWithWagmi, type SiweVerifyResult } from "@/lib/siwe-wagmi";
@@ -12,7 +11,6 @@ import { siweLoginWithWagmi, type SiweVerifyResult } from "@/lib/siwe-wagmi";
 interface WalletModalProps {
   open: boolean;
   onClose: () => void;
-  onConnected?: (address: string) => void;
   onSiweSuccess?: (res: SiweVerifyResult) => void;
   onSiweError?: (msg: string) => void;
 }
@@ -20,38 +18,51 @@ interface WalletModalProps {
 function WalletFlow({
   onSiweSuccess,
   onSiweError,
+  onClose,
 }: {
   onSiweSuccess?: (res: SiweVerifyResult) => void;
   onSiweError?: (msg: string) => void;
+  onClose: () => void;
 }) {
   const { address, isConnected } = useAccount();
   const { signMessageAsync } = useSignMessage();
   const { isPending } = useConnect();
+  const [signing, setSigning] = useState(false);
 
+  // Auto-trigger SIWE the moment a wallet connects.
   useEffect(() => {
-    if (!isConnected || !address) return;
+    if (!isConnected || !address || signing) return;
     let cancelled = false;
+    setSigning(true);
     (async () => {
       try {
         const res = await siweLoginWithWagmi(address as string, signMessageAsync);
-        if (!cancelled) onSiweSuccess?.(res);
+        if (cancelled) return;
+        // Persist auth + hand off to caller, then hard-redirect into the app.
+        onSiweSuccess?.(res);
+        onClose();
+        // Hard navigation guarantees we land in Mission Control even if a
+        // parent component forgets to route. (token already stored in localStorage
+        // by siweVerify/siweFetchVerify.)
+        window.location.href = "/dashboard";
       } catch (err) {
         if (!cancelled) {
           onSiweError?.(err instanceof Error ? err.message : "SIWE failed");
         }
+        setSigning(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [isConnected, address, signMessageAsync, onSiweSuccess, onSiweError]);
+  }, [isConnected, address, signing, signMessageAsync, onSiweSuccess, onSiweError, onClose]);
 
   return (
     <div className="flex flex-col items-center gap-4">
       <ConnectButton />
-      {isPending && (
+      {(isPending || signing) && (
         <p className="text-xs text-[var(--color-body-subtle)]">
-          Confirm in your wallet…
+          {signing ? "Sign the message in your wallet to continue…" : "Confirm in your wallet…"}
         </p>
       )}
     </div>
@@ -61,7 +72,6 @@ function WalletFlow({
 export default function WalletModal({
   open,
   onClose,
-  onConnected,
   onSiweSuccess,
   onSiweError,
 }: WalletModalProps) {
@@ -128,7 +138,11 @@ export default function WalletModal({
           <WagmiProvider config={buildWagmiConfig(projectId)}>
             <QueryClientProvider client={queryClient}>
               <RainbowKitProvider theme={darkTheme({ accentColor: "#6d28d9" })}>
-                <WalletFlow onSiweSuccess={onSiweSuccess} onSiweError={onSiweError} />
+                <WalletFlow
+                  onSiweSuccess={onSiweSuccess}
+                  onSiweError={onSiweError}
+                  onClose={onClose}
+                />
               </RainbowKitProvider>
             </QueryClientProvider>
           </WagmiProvider>

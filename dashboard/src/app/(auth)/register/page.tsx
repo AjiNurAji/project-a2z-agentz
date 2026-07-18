@@ -457,7 +457,6 @@ export default function RegisterPage() {
     <WalletModal
       open={walletModalOpen}
       onClose={() => setWalletModalOpen(false)}
-      onConnected={(addr) => setWalletAddress(addr)}
       onSiweSuccess={(res) => {
         if (res.wallet?.seed_phrase) setSeedResult({
           address: res.wallet.address || "",

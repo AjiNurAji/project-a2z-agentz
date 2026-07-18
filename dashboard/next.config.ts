@@ -22,9 +22,11 @@ const nextConfig: NextConfig = {
   // routes (e.g. /api/holdings) same-origin without CORS or NEXT_PUBLIC_API_URL.
   // Override target via NEXT_PUBLIC_API_URL at build time if needed.
   async rewrites() {
-    const target =
-      process.env.NEXT_PUBLIC_API_URL ||
-      "https://project-a2z-agentz-production-dc3d.up.railway.app";
+    const raw =
+      process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL !== "undefined"
+        ? process.env.NEXT_PUBLIC_API_URL
+        : "";
+    const target = (raw || "https://project-a2z-agentz-production-dc3d.up.railway.app").replace(/\/+$/, "");
     return [
       {
         source: "/api/:path*",
