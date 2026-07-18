@@ -32,11 +32,20 @@ export async function siweVerify(
   message: string,
   signature: string
 ): Promise<SiweVerifyResult> {
-  const { apiFetch } = await import("./api");
-  const data = await apiFetch<SiweVerifyResult>("/api/auth/siwe/verify", {
-    method: "POST",
-    body: JSON.stringify({ message, signature }),
-  });
+  const { apiFetch, API_URL } = await import("./api");
+  const url = `${API_URL}/api/auth/siwe/verify`;
+  console.log("[SIWE] Verifying to URL:", url);
+  console.log("[SIWE] body:", JSON.stringify({ message, signature: signature.slice(0, 12) + "…" }));
+  let data: SiweVerifyResult;
+  try {
+    data = await apiFetch<SiweVerifyResult>("/api/auth/siwe/verify", {
+      method: "POST",
+      body: JSON.stringify({ message, signature }),
+    });
+  } catch (err) {
+    console.error("[SIWE] verify fetch failed:", err);
+    throw err instanceof Error ? err : new Error("SIWE verify request failed");
+  }
   if (data.token && typeof window !== "undefined") {
     window.localStorage.setItem("a2z-token", data.token);
   }
