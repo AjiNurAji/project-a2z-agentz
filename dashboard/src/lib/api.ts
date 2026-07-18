@@ -3,13 +3,14 @@
 // when explicitly provided (e.g. local dev against a running backend).
 const RAW_API_URL = (process.env.NEXT_PUBLIC_API_URL || "").trim();
 // Vercel sometimes injects the literal string "undefined"/"null" when an env
-// var is unset — treat those as "unset" so we fall back to the relative path
-// instead of building an invalid URL (which throws "Failed to execute fetch:
-// Invalid value").
+// var is unset — treat those as "unset" so we fall back instead of building an
+// invalid URL (which throws "Failed to execute fetch: Invalid value").
+// When unset we hit the Railway backend directly (public URL, not a secret).
+const FALLBACK_API_URL = "https://project-a2z-agentz-production-dc3d.up.railway.app";
 const API_URL =
   RAW_API_URL && RAW_API_URL !== "undefined" && RAW_API_URL !== "null"
     ? RAW_API_URL.replace(/\/+$/, "")
-    : "";
+    : FALLBACK_API_URL;
 const API_KEY = (process.env.NEXT_PUBLIC_API_KEY || "").trim();
 const ADMIN_TOKEN = (process.env.NEXT_PUBLIC_ADMIN_TOKEN || "").trim();
 
