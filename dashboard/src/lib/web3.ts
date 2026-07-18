@@ -1,16 +1,14 @@
 "use client";
 
-import { getDefaultConfig } from "@rainbow-me/rainbowkit";
+import { createConfig, http } from "wagmi";
 import { base } from "wagmi/chains";
-import { http, type Chain } from "viem";
+import { walletConnect, injected, coinbaseWallet } from "wagmi/connectors";
+import { type Chain } from "viem";
 
 /**
  * WalletConnect projectId is NOT inlined by Vercel (NEXT_PUBLIC_ Sensitive
  * quirk). We fetch it from the public backend /api/config endpoint at runtime
- * so RainbowKit can bootstrap WalletConnect even when the build env is empty.
- *
- * Falls back to the build-time var if present, then to the backend, then to
- * an empty string (RainbowKit will show a clear "projectId missing" state).
+ * so WalletConnect can bootstrap even when the build env is empty.
  */
 let _wcProjectId: string | null = null;
 
@@ -33,20 +31,34 @@ export async function getWalletConnectProjectId(): Promise<string> {
   return _wcProjectId;
 }
 
+const BASE_RPC = "https://mainnet.base.org";
+
 export function buildWagmiConfig(projectId: string) {
-  return getDefaultConfig({
-    appName: "A2Z Agentz",
-    projectId,
+  // Use wagmi's createConfig directly (not RainbowKit getDefaultConfig) so we
+  // CONTROL the transports. getDefaultConfig auto-derives an RPC transport from
+  // the chain definition, and on mobile webviews that resolves to `undefined`,
+  // making signMessageAsync internally call fetch(undefined) →
+  // "Failed to execute 'fetch' on 'Window': Invalid value".
+  // Pinning an explicit http() transport guarantees a valid URL for signing.
+  return createConfig({
     chains: [base as Chain],
-    ssr: true,
-    // CRITICAL: provide an explicit RPC transport for `base`. Without this,
-    // wagmi/viem generate a transport from the chain definition, and on some
-    // setups (esp. WalletConnect mobile webviews) that resolves to `undefined`,
-    // causing signMessageAsync to internally call fetch(undefined) →
-    // "Failed to execute 'fetch' on 'Window': Invalid value". Pinning a known
-    // public Base RPC guarantees a valid transport for signing.
+    connectors: [
+      injected(),
+      coinbaseWallet({ appName: "A2Z Agentz", preference: "all" }),
+      walletConnect({
+        projectId,
+        showQrModal: true,
+        metadata: {
+          name: "A2Z Agentz",
+          description: "Autonomous DeFi Trading Agent",
+          url: "https://www.archbusins.web.id",
+          icons: ["https://www.archbusins.web.id/images/logo/logo.svg"],
+        },
+      }),
+    ],
     transports: {
-      [base.id]: http("https://mainnet.base.org"),
+      [base.id]: http(BASE_RPC),
     },
+    ssr: true,
   });
 }
