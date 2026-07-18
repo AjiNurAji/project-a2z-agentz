@@ -7,7 +7,7 @@ import { Sparkline } from "@/components/ui/Sparkline";
 import { Bot, Shield, Activity, Zap, Clock, CheckCircle2, XCircle, ListChecks, Pause, Play, Link2, TrendingUp, Wallet, ArrowUpRight, Coins, DollarSign, SlidersHorizontal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { isGuestSession, MOCK_HOLDINGS, MOCK_LIMIT_ORDERS, MOCK_SMART_BUYS } from "@/lib/mockData";
+import { isGuestSession, MOCK_HOLDINGS, MOCK_LIMIT_ORDERS, MOCK_SMART_BUYS, startGuestAgentsSimulation } from "@/lib/mockData";
 import { useToast } from "@/components/ui/Toast";
 
 function genSpark(base: number, n = 12): number[] {
@@ -246,7 +246,10 @@ export default function AgentsPage() {
       setHoldings(MOCK_HOLDINGS as any);
       setLimitOrders(MOCK_LIMIT_ORDERS as any);
       setSmartBuys(MOCK_SMART_BUYS as any);
-      return;
+      const stop = startGuestAgentsSimulation({
+        setHoldings, setLimitOrders, setSmartBuys,
+      });
+      return () => stop();
     }
     apiFetch("/api/holdings?network=mainnet").then(setHoldings).catch(() => {});
     const interval = setInterval(() => apiFetch("/api/holdings?network=mainnet").then(setHoldings).catch(() => {}), 15000);

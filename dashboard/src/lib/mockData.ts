@@ -141,3 +141,149 @@ export const MOCK_SMART_BUYS = [
   { id: "sb_1", symbol: "MORPHO", name: "morpho", score: 90, reason: "Rising TVL + positive sentiment", address: addr(), price_usd: 2.14 },
   { id: "sb_2", symbol: "BASESWAP", name: "BaseSwap", score: 84, reason: "Oversold bounce setup", address: addr(), price_usd: 0.19 },
 ];
+
+// ─── Live simulation for Guest / Demo mode ───────────────────
+// Keeps the dashboard feeling alive without ever touching the real backend:
+// gas ticks, new autonomous executions stream in, agent chat writes itself,
+// KPI counters climb. Pure client-side intervals, no network calls.
+
+function clock(): string {
+  return new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+}
+
+const GUEST_PROJECTS = [
+  "Aerodrome Finance", "DEGEN", "Brett", "morpho", "cbETH", "Compound",
+  "BaseSwap", "Moonwell", "TOSHI", "AERO", "Reserve", "ExtraFi", "Sushi",
+];
+
+export interface GuestSimHandlers {
+  setTransactions: (u: (prev: any[]) => any[]) => void;
+  setAgentMessages: (u: (prev: any[]) => any[]) => void;
+  setLogs: (u: (prev: any[]) => any[]) => void;
+  setKpiMetrics: (u: (prev: any) => any) => void;
+  setGasHistory: (u: (prev: any[]) => any[]) => void;
+  setTvlHistory: (u: (prev: any[]) => any[]) => void;
+  setSuccessHistory: (u: (prev: any[]) => any[]) => void;
+}
+
+export function startGuestSimulation(h: GuestSimHandlers): () => void {
+  const id = setInterval(() => {
+    h.setGasHistory((prev: any[]) =>
+      [...prev.slice(1), { time: clock(), gwei: +(0.006 + Math.random() * 0.022).toFixed(3) }]
+    );
+    h.setTvlHistory((prev: any[]) => {
+      const c = [...prev];
+      if (c.length) {
+        const last = { ...c[c.length - 1] };
+        last.tvl = Math.round(last.tvl + Math.random() * 3_000_000);
+        c[c.length - 1] = last;
+      }
+      return c;
+    });
+
+    if (Math.random() < 0.55) {
+      const p = GUEST_PROJECTS[Math.floor(Math.random() * GUEST_PROJECTS.length)];
+      const amt = +(Math.random() * 4 + 0.1).toFixed(2);
+      const hash = txhash();
+      h.setTransactions((prev: any[]) =>
+        [
+          {
+            id: "tx_" + Date.now(),
+            projectName: p,
+            targetAddress: addr(),
+            amountUsd: amt,
+            status: "success",
+            txHash: hash,
+            timestamp: new Date(),
+            reason: "Autonomous Execution (Agent B)",
+            gasUsedGwei: +(Math.random() * 0.03).toFixed(3),
+          },
+          ...prev,
+        ].slice(0, 50)
+      );
+      h.setAgentMessages((prev: any[]) =>
+        [
+          {
+            id: "am_" + Date.now(),
+            sender: "agent_b",
+            content: `Validated ${p} payload. Guardrail passed. Broadcasting secure transfer on Base L2 — $${amt}.`,
+            timestamp: new Date(),
+            status: "done",
+            metadata: { txHash: hash, projectName: p, amountUsd: amt },
+          },
+          ...prev,
+        ].slice(-50)
+      );
+      h.setLogs((prev: any[]) =>
+        [
+          {
+            id: "lg_" + Date.now(),
+            timestamp: new Date(),
+            level: "AGENT_B",
+            message: `Executed ${p} — tx 0x…${hash.slice(2, 8)} success, gas ${(Math.random() * 0.03).toFixed(3)} gwei`,
+          },
+          ...prev,
+        ].slice(0, 100)
+      );
+      h.setKpiMetrics((prev: any) => ({
+        ...prev,
+        totalTransactions: prev.totalTransactions + 1,
+        totalTvlAnalyzed: prev.totalTvlAnalyzed + Math.round(amt * 1_000_000),
+        gasSavedUsd: +(prev.gasSavedUsd + 0.08).toFixed(2),
+      }));
+      h.setSuccessHistory((prev: any[]) => {
+        const c = [...prev];
+        if (c.length) {
+          const last = { ...c[c.length - 1] };
+          last.success = last.success + 1;
+          c[c.length - 1] = last;
+        }
+        return c;
+      });
+    }
+  }, 3500);
+  return () => clearInterval(id);
+}
+
+export interface GuestAgentsHandlers {
+  setHoldings: (u: (prev: any) => any) => void;
+  setLimitOrders: (u: (prev: any[]) => any[]) => void;
+  setSmartBuys: (u: (prev: any[]) => any[]) => void;
+}
+
+export function startGuestAgentsSimulation(h: GuestAgentsHandlers): () => void {
+  const id = setInterval(() => {
+    h.setHoldings((prev: any) => {
+      if (!prev || !Array.isArray(prev.holding)) return prev;
+      return {
+        ...prev,
+        holding: prev.holding.map((x: any) => {
+          const drift = (Math.random() - 0.5) * 0.04;
+          return {
+            ...x,
+            pnl_pct: +(x.pnl_pct + drift * 10).toFixed(2),
+            value_usd: +(x.value_usd * (1 + drift)).toFixed(2),
+          };
+        }),
+      };
+    });
+    if (Math.random() < 0.3) {
+      const p = GUEST_PROJECTS[Math.floor(Math.random() * GUEST_PROJECTS.length)];
+      h.setSmartBuys((prev: any[]) =>
+        [
+          {
+            id: "sb_" + Date.now(),
+            symbol: p.slice(0, 5).toUpperCase(),
+            name: p,
+            score: 80 + Math.floor(Math.random() * 18),
+            reason: "Conviction rising — sentiment + TVL up",
+            address: addr(),
+            price_usd: +(Math.random() * 3 + 0.05).toFixed(3),
+          },
+          ...prev,
+        ].slice(0, 8)
+      );
+    }
+  }, 4000);
+  return () => clearInterval(id);
+}

@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { useAgentWebSocket } from "@/hooks/useAgentWebSocket";
 import { apiFetch } from "@/lib/api";
 import { mapLogToAgentMessage, mapRawTxToTransaction } from "@/lib/mappers";
-import { isGuestSession, MOCK_TRANSACTIONS, MOCK_APPROVAL_QUEUE, MOCK_AGENT_MESSAGES, MOCK_LOGS, MOCK_VECTOR_MEMORY, MOCK_KPI, MOCK_GAS_HISTORY, MOCK_TVL_HISTORY, MOCK_SUCCESS_HISTORY } from "@/lib/mockData";
+import { isGuestSession, MOCK_TRANSACTIONS, MOCK_APPROVAL_QUEUE, MOCK_AGENT_MESSAGES, MOCK_LOGS, MOCK_VECTOR_MEMORY, MOCK_KPI, MOCK_GAS_HISTORY, MOCK_TVL_HISTORY, MOCK_SUCCESS_HISTORY, startGuestSimulation } from "@/lib/mockData";
 import { KpiGridSkeleton, ChartSkeleton, TableSkeleton } from "@/components/ui/Skeleton";
 import { Skeleton } from "@/components/ui/Skeleton";
 
@@ -328,6 +328,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       setSuccessHistory(MOCK_SUCCESS_HISTORY);
       setAgentAStatus("online");
       setAgentBStatus("online");
+      // Keep the demo feeling alive: stream fake executions + ticks.
+      startGuestSimulation({
+        setTransactions, setAgentMessages, setLogs, setKpiMetrics,
+        setGasHistory, setTvlHistory, setSuccessHistory,
+      });
       return;
     }
     try {
