@@ -1,4 +1,4 @@
-"use use client";
+"use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { RainbowKitProvider, ConnectButton, darkTheme } from "@rainbow-me/rainbowkit";
@@ -28,11 +28,20 @@ function WalletFlow({
   const { signMessageAsync } = useSignMessage();
   const { isPending } = useConnect();
   const [signing, setSigning] = useState(false);
-  const [manualMode, setManualMode] = useState(false);
+  const [showSignButton, setShowSignButton] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  // Ensure we only auto-attempt SIWE once per mount (avoids double-fire on
-  // re-renders where isConnected/address are already truthy).
-  const triggeredRef = useRef(false);
+
+  // Manual-only flow: NO auto-sign. As soon as a wallet connects we show the
+  // explicit "Sign Message to Verify" button. The user taps it themselves —
+  // no timer, no auto deep-link (which mobile browsers block).
+  useEffect(() => {
+    if (isConnected && address) {
+      console.log("[SIWE] wallet connected; showing manual Sign button.", address);
+      setShowSignButton(true);
+    } else {
+      setShowSignButton(false);
+    }
+  }, [isConnected, address]);
 
   const runSiwe = useCallback(async () => {
     if (!address) {
@@ -41,62 +50,36 @@ function WalletFlow({
     }
     setSigning(true);
     setErrorMsg(null);
-    setManualMode(false);
     try {
-      console.log("[SIWE] starting sign-in for", address);
+      console.log("[SIWE] manual sign-in starting for", address);
       const res = await siweLoginWithWagmi(address as string, signMessageAsync);
       console.log("[SIWE] verify success, token issued:", res.token ? "yes" : "no");
-      // Persist auth + hand off to caller, then hard-redirect into the app.
       onSiweSuccess?.(res);
       onClose();
-      // Hard navigation guarantees we land in Mission Control even if a
-      // parent component forgets to route. (token already stored in localStorage
-      // by siweVerify/siweFetchVerify.)
       window.location.href = "/dashboard";
     } catch (err) {
       const msg = err instanceof Error ? err.message : "SIWE failed";
-      console.error(
-        "[SIWE] catch block hit — automatic sign rejected/failed:",
-        msg,
-        err
-      );
+      console.error("[SIWE] sign failed:", msg, err);
       setErrorMsg(msg);
       setSigning(false);
-      // Mobile browsers may block the auto deep-link sign; surface a manual
-      // button so the user is never stuck at the gate.
-      setManualMode(true);
+      setShowSignButton(true); // keep button available so user can retry
       onSiweError?.(msg);
     }
   }, [address, signMessageAsync, onSiweSuccess, onSiweError, onClose]);
-
-  // Auto-trigger SIWE AFTER a delay once connected. The delay lets the
-  // WalletConnect socket settle and RainbowKit's UI finish mounting — on
-  // mobile, firing signMessage synchronously on isConnected=true gets blocked
-  // by the browser and fails instantly.
-  useEffect(() => {
-    if (!isConnected || !address) return;
-    if (triggeredRef.current) return;
-    triggeredRef.current = true;
-    console.log("[SIWE] wallet connected; waiting 1200ms before auto-sign…");
-    const t = setTimeout(() => {
-      runSiwe();
-    }, 1200);
-    return () => clearTimeout(t);
-  }, [isConnected, address, runSiwe]);
 
   return (
     <div className="flex flex-col items-center gap-4">
       <ConnectButton />
       {signing && (
         <p className="text-xs text-[var(--color-body-subtle)]">
-          Sign the message in your wallet to continue…
+          Approve the signature request in your wallet…
         </p>
       )}
-      {manualMode && (
+      {showSignButton && !signing && (
         <div className="flex w-full flex-col items-center gap-2">
           <button
             type="button"
-            onClick={() => runSiwe()}
+            onClick={runSiwe}
             className="w-full rounded-xl py-3 text-sm font-bold text-white transition-all duration-300 hover:opacity-90 active:scale-[0.98]"
             style={{ background: "var(--color-brand)" }}
           >
@@ -104,7 +87,7 @@ function WalletFlow({
           </button>
           {errorMsg && (
             <p className="text-center text-xs text-[var(--color-fg-warning)]">
-              Auto-sign was blocked — tap above to sign manually.
+              {errorMsg}
             </p>
           )}
         </div>
@@ -126,9 +109,6 @@ export default function WalletModal({
 }: WalletModalProps) {
   const [queryClient] = useState(() => new QueryClient());
   // Resolve the real WC projectId BEFORE mounting Wagmi/RainbowKit.
-  // RainbowKit's getDefaultConfig contacts Reown with the projectId; an
-  // invalid/dummy id makes Reown return 403 and throws, crashing the tree.
-  // So we only build the config once we have a valid projectId.
   const [projectId, setProjectId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
