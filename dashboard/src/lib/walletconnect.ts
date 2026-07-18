@@ -32,14 +32,15 @@ async function resolveProjectId(): Promise<string> {
   if (buildTime) return buildTime;
   if (_projectIdCache !== null) return _projectIdCache;
   try {
-    const API_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/+$/, "");
-    const url = API_URL ? `${API_URL}/api/config` : "/api/config";
-    const res = await fetch(url, { headers: { Accept: "application/json" } });
-    if (res.ok) {
-      const data = (await res.json()) as { wc_project_id?: string };
-      _projectIdCache = (data.wc_project_id || "").trim();
-      return _projectIdCache;
-    }
+    // Use apiFetch (safe URL builder, trims NEXT_PUBLIC_API_URL, relative
+    // fallback) instead of a raw fetch so we never pass an "undefined" or
+    // whitespace-polluted URL to fetch() -> "Invalid value" error.
+    const { apiFetch } = await import("./api");
+    const data = await apiFetch<{ wc_project_id?: string }>("/api/config", {
+      headers: { Accept: "application/json" },
+    });
+    _projectIdCache = (data.wc_project_id || "").trim();
+    return _projectIdCache;
   } catch {
     /* ignore — fall through to empty */
   }
