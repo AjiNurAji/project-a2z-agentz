@@ -16,17 +16,43 @@ import { EthereumProvider } from "@walletconnect/ethereum-provider";
  */
 
 let _provider: InstanceType<typeof EthereumProvider> | null = null;
+let _projectIdCache: string | null = null;
 
 export function getWalletConnectProjectId(): string {
   return (process.env.NEXT_PUBLIC_WC_PROJECT_ID || "").trim();
 }
 
+/**
+ * Resolve the WC projectId. Prefers the build-time NEXT_PUBLIC_ var, but falls
+ * back to the public backend /api/config endpoint so WalletConnect works even
+ * when the env was not inlined at build time (common Vercel quirk).
+ */
+async function resolveProjectId(): Promise<string> {
+  const buildTime = getWalletConnectProjectId();
+  if (buildTime) return buildTime;
+  if (_projectIdCache !== null) return _projectIdCache;
+  try {
+    const API_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/+$/, "");
+    const url = API_URL ? `${API_URL}/api/config` : "/api/config";
+    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    if (res.ok) {
+      const data = (await res.json()) as { wc_project_id?: string };
+      _projectIdCache = (data.wc_project_id || "").trim();
+      return _projectIdCache;
+    }
+  } catch {
+    /* ignore — fall through to empty */
+  }
+  _projectIdCache = "";
+  return "";
+}
+
 export async function initWalletConnect(): Promise<InstanceType<typeof EthereumProvider>> {
   if (_provider) return _provider;
-  const projectId = getWalletConnectProjectId();
+  const projectId = await resolveProjectId();
   if (!projectId) {
     throw new Error(
-      "WalletConnect projectId missing. Set NEXT_PUBLIC_WC_PROJECT_ID in your deploy env."
+      "WalletConnect projectId missing. Set NEXT_PUBLIC_WC_PROJECT_ID or backend WALLETCONNECT_PROJECT_ID."
     );
   }
   _provider = await EthereumProvider.init({
