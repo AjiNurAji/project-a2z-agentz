@@ -2,7 +2,7 @@
 -- A2Z Agentz - Schema Patch: Dual-Home Network Segregation
 -- Idempotent migration. Safe to run on a live DB; safe to re-run.
 --
--- Adds a `network` discriminator column (DEFAULT 'mainnet') to the tables that
+-- Adds a `network` discriminator column (DEFAULT 'base') to the tables that
 -- store on-chain execution state, so Base mainnet and Base Sepolia testnet
 -- rows NEVER cross-contaminate. Every INSERT now stamps the active network.
 -- ============================================================================
@@ -17,8 +17,8 @@ BEGIN
         WHERE table_name = 'execution_logs' AND column_name = 'network'
     ) THEN
         ALTER TABLE execution_logs
-            ADD COLUMN network VARCHAR(16) NOT NULL DEFAULT 'mainnet'
-            CHECK (network IN ('mainnet', 'testnet'));
+            ADD COLUMN network VARCHAR(16) NOT NULL DEFAULT 'base'
+            CHECK (network IN ('base', 'mainnet', 'testnet', 'sepolia'));
         CREATE INDEX IF NOT EXISTS execution_logs_network_idx
             ON execution_logs (network);
     END IF;
@@ -32,8 +32,8 @@ BEGIN
         WHERE table_name = 'held_tokens' AND column_name = 'network'
     ) THEN
         ALTER TABLE held_tokens
-            ADD COLUMN network VARCHAR(16) NOT NULL DEFAULT 'mainnet'
-            CHECK (network IN ('mainnet', 'testnet'));
+            ADD COLUMN network VARCHAR(16) NOT NULL DEFAULT 'base'
+            CHECK (network IN ('base', 'mainnet', 'testnet', 'sepolia'));
         CREATE INDEX IF NOT EXISTS held_tokens_network_idx
             ON held_tokens (network);
     END IF;
@@ -48,8 +48,8 @@ BEGIN
         WHERE table_name = 'target_addresses' AND column_name = 'network'
     ) THEN
         ALTER TABLE target_addresses
-            ADD COLUMN network VARCHAR(16) NOT NULL DEFAULT 'mainnet'
-            CHECK (network IN ('mainnet', 'testnet'));
+            ADD COLUMN network VARCHAR(16) NOT NULL DEFAULT 'base'
+            CHECK (network IN ('base', 'mainnet', 'testnet', 'sepolia'));
         CREATE INDEX IF NOT EXISTS target_addresses_network_idx
             ON target_addresses (network);
     END IF;

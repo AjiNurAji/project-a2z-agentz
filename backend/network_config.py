@@ -77,7 +77,9 @@ class NetworkConfig:
     @property
     def network_flag(self) -> str:
         """Short flag stored in DB columns to segregate execution data."""
-        return "mainnet" if self.is_mainnet else "testnet"
+        if self.is_mainnet:
+            return "base"
+        return "testnet"
 
     def describe(self) -> str:
         return (
