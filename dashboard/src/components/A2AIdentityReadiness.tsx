@@ -63,9 +63,8 @@ export default function A2AIdentityReadiness({ wsStatus, user }: Props) {
         </div>
       </div>
 
-      <p className="mt-4 rounded-xl border p-3 text-xs leading-relaxed" style={{ color: "var(--color-fg-warning)", borderColor: "var(--color-border-warning)", background: "var(--color-bg-warning-subtle)" }}>
-        Wallet connect is ready on the frontend. Backend sign-in-with-wallet is pending. Next backend milestone: add SIWE challenge/verify endpoint and issue the same auth cookie used by email login.
+      <p className="mt-4 rounded-xl border p-3 text-xs leading-relaxed" style={{ color: "var(--color-fg-cyan)", borderColor: "var(--color-border-brand)", background: "var(--color-bg-info-subtle)" }}>
+        Wallet connect (SIWE) is live on both frontend and backend. Sign in with MetaMask or scan the WalletConnect QR from any mobile wallet — both issue the same JWT session as email login.
       </p>
-    </section>
   );
 }
