@@ -1,6 +1,6 @@
-"use client";
+"use use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { RainbowKitProvider, ConnectButton, darkTheme } from "@rainbow-me/rainbowkit";
 import { WagmiProvider, useAccount, useSignMessage, useConnect } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -28,41 +28,90 @@ function WalletFlow({
   const { signMessageAsync } = useSignMessage();
   const { isPending } = useConnect();
   const [signing, setSigning] = useState(false);
+  const [manualMode, setManualMode] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Ensure we only auto-attempt SIWE once per mount (avoids double-fire on
+  // re-renders where isConnected/address are already truthy).
+  const triggeredRef = useRef(false);
 
-  // Auto-trigger SIWE the moment a wallet connects.
-  useEffect(() => {
-    if (!isConnected || !address || signing) return;
-    let cancelled = false;
+  const runSiwe = useCallback(async () => {
+    if (!address) {
+      console.warn("[SIWE] runSiwe aborted: address not ready yet");
+      return;
+    }
     setSigning(true);
-    (async () => {
-      try {
-        const res = await siweLoginWithWagmi(address as string, signMessageAsync);
-        if (cancelled) return;
-        // Persist auth + hand off to caller, then hard-redirect into the app.
-        onSiweSuccess?.(res);
-        onClose();
-        // Hard navigation guarantees we land in Mission Control even if a
-        // parent component forgets to route. (token already stored in localStorage
-        // by siweVerify/siweFetchVerify.)
-        window.location.href = "/dashboard";
-      } catch (err) {
-        if (!cancelled) {
-          onSiweError?.(err instanceof Error ? err.message : "SIWE failed");
-        }
-        setSigning(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isConnected, address, signing, signMessageAsync, onSiweSuccess, onSiweError, onClose]);
+    setErrorMsg(null);
+    setManualMode(false);
+    try {
+      console.log("[SIWE] starting sign-in for", address);
+      const res = await siweLoginWithWagmi(address as string, signMessageAsync);
+      console.log("[SIWE] verify success, token issued:", res.token ? "yes" : "no");
+      // Persist auth + hand off to caller, then hard-redirect into the app.
+      onSiweSuccess?.(res);
+      onClose();
+      // Hard navigation guarantees we land in Mission Control even if a
+      // parent component forgets to route. (token already stored in localStorage
+      // by siweVerify/siweFetchVerify.)
+      window.location.href = "/dashboard";
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "SIWE failed";
+      console.error(
+        "[SIWE] catch block hit — automatic sign rejected/failed:",
+        msg,
+        err
+      );
+      setErrorMsg(msg);
+      setSigning(false);
+      // Mobile browsers may block the auto deep-link sign; surface a manual
+      // button so the user is never stuck at the gate.
+      setManualMode(true);
+      onSiweError?.(msg);
+    }
+  }, [address, signMessageAsync, onSiweSuccess, onSiweError, onClose]);
+
+  // Auto-trigger SIWE AFTER a delay once connected. The delay lets the
+  // WalletConnect socket settle and RainbowKit's UI finish mounting — on
+  // mobile, firing signMessage synchronously on isConnected=true gets blocked
+  // by the browser and fails instantly.
+  useEffect(() => {
+    if (!isConnected || !address) return;
+    if (triggeredRef.current) return;
+    triggeredRef.current = true;
+    console.log("[SIWE] wallet connected; waiting 1200ms before auto-sign…");
+    const t = setTimeout(() => {
+      runSiwe();
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [isConnected, address, runSiwe]);
 
   return (
     <div className="flex flex-col items-center gap-4">
       <ConnectButton />
-      {(isPending || signing) && (
+      {signing && (
         <p className="text-xs text-[var(--color-body-subtle)]">
-          {signing ? "Sign the message in your wallet to continue…" : "Confirm in your wallet…"}
+          Sign the message in your wallet to continue…
+        </p>
+      )}
+      {manualMode && (
+        <div className="flex w-full flex-col items-center gap-2">
+          <button
+            type="button"
+            onClick={() => runSiwe()}
+            className="w-full rounded-xl py-3 text-sm font-bold text-white transition-all duration-300 hover:opacity-90 active:scale-[0.98]"
+            style={{ background: "var(--color-brand)" }}
+          >
+            Sign Message to Verify
+          </button>
+          {errorMsg && (
+            <p className="text-center text-xs text-[var(--color-fg-warning)]">
+              Auto-sign was blocked — tap above to sign manually.
+            </p>
+          )}
+        </div>
+      )}
+      {isPending && !signing && (
+        <p className="text-xs text-[var(--color-body-subtle)]">
+          Confirm in your wallet…
         </p>
       )}
     </div>
