@@ -33,15 +33,10 @@ export async function getWalletConnectProjectId(): Promise<string> {
   return _wcProjectId;
 }
 
-// Reown/RainbowKit requires a non-empty projectId at config-build time.
-// We use a placeholder synchronously and patch it post-mount via the
-// RainbowKitProvider (see components/WalletModal.tsx) once we resolve it.
-export const FALLBACK_PROJECT_ID = "demo-project-id";
-
 export function buildWagmiConfig(projectId: string) {
   return getDefaultConfig({
     appName: "A2Z Agentz",
-    projectId: projectId || FALLBACK_PROJECT_ID,
+    projectId,
     chains: [base as Chain],
     ssr: true,
   });

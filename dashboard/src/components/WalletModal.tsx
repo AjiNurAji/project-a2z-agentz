@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { RainbowKitProvider, ConnectButton, darkTheme } from "@rainbow-me/rainbowkit";
 import { WagmiProvider, useAccount, useSignMessage, useConnect } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { buildWagmiConfig, getWalletConnectProjectId, FALLBACK_PROJECT_ID } from "@/lib/web3";
+import { base } from "wagmi/chains";
+import { getDefaultConfig } from "@rainbow-me/rainbowkit";
+import { buildWagmiConfig, getWalletConnectProjectId } from "@/lib/web3";
 import { siweLoginWithWagmi, type SiweVerifyResult } from "@/lib/siwe-wagmi";
 
 interface WalletModalProps {
@@ -15,7 +17,6 @@ interface WalletModalProps {
   onSiweError?: (msg: string) => void;
 }
 
-// Inner component (must be inside WagmiProvider/QueryClientProvider)
 function WalletFlow({
   onSiweSuccess,
   onSiweError,
@@ -25,7 +26,7 @@ function WalletFlow({
 }) {
   const { address, isConnected } = useAccount();
   const { signMessageAsync } = useSignMessage();
-  const { connectors, connect, isPending } = useConnect();
+  const { isPending } = useConnect();
 
   useEffect(() => {
     if (!isConnected || !address) return;
@@ -65,24 +66,29 @@ export default function WalletModal({
   onSiweError,
 }: WalletModalProps) {
   const [queryClient] = useState(() => new QueryClient());
-  const [config, setConfig] = useState(() => buildWagmiConfig(FALLBACK_PROJECT_ID));
+  // Resolve the real WC projectId BEFORE mounting Wagmi/RainbowKit.
+  // RainbowKit's getDefaultConfig contacts Reown with the projectId; an
+  // invalid/dummy id makes Reown return 403 and throws, crashing the tree.
+  // So we only build the config once we have a valid projectId.
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Resolve real WC projectId post-mount (from backend /api/config).
   useEffect(() => {
     let active = true;
-    getWalletConnectProjectId().then((pid) => {
-      if (active && pid) setConfig(buildWagmiConfig(pid));
-    });
+    getWalletConnectProjectId()
+      .then((pid) => {
+        if (active) setProjectId(pid || null);
+      })
+      .catch(() => {
+        if (active) setProjectId(null);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
     return () => {
       active = false;
     };
   }, []);
-
-  // Surface connected address to parent (optional).
-  const { address } = useAccount();
-  useEffect(() => {
-    if (address) onConnected?.(address as string);
-  }, [address, onConnected]);
 
   if (!open) return null;
 
@@ -115,13 +121,23 @@ export default function WalletModal({
           Choose a wallet to sign in with Ethereum (SIWE). Scanned QR works with
           Rainbow, Trust, OKX, Binance, MetaMask mobile and more.
         </p>
-        <WagmiProvider config={config}>
-          <QueryClientProvider client={queryClient}>
-            <RainbowKitProvider theme={darkTheme({ accentColor: "#6d28d9" })}>
-              <WalletFlow onSiweSuccess={onSiweSuccess} onSiweError={onSiweError} />
-            </RainbowKitProvider>
-          </QueryClientProvider>
-        </WagmiProvider>
+
+        {loading ? (
+          <p className="text-sm opacity-70">Loading wallets…</p>
+        ) : projectId ? (
+          <WagmiProvider config={buildWagmiConfig(projectId)}>
+            <QueryClientProvider client={queryClient}>
+              <RainbowKitProvider theme={darkTheme({ accentColor: "#6d28d9" })}>
+                <WalletFlow onSiweSuccess={onSiweSuccess} onSiweError={onSiweError} />
+              </RainbowKitProvider>
+            </QueryClientProvider>
+          </WagmiProvider>
+        ) : (
+          <p className="text-sm text-[var(--color-fg-warning)]">
+            WalletConnect is unavailable (projectId not configured). Use email/password
+            or install MetaMask to continue.
+          </p>
+        )}
       </div>
     </div>
   );
