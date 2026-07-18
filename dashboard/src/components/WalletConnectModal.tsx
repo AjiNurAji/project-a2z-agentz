@@ -10,10 +10,12 @@ interface WalletConnectModalProps {
   onClose: () => void;
   onConnected?: (session: WalletSession) => void;
   onContinue?: () => void;
-  /** Zero-Friction: when supplied, selecting a wallet immediately triggers
+  /** Zero-Friction: when supplied, selecting an injected wallet immediately triggers
    *  the full SIWE sign+verify flow (connect -> sign -> dashboard),
    *  collapsing the separate login/register barrier into one tap. */
   onSiweConnect?: () => void;
+  /** WalletConnect v2 (QR) variant of onSiweConnect. */
+  onWalletConnect?: () => void;
 }
 
 function statusLabel(status: WalletStatus) {
@@ -29,7 +31,7 @@ function statusClass(status: WalletStatus) {
   return "text-[var(--color-fg-warning)] bg-[var(--color-bg-warning-subtle)] border-[var(--color-border-warning)]";
 }
 
-export default function WalletConnectModal({ open, onClose, onConnected, onContinue, onSiweConnect }: WalletConnectModalProps) {
+export default function WalletConnectModal({ open, onClose, onConnected, onContinue, onSiweConnect, onWalletConnect }: WalletConnectModalProps) {
   const wallet = useWalletConnect();
 
   useEffect(() => {
@@ -77,6 +79,42 @@ export default function WalletConnectModal({ open, onClose, onConnected, onConti
         </div>
 
         <div className="mt-5 space-y-2">
+          {/* WalletConnect v2 — QR for mobile wallets (Rainbow, Trust, MetaMask mobile) */}
+          <button
+            key="walletconnect"
+            onClick={async () => {
+              if (onWalletConnect) {
+                // Route through WalletConnect v2 SIWE pipeline.
+                onWalletConnect();
+                return;
+              }
+              if (onSiweConnect) {
+                onSiweConnect();
+                return;
+              }
+            }}
+            disabled={wallet.state === "connecting"}
+            aria-label="Connect with WalletConnect (QR)"
+            className="flex w-full items-center justify-between gap-3 rounded-xl px-4 py-3 text-left transition-all hover:border-[var(--color-border-brand)] hover:shadow-md disabled:opacity-60 focus-ring"
+            style={{
+              border: "1px solid var(--color-border-default)",
+              background:
+                "color-mix(in srgb, var(--color-neutral-secondary-soft) 40%, transparent)",
+            }}
+          >
+            <div className="flex-1 min-w-0 pr-3">
+              <span className="block text-sm font-semibold truncate" style={{ color: "var(--color-heading)" }}>
+                WalletConnect
+              </span>
+              <span className="block text-xs mt-0.5" style={{ color: "var(--color-body-subtle)", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                Scan with any mobile wallet (Rainbow, Trust, MetaMask). No extension required.
+              </span>
+            </div>
+            <span className={`shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] font-semibold ${statusClass("available")}`}>
+              QR
+            </span>
+          </button>
+
           {wallet.wallets.map((option) => (
             <button
               key={option.id}

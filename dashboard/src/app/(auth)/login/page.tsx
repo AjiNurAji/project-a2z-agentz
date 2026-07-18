@@ -10,7 +10,7 @@ import { useToast } from "@/components/ui/Toast";
 import WalletConnectModal from "@/components/WalletConnectModal";
 
 export default function LoginPage() {
-  const { login, loginAsGuest, loginWithWallet } = useAuth();
+  const { login, loginAsGuest, loginWithWallet, loginWithWalletConnect } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const toast = useToast();
@@ -66,6 +66,23 @@ export default function LoginPage() {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Wallet login failed";
       toast.error("Wallet login failed", message);
+    } finally {
+      setSiweLoading(false);
+    }
+  };
+
+  const handleSiweWalletConnect = async () => {
+    setSiweLoading(true);
+    try {
+      const res = await loginWithWalletConnect();
+      if (res.wallet?.seed_phrase) {
+        setSiweSeed(res.wallet);
+      } else {
+        router.push(searchParams.get("next") || "/dashboard");
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "WalletConnect login failed";
+      toast.error("WalletConnect login failed", message);
     } finally {
       setSiweLoading(false);
     }
@@ -369,6 +386,7 @@ export default function LoginPage() {
       onClose={() => setWalletModalOpen(false)}
       onContinue={() => router.push("/dashboard")}
       onSiweConnect={handleSiwe}
+      onWalletConnect={handleSiweWalletConnect}
     />
     </>
   );

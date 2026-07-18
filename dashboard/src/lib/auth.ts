@@ -114,6 +114,25 @@ export interface SiweVerifyResult {
   };
 }
 
+export async function siweFetchNonce(address: string): Promise<{ message: string; nonce: string }> {
+  const data = await apiFetch<{ message: string; nonce: string }>("/api/auth/siwe/nonce", {
+    method: "POST",
+    body: JSON.stringify({ address }),
+  });
+  return data;
+}
+
+export async function siweFetchVerify(message: string, signature: string): Promise<SiweVerifyResult> {
+  const data = await apiFetch<SiweVerifyResult>("/api/auth/siwe/verify", {
+    method: "POST",
+    body: JSON.stringify({ message, signature }),
+  });
+  if (data.token && typeof window !== "undefined") {
+    localStorage.setItem("a2z-token", data.token);
+  }
+  return data;
+}
+
 /**
  * Sign-In-With-Ethereum (P6): pure wallet-signature login, no email/password.
  * 1. Request the connected address from window.ethereum.
@@ -133,25 +152,25 @@ export async function siweLogin(): Promise<SiweVerifyResult> {
   }
   const address = accounts[0];
 
-  const nonceRes = await apiFetch<{ message: string }>("/api/auth/siwe/nonce", {
-    method: "POST",
-    body: JSON.stringify({ address }),
-  });
+  const { message } = await siweFetchNonce(address);
 
   const signature: string = await eth.request({
     method: "personal_sign",
-    params: [nonceRes.message, address],
+    params: [message, address],
   });
   if (!signature) {
     throw new Error("Signature was rejected.");
   }
 
-  const data = await apiFetch<SiweVerifyResult>("/api/auth/siwe/verify", {
-    method: "POST",
-    body: JSON.stringify({ message: nonceRes.message, signature }),
-  });
-  if (data.token && typeof window !== "undefined") {
-    localStorage.setItem("a2z-token", data.token);
-  }
-  return data;
+  return siweFetchVerify(message, signature);
+}
+
+/**
+ * WalletConnect v2 SIWE login. Reuses the same nonce/verify backend so the
+ * database upsert path is identical to injected-wallet SIWE.
+ */
+export async function siweLoginWalletConnect(): Promise<SiweVerifyResult> {
+  const wc = await import("./walletconnect");
+  const { address, message, signature } = await wc.walletConnectSiweLogin();
+  return siweFetchVerify(message, signature);
 }

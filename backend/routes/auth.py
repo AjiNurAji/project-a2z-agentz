@@ -414,15 +414,19 @@ async def siwe_nonce(request: Request):
     issued_at = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
     # Return a ready-to-sign EIP-4361 message (frontend just signs `message`).
     # SIWE domain resolution (best-practice order):
-    #   1. Origin header (frontend URL the browser actually called from) — automatic
-    #   2. SIWE_DOMAIN env var (explicit override)
-    #   3. request.url.hostname (API host, last-resort fallback)
-    domain = (
-        request.headers.get("origin")
-        or os.getenv("SIWE_DOMAIN")
-        or request.url.hostname
-        or "a2z.agentz"
-    )
+    #   1. Origin header (frontend URL the browser actually called from) — STRONGEST
+    #      signal; we always trust this over any static env so a stale SIWE_DOMAIN
+    #      can never produce a domain-mismatch prompt (e.g. cjptoken.net).
+    #   2. request.url.hostname (API host, last-resort fallback)
+    origin = (request.headers.get("origin") or "").strip()
+    domain = origin or request.url.hostname or "a2z.agentz"
+    # Defensive: never let a hard-coded/stale SIWE_DOMAIN override the real Origin.
+    env_domain = (os.getenv("SIWE_DOMAIN") or "").strip().lower()
+    if origin and env_domain and env_domain not in origin.lower():
+        logger.warning(
+            "SIWE_DOMAIN env (%s) disagrees with request Origin (%s); using Origin.",
+            env_domain, origin,
+        )
     # URI in the EIP-4361 message must match the frontend origin (domain),
     # not the backend API URL, so the wallet shows a consistent sign-in target.
     uri = domain

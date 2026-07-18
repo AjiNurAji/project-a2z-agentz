@@ -1,9 +1,10 @@
 // Default to a relative URL so Next.js rewrites (next.config.ts) proxy
 // /api/* to the Railway backend same-origin. Only use an absolute API_URL
 // when explicitly provided (e.g. local dev against a running backend).
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
-const API_KEY = process.env.NEXT_PUBLIC_API_KEY || "";
-const ADMIN_TOKEN = process.env.NEXT_PUBLIC_ADMIN_TOKEN || "";
+const RAW_API_URL = (process.env.NEXT_PUBLIC_API_URL || "").trim();
+const API_URL = RAW_API_URL.replace(/\/+$/, ""); // strip trailing slashes
+const API_KEY = (process.env.NEXT_PUBLIC_API_KEY || "").trim();
+const ADMIN_TOKEN = (process.env.NEXT_PUBLIC_ADMIN_TOKEN || "").trim();
 
 interface ApiError extends Error {
   status: number;
@@ -29,7 +30,11 @@ export async function apiFetch<T = unknown>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const url = `${API_URL}${path}`;
+  // Build the request URL safely. If API_URL is empty/unset we use a
+  // same-origin relative path (browser resolves it against window.location),
+  // which is valid for fetch() and avoids "Invalid URL" from new URL().
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  const url = API_URL ? `${API_URL}${cleanPath}` : cleanPath;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string> | undefined),
