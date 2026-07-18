@@ -46,7 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const isGuest = typeof window !== "undefined" && localStorage.getItem("a2z-guest-session") === "1";
       if (isGuest) {
-        setUser({ id: 999, email: "judge@a2z.demo", wallet_address: "0xDemoWallet999" });
+        setUser({ id: 999, email: "guest@a2z.demo", wallet_address: "0xDemoWallet999" });
         setLoading(false);
         return;
       }
@@ -103,7 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const loginAsGuest = useCallback(() => {
-    setUser({ id: 999, email: "judge@a2z.demo", wallet_address: "0xDemoWallet999" });
+    setUser({ id: 999, email: "guest@a2z.demo", wallet_address: "0xDemoWallet999" });
     if (typeof window !== "undefined") {
       localStorage.setItem("a2z-guest-session", "1");
       // Set dummy token so it passes middleware if enabled.
