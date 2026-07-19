@@ -2,6 +2,7 @@
 
 import { type SignableMessage } from "viem";
 import { useSignMessage } from "wagmi";
+import type { User } from "@/lib/auth";
 
 /**
  * SIWE bridge for RainbowKit/Wagmi wallets.
@@ -14,7 +15,7 @@ import { useSignMessage } from "wagmi";
 
 export interface SiweVerifyResult {
   token: string;
-  user: Record<string, unknown>;
+  user: User;
   wallet?: { seed_phrase?: string; address?: string };
 }
 
