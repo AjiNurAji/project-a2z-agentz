@@ -43,6 +43,10 @@ try:
 except Exception:  # pragma: no cover - config module should always be present
     _nc = None
 
+# Required by get_user_wallet_account() which decrypts the user's P3 wallet
+# blob (self-custodial execution mode) from the users table.
+import database
+
 # Backward-compatible alias. Real chain id now comes from network_config so a
 # single ACTIVE_NETWORK switch flips every caller.
 BASE_CHAIN_ID: int = int(os.environ.get("BASE_CHAIN_ID", "8453"))

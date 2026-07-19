@@ -19,7 +19,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 import database
 from agent_a_chroma import check_semantic_similarity
 import web3_async as w3_async
-from web3_async import _rotated_rpc_urls, swap_token_for_eth, collect_platform_fee, get_user_wallet_account, send_native_from_account
+from web3_async import _rotated_rpc_urls, swap_token_for_eth, collect_platform_fee, get_user_wallet_account, send_native_from_account, _usd_to_wei_real
 from lib.dexscreener import get_prices_usd
 from eth_abi import encode as _encode, decode as _decode
 from eth_utils import to_checksum_address as _checksum
