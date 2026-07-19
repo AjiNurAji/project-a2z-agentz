@@ -506,7 +506,7 @@ async def siwe_verify(request: Request):
         )
 
     # 2. Consume nonce (anti-replay + expiry).
-    nonce = _siwe_parse_field(message, "Nonce")
+    nonce = _siwe_parse_all(message).get("nonce")
     if not database.consume_siwe_nonce(claimed_addr, nonce):
         return JSONResponse({"error": "Invalid or expired nonce"}, status_code=401)
 
