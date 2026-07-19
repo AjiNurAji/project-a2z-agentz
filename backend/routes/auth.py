@@ -293,13 +293,29 @@ def _siwe_parse_all(message: str) -> dict:
 
     Keys: address, chain_id, nonce, issued_at, expiration_time,
     not_before, uri, domain, version.
+
+    EIP-4361 address is on its OWN line (no colon) immediately AFTER the
+    "wants you to sign in with your Ethereum account:" declaration line, so a
+    naive "split on ':'" parser drops it and verification fails with
+    "Malformed SIWE message (no Address)". We recover it from that following
+    line when the colon-based parse leaves address empty.
     """
     out: dict = {}
-    for line in message.splitlines():
+    lines = message.splitlines()
+    for line in lines:
         if ":" not in line:
             continue
         k, _, v = line.partition(":")
         out[k.strip().lower()] = v.strip()
+    if not out.get("address"):
+        for i, line in enumerate(lines):
+            if "wants you to sign in with your ethereum account" in line.lower():
+                for nxt in lines[i + 1 :]:
+                    nxt = nxt.strip()
+                    if nxt:
+                        out["address"] = nxt
+                        break
+                break
     return out
 
 
