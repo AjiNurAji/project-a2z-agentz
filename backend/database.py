@@ -471,14 +471,19 @@ def create_siwe_user(wallet_address: str) -> dict | None:
     Returns the new user dict, or None on collision/error.
     """
     fake_email = f"{wallet_address.lower()}@siwe.local"
+    # SIWE users authenticate by signature, never by password. The users table
+    # requires password_hash NOT NULL, so we store a non-null placeholder that
+    # can never match a real bcrypt hash (login always routes SIWE users
+    # through signature verification, never password comparison).
+    placeholder_hash = "siwe-no-password"
     query = """
         INSERT INTO users (email, password_hash, wallet_address, wallet_source)
-        VALUES (%s, NULL, %s, 'linked')
+        VALUES (%s, %s, %s, 'linked')
         RETURNING id, email, wallet_address, wallet_source, created_at, last_login_at;
     """
     try:
         with _get_cursor() as cur:
-            cur.execute(query, (fake_email, wallet_address))
+            cur.execute(query, (fake_email, placeholder_hash, wallet_address))
             row = cur.fetchone()
             if row:
                 return {
