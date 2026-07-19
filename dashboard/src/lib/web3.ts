@@ -11,6 +11,7 @@ import { http, type Chain } from "viem";
  */
 let _resolved = false;
 let _pid = "";
+const FALLBACK_PROJECT_ID = "970e9bd81ce1de4876fc0781b8dce583";
 
 export async function getWalletConnectProjectId(): Promise<string> {
   if (_resolved) return _pid;
