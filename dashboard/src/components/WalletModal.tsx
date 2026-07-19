@@ -44,8 +44,15 @@ function WalletFlow({
   }, [isConnected, address]);
 
   const runSiwe = useCallback(async () => {
+    console.log("[DEBUG_RUNSIWE]", JSON.stringify({
+      address, address_type: typeof address,
+      signMessageAsync_type: typeof signMessageAsync,
+      isConnected,
+    }, null, 2));
     if (!address) {
       console.warn("[SIWE] runSiwe aborted: address not ready yet");
+      setErrorMsg("Wallet address not ready — reconnect and try again.");
+      setShowSignButton(true);
       return;
     }
     setSigning(true);
