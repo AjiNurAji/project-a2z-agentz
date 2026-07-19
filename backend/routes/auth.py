@@ -491,8 +491,10 @@ async def siwe_verify(request: Request):
 
     # 1. Recover signer from signature (EIP-191 personal_sign / EIP-4361).
     try:
-        recovered = _EthAccountSIWE._recover_message(
-            message.encode("utf-8"), signature=signature
+        from eth_account.messages import encode_defunct
+
+        recovered = _EthAccountSIWE.recover_message(
+            encode_defunct(text=message), signature=signature
         )
     except Exception as exc:
         return JSONResponse({"error": f"Signature recovery failed: {exc}"}, status_code=400)
