@@ -9,24 +9,26 @@ import { http, type Chain } from "viem";
  * quirk). We fetch it from the public backend /api/config endpoint at runtime
  * so WalletConnect can bootstrap even when the build env is empty.
  */
-let _wcProjectId: string | null = null;
-const FALLBACK_PROJECT_ID = "970e9bd81ce1de4876fc0781b8dce583";
+let _resolved = false;
+let _pid = "";
 
 export async function getWalletConnectProjectId(): Promise<string> {
-  if (_wcProjectId !== null) return _wcProjectId;
+  if (_resolved) return _pid;
   const buildTime = (process.env.NEXT_PUBLIC_WC_PROJECT_ID || "").trim();
   if (buildTime) {
-    _wcProjectId = buildTime;
-    return _wcProjectId;
+    _pid = buildTime;
+    _resolved = true;
+    return _pid;
   }
   try {
     const res = await fetch("/api/config");
     const data = await res.json();
-    _wcProjectId = (data.wc_project_id || FALLBACK_PROJECT_ID).trim();
+    _pid = (data.wc_project_id || FALLBACK_PROJECT_ID).trim();
   } catch {
-    _wcProjectId = FALLBACK_PROJECT_ID;
+    _pid = FALLBACK_PROJECT_ID;
   }
-  return _wcProjectId;
+  _resolved = true;
+  return _pid;
 }
 
 export function buildWagmiConfig(projectId: string) {
