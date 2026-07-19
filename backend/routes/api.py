@@ -1414,19 +1414,26 @@ async def admin_list_smart_buys(request: Request):
 
 
 def _smart_buy_dto(o: dict) -> dict:
+    from decimal import Decimal as _Decimal
+
+    def _n(v):
+        if isinstance(v, _Decimal):
+            return float(v)
+        return v
+
     return {
         "id": o.get("id"),
         "token_address": o.get("token_address"),
         "token_name": o.get("token_name"),
         "amount_wei": str(o.get("amount_wei")),
-        "target_entry_usd": o.get("target_entry_usd"),
+        "target_entry_usd": _n(o.get("target_entry_usd")),
         "status": o.get("status"),
         "source": o.get("source"),
         "created_at": o.get("created_at").isoformat() if o.get("created_at") else None,
         "expires_at": o.get("expires_at").isoformat() if o.get("expires_at") else None,
         "executed_at": o.get("executed_at").isoformat() if o.get("executed_at") else None,
         "buy_tx_hash": o.get("buy_tx_hash"),
-        "executed_price_usd": o.get("executed_price_usd"),
+        "executed_price_usd": _n(o.get("executed_price_usd")),
     }
 
 
