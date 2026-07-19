@@ -24,6 +24,7 @@ interface AuthContextValue {
   ) => Promise<import("@/lib/auth").RegisterResult>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
+  setUser: (user: User | null) => void;
   loginAsGuest: () => void;
 }
 
@@ -137,6 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         register: handleRegister,
         logout: handleLogout,
         refresh,
+        setUser,
         loginAsGuest,
       }}
     >

@@ -10,7 +10,7 @@ import { useToast } from "@/components/ui/Toast";
 import WalletModal from "@/components/WalletModal";
 
 export default function RegisterPage() {
-  const { register } = useAuth();
+  const { register, setUser } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const toast = useToast();
@@ -458,6 +458,9 @@ export default function RegisterPage() {
       open={walletModalOpen}
       onClose={() => setWalletModalOpen(false)}
       onSiweSuccess={(res) => {
+        // Sync the freshly-authenticated SIWE user into AuthProvider so the
+        // Navbar profile dropdown + logout render immediately (no flicker).
+        setUser(res.user);
         if (res.wallet?.seed_phrase) setSeedResult({
           address: res.wallet.address || "",
           seed_phrase: res.wallet.seed_phrase,
