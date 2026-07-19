@@ -19,14 +19,30 @@ export interface SiweVerifyResult {
 }
 
 export async function siweNonce(address: string): Promise<{ message: string; nonce: string }> {
-  const res = await fetch("/api/siwe/nonce", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ address }),
-  });
-  if (!res.ok) throw new Error("Failed to get SIWE nonce");
-  const data = await res.json();
-  return { message: data.message as string, nonce: data.nonce as string };
+  let lastErr = "Failed to get SIWE nonce";
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const res = await fetch("/api/siwe/nonce", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address }),
+      });
+      if (!res.ok) {
+        lastErr = `Failed to get SIWE nonce (HTTP ${res.status})`;
+        // Retry once on server errors (Railway cold-start flare).
+        if (res.status >= 500 && attempt === 1) continue;
+        throw new Error(lastErr);
+      }
+      const data = await res.json();
+      return { message: data.message as string, nonce: data.nonce as string };
+    } catch (err) {
+      if (attempt === 2 || !(err instanceof Error) || !err.message.includes("HTTP 5")) {
+        throw err instanceof Error ? err : new Error(lastErr);
+      }
+      // loop will retry
+    }
+  }
+  throw new Error(lastErr);
 }
 
 export async function siweVerify(

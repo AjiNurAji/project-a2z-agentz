@@ -5,7 +5,7 @@
 
 const RAILWAY = "https://project-a2z-agentz-production-dc3d.up.railway.app";
 
-async function proxy(req: Request, path: string): Promise<Response> {
+async function proxyOnce(req: Request, path: string): Promise<Response> {
   const url = `${RAILWAY}${path}`;
   const init: RequestInit = {
     method: req.method,
@@ -20,6 +20,16 @@ async function proxy(req: Request, path: string): Promise<Response> {
     status: res.status,
     headers: { "Content-Type": "application/json" },
   });
+}
+
+// Retry once on backend 5xx — Railway instances can cold-start/sleep, and the
+// first hit after idle occasionally returns 500. One transparent retry makes
+// the SIWE nonce/verify flow resilient to that flare without surfacing an
+// error to the user.
+async function proxy(req: Request, path: string): Promise<Response> {
+  const first = await proxyOnce(req, path);
+  if (first.status < 500) return first;
+  return proxyOnce(req, path);
 }
 
 export async function POST(req: Request) {
