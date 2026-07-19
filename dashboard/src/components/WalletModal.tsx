@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { RainbowKitProvider, ConnectButton, darkTheme } from "@rainbow-me/rainbowkit";
 import { WagmiProvider, useAccount, useSignMessage, useConnect } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { getDefaultConfig } from "@rainbow-me/rainbowkit";
+import { base } from "wagmi/chains";
 import { buildWagmiConfig, getWalletConnectProjectId } from "@/lib/web3";
 import { siweLoginWithWagmi, type SiweVerifyResult } from "@/lib/siwe-wagmi";
 
@@ -16,13 +16,13 @@ interface WalletModalProps {
 }
 
 function WalletFlow({
+  onClose,
   onSiweSuccess,
   onSiweError,
-  onClose,
 }: {
+  onClose: () => void;
   onSiweSuccess?: (res: SiweVerifyResult) => void;
   onSiweError?: (msg: string) => void;
-  onClose: () => void;
 }) {
   const { address, isConnected } = useAccount();
   const { signMessageAsync } = useSignMessage();
@@ -31,26 +31,15 @@ function WalletFlow({
   const [showSignButton, setShowSignButton] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Manual-only flow: NO auto-sign. As soon as a wallet connects we show the
-  // explicit "Sign Message to Verify" button. The user taps it themselves —
-  // no timer, no auto deep-link (which mobile browsers block).
+  // PURE MANUAL: show the explicit Sign button once connected. No auto-sign,
+  // no timer (mobile browsers block auto deep-link sign).
   useEffect(() => {
-    if (isConnected && address) {
-      console.log("[SIWE] wallet connected; showing manual Sign button.", address);
-      setShowSignButton(true);
-    } else {
-      setShowSignButton(false);
-    }
+    if (isConnected && address) setShowSignButton(true);
+    else setShowSignButton(false);
   }, [isConnected, address]);
 
   const runSiwe = useCallback(async () => {
-    console.log("[DEBUG_RUNSIWE]", JSON.stringify({
-      address, address_type: typeof address,
-      signMessageAsync_type: typeof signMessageAsync,
-      isConnected,
-    }, null, 2));
     if (!address) {
-      console.warn("[SIWE] runSiwe aborted: address not ready yet");
       setErrorMsg("Wallet address not ready — reconnect and try again.");
       setShowSignButton(true);
       return;
@@ -58,18 +47,15 @@ function WalletFlow({
     setSigning(true);
     setErrorMsg(null);
     try {
-      console.log("[SIWE] manual sign-in starting for", address);
       const res = await siweLoginWithWagmi(address as string, signMessageAsync);
-      console.log("[SIWE] verify success, token issued:", res.token ? "yes" : "no");
       onSiweSuccess?.(res);
       onClose();
       window.location.href = "/dashboard";
     } catch (err) {
       const msg = err instanceof Error ? err.message : "SIWE failed";
-      console.error("[SIWE] sign failed:", msg, err);
       setErrorMsg(msg);
       setSigning(false);
-      setShowSignButton(true); // keep button available so user can retry
+      setShowSignButton(true);
       onSiweError?.(msg);
     }
   }, [address, signMessageAsync, onSiweSuccess, onSiweError, onClose]);
@@ -115,7 +101,6 @@ export default function WalletModal({
   onSiweError,
 }: WalletModalProps) {
   const [queryClient] = useState(() => new QueryClient());
-  // Resolve the real WC projectId BEFORE mounting Wagmi/RainbowKit.
   const [projectId, setProjectId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -175,9 +160,9 @@ export default function WalletModal({
             <QueryClientProvider client={queryClient}>
               <RainbowKitProvider theme={darkTheme({ accentColor: "#6d28d9" })}>
                 <WalletFlow
+                  onClose={onClose}
                   onSiweSuccess={onSiweSuccess}
                   onSiweError={onSiweError}
-                  onClose={onClose}
                 />
               </RainbowKitProvider>
             </QueryClientProvider>

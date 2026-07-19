@@ -6,12 +6,10 @@ import { useSignMessage } from "wagmi";
 /**
  * SIWE bridge for RainbowKit/Wagmi wallets.
  *
- * Reuses the SAME backend endpoints as the MetaMask flow:
- *   POST /api/auth/siwe/nonce {address}  -> {message} (EIP-4361)
- *   sign message with wagmi signMessage
- *   POST /api/auth/siwe/verify {message, signature} -> {token, user}
- *
- * All network calls go through apiFetch (safe URL builder, no "Invalid value").
+ * Reuses the SAME backend endpoints as the MetaMask flow, but ALL calls go
+ * through SAME-ORIGIN Next.js proxy routes (/api/siwe/*) which forward to the
+ * Railway backend server-side. The client NEVER constructs an absolute backend
+ * URL, so the "Failed to execute fetch: Invalid value" bug cannot occur here.
  */
 
 export interface SiweVerifyResult {
@@ -21,62 +19,32 @@ export interface SiweVerifyResult {
 }
 
 export async function siweNonce(address: string): Promise<{ message: string; nonce: string }> {
-  const { apiFetch, API_URL } = await import("./api");
-  const url = `${API_URL}/api/auth/siwe/nonce`;
-  const body = JSON.stringify({ address });
-  console.log("[DEBUG_NONCE_PAYLOAD]", JSON.stringify({
-    url, body, address_type: typeof address, address_len: address?.length,
-  }, null, 2));
-  if (!url || url.includes("undefined") || !address) {
-    const msg = `[GUARD] nonce payload incomplete — url=${url} address?=${!!address}`;
-    console.error(msg);
-    throw new Error("Data belum lengkap (nonce): " + msg);
-  }
-  return apiFetch<{ message: string; nonce: string }>("/api/auth/siwe/nonce", {
+  const res = await fetch("/api/siwe/nonce", {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ address }),
   });
+  if (!res.ok) throw new Error("Failed to get SIWE nonce");
+  const data = await res.json();
+  return { message: data.message as string, nonce: data.nonce as string };
 }
 
 export async function siweVerify(
   message: string,
   signature: string
 ): Promise<SiweVerifyResult> {
-  const { apiFetch, API_URL } = await import("./api");
-  const url = `${API_URL}/api/auth/siwe/verify`;
-  const body = JSON.stringify({ message, signature });
-  const headers = { "Content-Type": "application/json" };
-  // === MANDATORY DEBUG (per audit): print EVERYTHING before fetch ===
-  console.log("[DEBUG_VERIFY_PAYLOAD]", JSON.stringify({
-    url,
-    body,
-    headers,
-    message_type: typeof message,
-    message_len: message?.length,
-    signature_type: typeof signature,
-    signature_len: signature?.length,
-    api_url: API_URL,
-  }, null, 2));
-  // === GUARD: never fire fetch with empty/undefined fields ===
-  if (!url || url.includes("undefined") || !message || !signature) {
-    const msg = `[GUARD] verify payload incomplete — url=${url} message?=${!!message} signature?=${!!signature}`;
-    console.error(msg);
-    throw new Error("Data belum lengkap (verify): " + msg);
-  }
-  let data: SiweVerifyResult;
-  try {
-    data = await apiFetch<SiweVerifyResult>("/api/auth/siwe/verify", {
-      method: "POST",
-      body: JSON.stringify({ message, signature }),
-    });
-  } catch (err) {
-    console.error("[SIWE] verify fetch failed:", err);
-    throw err instanceof Error ? err : new Error("SIWE verify request failed");
-  }
+  const res = await fetch("/api/siwe/verify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message, signature }),
+  });
+  if (!res.ok) throw new Error("SIWE verify failed");
+  const data = await res.json();
   if (data.token && typeof window !== "undefined") {
     window.localStorage.setItem("a2z-token", data.token);
+    document.cookie = `a2z-token=${data.token}; path=/; SameSite=None; Secure`;
   }
-  return data;
+  return data as SiweVerifyResult;
 }
 
 /**
@@ -88,14 +56,7 @@ export async function siweLoginWithWagmi(
   signMessageAsync: (args: { message: SignableMessage }) => Promise<`0x${string}`>
 ): Promise<SiweVerifyResult> {
   const { message } = await siweNonce(address);
-  console.log("[SIWE] nonce received, signing message for", address);
-  let signature: `0x${string}`;
-  try {
-    signature = await signMessageAsync({ message: message as SignableMessage });
-  } catch (err) {
-    console.error("[SIWE] signMessageAsync FAILED (this is the wallet/sign step, not verify):", err);
-    throw err instanceof Error ? err : new Error("Wallet sign rejected");
-  }
+  const signature = await signMessageAsync({ message: message as SignableMessage });
   if (!signature) throw new Error("Signature was rejected.");
   return siweVerify(message, signature);
 }

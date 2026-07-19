@@ -20,10 +20,8 @@ export async function getWalletConnectProjectId(): Promise<string> {
     return _wcProjectId;
   }
   try {
-    const { apiFetch } = await import("./api");
-    const data = await apiFetch<{ wc_project_id?: string }>("/api/config", {
-      headers: { Accept: "application/json" },
-    });
+    const res = await fetch("/api/config");
+    const data = await res.json();
     _wcProjectId = (data.wc_project_id || FALLBACK_PROJECT_ID).trim();
   } catch {
     _wcProjectId = FALLBACK_PROJECT_ID;
@@ -32,18 +30,16 @@ export async function getWalletConnectProjectId(): Promise<string> {
 }
 
 export function buildWagmiConfig(projectId: string) {
-  // getDefaultConfig keeps the RainbowKit UI intact (proper modal, wallet list).
-  // We pin an explicit http() transport for `base` so wagmi never derives an
-  // undefined RPC URL (which made signMessageAsync call fetch(undefined) →
-  // "Failed to execute 'fetch' on 'Window': Invalid value").
-  // Pass a guaranteed-non-empty projectId (FALLBACK hard-coded) so WalletConnect
-  // relay URLs are always well-formed.
   const pid = projectId && projectId !== "undefined" ? projectId : FALLBACK_PROJECT_ID;
   return getDefaultConfig({
     appName: "A2Z Agentz",
     projectId: pid,
     chains: [base as Chain],
     ssr: true,
+    // Pin an explicit Base RPC transport. Without this, getDefaultConfig
+    // derives a public RPC that can resolve to `undefined` on mobile
+    // WalletConnect webviews, making wagmi internally call fetch(undefined)
+    // -> "Failed to execute 'fetch' on 'Window': Invalid value".
     transports: {
       [base.id]: http("https://mainnet.base.org"),
     },
