@@ -7,9 +7,19 @@ const RAILWAY = "https://project-a2z-agentz-production-dc3d.up.railway.app";
 
 async function proxyOnce(req: Request, path: string): Promise<Response> {
   const url = `${RAILWAY}${path}`;
+  // Forward the browser's Origin/Host to Railway so the backend generates the
+  // EIP-4361 message domain (and validates it on verify) using the REAL
+  // frontend origin (archbusins.web.id), not the Railway API host. Without
+  // this, the message URI == railway.app -> wallet + verify reject (400 domain
+  // mismatch).
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const origin = req.headers.get("origin");
+  if (origin) headers["origin"] = origin;
+  const host = req.headers.get("host");
+  if (host) headers["host"] = host;
   const init: RequestInit = {
     method: req.method,
-    headers: { "Content-Type": "application/json" },
+    headers,
   };
   if (req.method !== "GET") {
     init.body = JSON.stringify(await req.json().catch(() => ({})));
