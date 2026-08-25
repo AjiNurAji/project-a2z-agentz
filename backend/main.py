@@ -2,6 +2,7 @@ from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.routing import Mount, Route
+from starlette.requests import Request
 from starlette.responses import JSONResponse, HTMLResponse
 import asyncio
 import os
@@ -42,9 +43,37 @@ async def lifespan(app: Starlette):
     else:
         start_scheduler()
         task = asyncio.create_task(poll_and_broadcast())
+        smart_buy_task = None  # created below; guarded on shutdown
+        # Agent B runs as a dedicated daemon (continuous queue poll) so it
+        # never hits APScheduler's max_instances cap. worker_loop is a pure
+        # coroutine (await poll + await process_task + await broadcast) so it
+        # runs directly on the server's event loop via create_task -- no
+        # thread / asyncio.run wrapper needed.
+        from scheduler.agent_b_cycle import worker_loop
+        async def _agent_b_daemon_wrapper():
+            try:
+                await worker_loop(poll_interval=2.0)
+            except Exception as exc:
+                logging.error("Agent B daemon crashed: %s", exc, exc_info=True)
+        try:
+            agent_b_task = asyncio.create_task(_agent_b_daemon_wrapper())
+            print("[STARTUP] Agent B daemon task created:", agent_b_task)
+        except Exception as exc:
+            print(f"[STARTUP-ERROR] Agent B daemon failed to start: {exc}")
+        # P-OpsiA: Smart Buy Engine daemon (LLM-driven limit buys). Runs as a
+        # dedicated asyncio task polling PENDING orders; fills when market hits
+        # the LLM's target_entry_usd, expires stale orders after SMART_BUY_TTL_HOURS.
+        from scheduler.agent_smart_buy import run_smart_buy_daemon
+        try:
+            smart_buy_task = asyncio.create_task(run_smart_buy_daemon())
+            print("[STARTUP] Smart-Buy daemon task created:", smart_buy_task)
+        except Exception as exc:
+            print(f"[STARTUP-ERROR] Smart-Buy daemon failed to start: {exc}")
         # Self-heal the system/owner user (id=1) so Agent A's enqueue_target
         # FK (scraping_queue_user_fk) doesn't fail on fresh Railway databases.
         database.ensure_system_user()
+        # Self-heal SIWE nonce table (P6 wallet-only auth, anti-replay).
+        database.ensure_siwe_tables()
         # Startup guard: warn (not crash) if real execution is enabled but the
         # required secrets/RPCs are missing, so failures aren't silent.
         if os.getenv("AGENT_B_REAL_EXECUTION", "0") == "1":
@@ -66,6 +95,9 @@ async def lifespan(app: Starlette):
         print("Shutting down A2Z Agentz Backend...")
         stop_scheduler()
         task.cancel()
+        agent_b_task.cancel()
+        if smart_buy_task is not None:
+            smart_buy_task.cancel()
         return
     yield
 
@@ -229,15 +261,43 @@ frontend_origin = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
 # often live on a different host than localhost). When allow_credentials is
 # True Starlette forbids "*", so we expand the env into an explicit list.
 allow_origins = [o.strip() for o in frontend_origin.split(",") if o.strip()]
-# In debug mode, also allow any origin so local/dev dashboards just work.
-if os.getenv("DEBUG", "false").lower() == "true":
-    allow_origins = ["*"]
+# Always allow the production Vercel dashboard host(s) so judges can open
+# the live demo without a CORS block. Add more hosts via FRONTEND_ORIGIN
+# (comma list). Legacy/stale preview hosts removed.
+_known_hosts = [
+    "https://project-a2z-agentz-gamma.vercel.app",
+    "https://archbusins.web.id",
+]
+for _h in _known_hosts:
+    if _h not in allow_origins:
+        allow_origins.append(_h)
+# SECURITY: never fall back to "*" + allow_credentials. A wildcard origin with
+# credentials enabled makes the API readable/off-loadable from ANY website
+# (reflected-origin CSRF / cross-origin data theft). DEBUG may relax logging
+# but MUST NOT relax CORS. If FRONTEND_ORIGIN is empty we keep the explicit
+# localhost default above rather than opening up to "*".
+assert allow_origins, "FRONTEND_ORIGIN must list at least one explicit origin"
 
 middleware = [
     Middleware(CORSMiddleware, allow_origins=allow_origins, allow_methods=["*"], allow_headers=["*"], allow_credentials=True)
 ]
-
 debug = os.getenv("DEBUG", "false").lower() == "true"
+
+
+async def public_config(request: Request) -> JSONResponse:
+    """Public, non-secret deployment config for the frontend.
+
+    Exposes the WalletConnect projectId (which is NOT a secret — it is meant
+    to be public client-side) so the dashboard can bootstrap WalletConnect
+    even when NEXT_PUBLIC_WC_PROJECT_ID is not inlined at build time.
+    """
+    wc_project_id = (
+        os.getenv("WALLETCONNECT_PROJECT_ID")
+        or os.getenv("NEXT_PUBLIC_WC_PROJECT_ID")
+        or ""
+    ).strip()
+    return JSONResponse({"wc_project_id": wc_project_id})
+
 
 app = Starlette(
     debug=debug,
@@ -245,6 +305,7 @@ app = Starlette(
         Route("/", read_root, methods=["GET"]),
         Route("/docs", get_docs, methods=["GET"]),
         Route("/openapi.json", get_openapi, methods=["GET"]),
+        Route("/api/config", public_config, methods=["GET"]),
         Mount("/api/auth", routes=auth_routes),
         Mount("/api", routes=api_routes),
     ] + ([Mount("/", routes=ws_routes)] if not IS_SERVERLESS else []),

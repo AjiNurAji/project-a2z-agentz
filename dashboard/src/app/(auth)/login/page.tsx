@@ -2,20 +2,29 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "motion/react";
 import { Mail, Lock, LogIn, Loader2, Wallet, User } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
-import WalletConnectModal from "@/components/WalletConnectModal";
+import { useToast } from "@/components/ui/Toast";
+import WalletModal from "@/components/WalletModal";
 
 export default function LoginPage() {
-  const { login, loginAsGuest } = useAuth();
+  const { login, loginAsGuest, setUser } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const toast = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [walletModalOpen, setWalletModalOpen] = useState(false);
+  const [siweLoading, setSiweLoading] = useState(false);
+  const [siweSeed, setSiweSeed] = useState<{
+    address: string;
+    seed_phrase: string;
+    warning: string;
+  } | null>(null);
 
   const validate = (): boolean => {
     const e: Record<string, string> = {};
@@ -35,12 +44,16 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       await login(email.trim().toLowerCase(), password);
-    } catch {
-      // Error toast shown by AuthProvider
+    } catch (err: unknown) {
+      // Surface the failure explicitly so the user is never left on a dead form.
+      const message = err instanceof Error ? err.message : "Login failed";
+      toast.error("Login failed", message);
     } finally {
       setSubmitting(false);
     }
   };
+
+  const handleSiwe = () => setWalletModalOpen(true);
 
   return (
     <>
@@ -196,12 +209,13 @@ export default function LoginPage() {
               />
               Remember me
             </label>
-            <span
-              className="cursor-pointer hover:underline"
+            <Link
+              href="/forgot-password"
+              className="hover:underline"
               style={{ color: "var(--color-fg-brand)" }}
             >
               Forgot password?
-            </span>
+            </Link>
           </div>
 
           {/* Submit */}
@@ -254,20 +268,50 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={() => setWalletModalOpen(true)}
-            className="group relative w-full py-3 rounded-xl text-sm font-bold border transition-all duration-300 overflow-hidden focus-ring flex items-center justify-center gap-2 hover:border-[var(--color-border-brand)] hover:shadow-[0_0_15px_rgba(110,90,124,0.15)] active:scale-[0.98]"
+            disabled={siweLoading}
+            className="group relative w-full py-3 rounded-xl text-sm font-bold border transition-all duration-300 overflow-hidden focus-ring flex items-center justify-center gap-2 hover:border-[var(--color-border-brand)] hover:shadow-[0_0_15px_rgba(110,90,124,0.15)] active:scale-[0.98] disabled:opacity-50"
             style={{
               borderColor: "var(--color-border-brand-subtle)",
               color: "var(--color-heading)",
               background: "color-mix(in srgb, var(--color-surface) 40%, transparent)",
             }}
-            aria-label="Connect Web3 wallet"
+            aria-label="Sign in with Ethereum wallet"
           >
-            {/* Subtle background glow on hover */}
             <div className="absolute inset-0 bg-gradient-to-r from-[var(--color-brand)]/10 via-[var(--color-accent-purple)]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            
             <Wallet className="w-4 h-4 text-[var(--color-fg-brand)] group-hover:scale-110 transition-transform duration-300 relative z-10" aria-hidden="true" />
-            <span className="relative z-10">Connect Web3 Wallet</span>
+            <span className="relative z-10">
+              {siweLoading ? "Waiting for signature…" : "Connect Wallet (SIWE)"}
+            </span>
           </button>
+
+          {/* First-time SIWE user: show seed phrase ONCE */}
+          {siweSeed && (
+            <div
+              className="rounded-xl p-4 space-y-2 border"
+              style={{
+                borderColor: "var(--color-border-warning-subtle)",
+                background: "color-mix(in srgb, var(--color-warning-soft) 30%, transparent)",
+              }}
+            >
+              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--color-fg-warning)" }}>
+                Save your recovery phrase
+              </p>
+              <p className="text-xs" style={{ color: "var(--color-body-subtle)" }}>
+                {siweSeed.warning}
+              </p>
+              <code className="block text-sm break-words rounded-lg p-2" style={{ background: "var(--color-neutral-secondary-soft)", color: "var(--color-heading)" }}>
+                {siweSeed.seed_phrase}
+              </code>
+              <button
+                type="button"
+                onClick={() => router.push("/dashboard")}
+                className="w-full py-2 rounded-lg text-sm font-semibold"
+                style={{ background: "var(--color-fg-warning)", color: "#1a0b2e" }}
+              >
+                I&apos;ve saved it → Enter Mission Control
+              </button>
+            </div>
+          )}
 
           {/* Demo / Guest Login */}
           <button
@@ -304,10 +348,21 @@ export default function LoginPage() {
       </div>
     </motion.div>
 
-    <WalletConnectModal
+    <WalletModal
       open={walletModalOpen}
       onClose={() => setWalletModalOpen(false)}
-      onContinue={() => router.push("/dashboard")}
+      onSiweSuccess={(res) => {
+        // Sync the freshly-authenticated SIWE user into AuthProvider so the
+        // Navbar profile dropdown + logout render immediately (no flicker).
+        setUser(res.user);
+        if (res.wallet?.seed_phrase) setSiweSeed({
+          address: res.wallet.address || "",
+          seed_phrase: res.wallet.seed_phrase,
+          warning: "",
+        });
+        else router.push(searchParams.get("next") || "/dashboard");
+      }}
+      onSiweError={(msg) => toast.error("Wallet login failed", msg)}
     />
     </>
   );

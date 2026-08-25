@@ -52,13 +52,15 @@ export function mapRawTxToTransaction(tx: RawTransaction): MappedTransaction {
 
   return {
     id: tx.tx_hash_id,
-    projectName: "On-Chain Target",
+    // Prefer project_name (from execution_logs), fall back to a generic label.
+    projectName: tx.project_name || "On-Chain Target",
     targetAddress: tx.project_target_address,
     amountUsd: tx.amount_usd,
     status,
     txHash: tx.tx_hash_id,
     timestamp: new Date(tx.created_at.replace(" ", "T") + "Z"),
-    reason: "Autonomous Execution",
+    // Agent A's LLM narrative (OSINT rationale) — carried from synthesis_results.
+    reason: tx.reason || "Autonomous Execution",
     gasUsedGwei: 42,
   };
 }

@@ -9,7 +9,7 @@ This document covers the *deployment* steps for A2Z Agentz on **AMD Developer Cl
 - Docker & Docker Compose.
 - Node.js (v18+) for the Web Dashboard.
 - Python (3.10+) for LangGraph, Agent A, and Agent B.
-- An EOA wallet on **Base Mainnet** (for Agent B) + Base Sepolia (for testing).
+- An EOA wallet on **Base Mainnet** (for Agent B).
 
 ## Step 1: Set Up AMD AI Workbench
 
@@ -41,12 +41,12 @@ Access AMD AI Workbench from the AMD Developer Cloud console. This is the no-cod
 # 5. Export the result as a vLLM model server
 ```
 
-Output from this step: a **Qwen/Qwen2.5-72B-Instruct-AWQ** container image ready to serve.
+Output from this step: a **hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4** container image ready to serve.
 
 ## Step 3: Start vLLM on the AMD GPU Server
 
 ```bash
-# Deploy Qwen/Qwen2.5-72B-Instruct-AWQ via vLLM on AMD Developer Cloud
+# Deploy hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4via vLLM on AMD Developer Cloud
 # (vLLM is the AMD-recommended serving framework for ROCm)
 
 docker run -d \

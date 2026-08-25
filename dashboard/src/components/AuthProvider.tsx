@@ -19,10 +19,12 @@ interface AuthContextValue {
   register: (
     email: string,
     password: string,
-    walletAddress?: string
-  ) => Promise<void>;
+    walletAddress?: string,
+    generateWallet?: boolean
+  ) => Promise<import("@/lib/auth").RegisterResult>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
+  setUser: (user: User | null) => void;
   loginAsGuest: () => void;
 }
 
@@ -45,7 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const isGuest = typeof window !== "undefined" && localStorage.getItem("a2z-guest-session") === "1";
       if (isGuest) {
-        setUser({ id: 999, email: "judge@a2z.demo", wallet_address: "0xDemoWallet999" });
+        setUser({ id: 999, email: "guest@a2z.demo", wallet_address: "0xDemoWallet999" });
         setLoading(false);
         return;
       }
@@ -84,12 +86,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (
       email: string,
       password: string,
-      walletAddress?: string
+      walletAddress?: string,
+      generateWallet?: boolean
     ) => {
       try {
-        const u = await authLib.register(email, password, walletAddress);
-        setUser(u);
-        router.push("/dashboard");
+        const res = await authLib.register(email, password, walletAddress, generateWallet);
+        setUser(res.user);
+        return res;
       } catch (err: unknown) {
         const message =
           err instanceof Error ? err.message : "Registration failed";
@@ -101,7 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const loginAsGuest = useCallback(() => {
-    setUser({ id: 999, email: "judge@a2z.demo", wallet_address: "0xDemoWallet999" });
+    setUser({ id: 999, email: "guest@a2z.demo", wallet_address: "0xDemoWallet999" });
     if (typeof window !== "undefined") {
       localStorage.setItem("a2z-guest-session", "1");
       // Set dummy token so it passes middleware if enabled.
@@ -135,6 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         register: handleRegister,
         logout: handleLogout,
         refresh,
+        setUser,
         loginAsGuest,
       }}
     >

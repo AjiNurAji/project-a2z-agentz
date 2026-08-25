@@ -1,35 +1,93 @@
 # 03. Agent B (The Vault)
 
-**Agent B** is the execution-vault system in A2Z Agentz, operating on the **Base** blockchain. Because it handles real funds, Agent B is built around bulletproof security and operational reliability.
+**Agent B** is the on-chain execution engine of A2Z Agentz. It consumes scored tokens from Agent A, runs GoPlus security checks, and executes **DEX swaps** on **Base Network** via **Uniswap V2** — including automated **take-profit selling**.
 
-> **Note:** Agent B does **not** run a language model. All decision-making lives in Agent A (vLLM-served). Agent B is purely a deterministic executor, so there is no AMD runtime requirement here. Only its **deployment host** changes (co-located with Agent A on AMD Developer Cloud, or on separate compute).
+Agent B runs as a **continuous asyncio daemon** (not a cron job), polling the `scraping_queue` every 2 seconds.
 
-## 1. Wallet & Key Management
+## 1. Execution Flow
 
-Agent B uses an Externally Owned Account (EOA) for hackathon-speed simplicity, wrapped in a strict protection layer:
+```
+scraping_queue → GoPlus security gate → Agent A score trust → DEX swap (buy) → held_tokens → take-profit monitor → DEX swap (sell)
+```
 
-- **AWS KMS / HashiCorp Vault** — the *private key* is never stored in `.env` files or hardcoded. It is managed through a Key Management Service with automatic rotation.
-- **Smart Contract Modifier** — Agent B only interacts with a *Custom Smart Contract* that exposes an `onlyOwner` function (Owner = Agent B's KMS identity).
+### Step-by-step:
 
-## 2. Gas Strategy & Multi-RPC Fallback
+1. **Poll**: `SELECT ... FOR UPDATE SKIP LOCKED` from `scraping_queue` (pending tasks)
+2. **GoPlus Security Check**: queries GoPlus Token Security API for:
+   - Honeypot detection
+   - Buy/sell tax percentage
+   - Ownership risks (hidden owner, can take back ownership)
+   - Holder concentration, mintable, proxy status
+3. **Score Decision**: uses `max(Agent B score, Agent A score)` — trusts Agent A's data-driven scoring
+4. **Security Gate**: blocks execution if ANY of:
+   - `is_honeypot = true` → BLOCKED
+   - `buy_tax > 10% or sell_tax > 10%` → BLOCKED
+   - `can_take_back_ownership + hidden_owner` → BLOCKED
+5. **DEX Swap (Buy)**: if score ≥ 60 and GoPlus clean → `swap_eth_for_token()` via Uniswap V2
+6. **Track Purchase**: records to `held_tokens` table (address, entry price, amount, tx hash)
+7. **Take-Profit Monitor**: polls DexScreener for current price every cycle
+8. **Auto-Sell**: if profit ≥ `AGENT_B_PROFIT_PCT` (default 30%) → `swap_token_for_eth()` + mark sold
 
-To guarantee **99.9% uptime** and avoid stuck transactions:
+## 2. DEX Execution
 
-- **Gas Oracle API** — before execution, Agent B pings the Alchemy / Infura Gas Station API and sets `maxFeePerGas` at the market average plus a 15% buffer.
-- **Multi-RPC Fallback** — primary execution through Alchemy. If the primary node times out or goes down, failover is automatic to Infura or the public Base RPC.
+### Buy Side: `swap_eth_for_token()`
+- **Router**: Uniswap V2 on Base (`0x4752ba5D...`)
+- **Function**: `swapExactETHForTokensSupportingFeeOnTransferTokens`
+- **Path**: WETH → token
+- **Amount**: $0.50 micro-trade (configurable)
+- **Gas**: EIP-1559 type-2, max 300k gas, fee cap from env
+- **Slippage**: amountOutMin = 1 wei (micro amount)
 
-## 3. Idempotency & Circuit Breaker
+### Sell Side: `swap_token_for_eth()`
+- **Step 1**: `approve()` — ERC20 approval for Uniswap router
+- **Step 2**: `swapExactTokensForETHSupportingFeeOnTransferTokens`
+- **Path**: token → WETH
+- **Trigger**: profit ≥ `AGENT_B_PROFIT_PCT` (default 30%)
+- **Broadcast**: "TAKE PROFIT" event to dashboard WebSocket
 
-- **Double-Spend Prevention** — before broadcasting to the mempool, Agent B records a unique hash combining `(AgentA_ID, Project_Address, Timestamp)` in **PostgreSQL**. If Agent A submits a duplicate payload, Agent B rejects it locally.
-- **Emergency Pause (Kill Switch)** — wired to the Next.js Dashboard. A human can click a global emergency stop that halts all on-chain operations instantly.
-- **Per-Transaction Cap** — a hard cap of $1 to $2 per autonomous transaction. Anything above that must enter the *Manual Approval* queue.
+## 3. Multi-RPC Resilience
 
-## 4. Transaction Security Validation (Anti-Honeypot)
+- **Up to 3 RPC endpoints**: `BASE_RPC_1`, `BASE_RPC_2`, `BASE_RPC_3`
+- **Retry with exponential backoff**: 3 attempts (3s, 6s, 9s)
+- **No infinite retry**: if `_build_rpc_provider()` returns None → FAILED with `retry=False`
+- **Hardcoded threshold**: `MAX_SCORE_FOR_AUTO = 60` (no env override)
 
-Before sending funds to a project address, Agent B runs a **local dry-run simulation** by forking state through **Foundry Anvil** or **Tenderly**. If the simulation shows a revert or an unexpected token drain -> the transaction is blocked.
+## 4. Database Tables
 
-## 5. Deployment Context
+| Table | Purpose |
+|---|---|
+| `scraping_queue` | Task queue between Agent A → Agent B |
+| `synthesis_results` | Agent B scoring results |
+| `transaction_proposals` | Execution proposals |
+| `execution_logs` | On-chain transaction history (powers `/api/stats`) |
+| `held_tokens` | Buy tracking for take-profit (address, entry price, status) |
+| `audit_log` | Full pipeline audit trail |
 
-- **Host**: Container on AMD Developer Cloud (same region as Agent A for low inter-agent REST latency).
-- **No LLM on Agent B** — the entire decision stack is deterministic, so it does not consume GPU resources.
-- **Communication with Agent A**: HTTPS REST with ECDSA signature verification (see `04-communication-protocol.md`).
+## 5. Vault Holdings Dashboard
+
+Endpoint: `GET /api/holdings`
+
+Returns:
+```json
+{
+  "holding": [{ "token_address": "0x...", "token_name": "...", "entry_price_usd": 0.50, ... }],
+  "sold": [{ "token_address": "0x...", "sell_tx_hash": "0x...", ... }],
+  "count_holding": 2,
+  "count_sold": 1
+}
+```
+
+Frontend displays on Agents page with BaseScan links.
+
+## 6. Configuration
+
+| Env Variable | Default | Purpose |
+|---|---|---|
+| `AGENT_B_REAL_EXECUTION` | `0` | Set to `1` for real on-chain swaps |
+| `AGENT_B_PROFIT_PCT` | `30` | Take-profit percentage target |
+| `MAX_SCORE_FOR_AUTO` | `60` | Minimum score for execution (hardcoded) |
+| `MAX_TX_AMOUNT_USD` | `2.0` | Per-tx USD cap |
+| `MAX_GAS_PRICE_GWEI` | `5` | Gas fee cap |
+| `VAULT_ADDRESS` | (required) | Vault wallet address |
+| `PRIVATE_KEY` | (required) | Vault signing key |
+| `BASE_RPC_1/2/3` | (required) | Base mainnet RPC endpoints |

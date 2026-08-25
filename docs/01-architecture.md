@@ -69,7 +69,7 @@ graph TD
 ## Core Components
 
 1. **AMD Instinct™ MI300X hardware** (192GB HBM3) — the AI compute core, available through **AMD Developer Cloud**. All LLM inference runs on this GPU through **vLLM** with a **ROCm** backend.
-2. **AMD AI Workbench** — the no-code GUI used to fine-tune the base LLM (Qwen/Qwen2.5-72B-Instruct-AWQ) into a **vLLM-served LLM** specialized for Web3 sentiment analysis (Farcaster and on-chain narrative).
+2. **AMD AI Workbench** — the no-code GUI used to fine-tune the base LLM (hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4) into a **vLLM-served LLM** specialized for Web3 sentiment analysis (Farcaster and on-chain narrative).
 3. **vLLM model server** — the standard AMD deployment format for fine-tune outputs. The LLM is wrapped as a *microservice* callable over HTTP/gRPC by Agent A.
 4. **vLLM (AMD-recommended)** — a *high-throughput* LLM *serving framework* running on ROCm. It receives inference *requests* from Agent A and returns structured *responses*.
 5. **LangGraph Framework** — orchestrates inter-agent state graphs, handling *retry mechanisms* and *backpressure*.
@@ -83,7 +83,7 @@ graph TD
 ## AMD Pipeline Flow (Core)
 
 ```
-Base Qwen/Qwen2.5-72B-Instruct-AWQ (HuggingFace)
+Base hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4(HuggingFace)
  │
  ▼
 [AMD AI Workbench — fine-tune on Web3 sentiment dataset]
@@ -201,12 +201,12 @@ Pattern: **Streaming SSR** via the Next.js App Router — simulated real-time da
 ### Lane 1 — Active Inference Engine (Agent A)
 - **Role**: Sentiment analysis and opportunity scoring
 - **Runtime**: vLLM on ROCm / AMD Instinct MI300X
-- **Model**: Qwen/Qwen2.5-72B-Instruct-AWQ (via AMD vLLM)
+- **Model**: hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4(via AMD vLLM)
 - **Entrypoint**: `AGENT_A_ENDPOINT=https://[tunnel].trycloudflare.com/v1`
 
 ### Lane 2 — Active Security Gatekeeper (Agent B)
 - **Role**: Anti-honeypot validation, risk scoring, transaction gating
 - **Primary Runtime**: GoPlus API security check (chain-native risk data)
-- **Backup Inference**: Fireworks AI Llama 3.1 8B (via `AGENT_B_ENDPOINT`)
+- **Backup Inference**: Fireworks AI DeepSeek-V4-Pro (via `AGENT_B_ENDPOINT`)
 - **Key Mapping**: `FIREWORKS_API_KEY` is aliased to `AGENT_B_API_KEY` in backend code
 - **Failure Mode**: If GoPlus returns 404, task is marked `FAILED` with no DB insert

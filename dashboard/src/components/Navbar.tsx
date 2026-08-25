@@ -16,6 +16,18 @@ export default function Navbar() {
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
+  // Display identity: prefer the connected wallet address (truncated), fall
+  // back to email for email/password users. SIWE users have a synthetic
+  // "0x...@siwe.local" email, so the wallet address is the human-readable id.
+  const displayId =
+    user?.wallet_address && user.wallet_address.startsWith("0x")
+      ? user.wallet_address
+      : user?.email || "";
+  const shortId =
+    displayId.length > 13
+      ? `${displayId.slice(0, 6)}…${displayId.slice(-4)}`
+      : displayId;
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
@@ -51,7 +63,7 @@ export default function Navbar() {
             style={{ background: "var(--color-neutral-secondary-medium)", border: "1px solid var(--color-border-default)" }}
           >
             <Cpu className="w-3.5 h-3.5 text-[var(--color-fg-brand)]" aria-hidden="true" />
-            <span>AMD MI300X · ROCm · vLLM</span>
+            <span>Cloud GPU · LLM Stack</span>
           </div>
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs text-[var(--color-body-subtle)]"
             style={{ background: "var(--color-neutral-secondary-medium)", border: "1px solid var(--color-border-default)" }}
@@ -86,7 +98,7 @@ export default function Navbar() {
               >
                 <User className="w-3.5 h-3.5" style={{ color: "var(--color-fg-brand)" }} aria-hidden="true" />
                 <span className="text-[var(--color-heading)] font-medium max-w-[120px] truncate hidden sm:inline-block">
-                  {user.email}
+                  {shortId}
                 </span>
               </button>
 
@@ -101,11 +113,16 @@ export default function Navbar() {
                 >
                   <div className="px-4 py-3 border-b mb-1" style={{ borderColor: "var(--color-border-default)" }}>
                     <p className="text-[10px] font-bold tracking-wider uppercase mb-0.5" style={{ color: "var(--color-body-subtle)" }}>
-                      Signed in as
+                      {user.wallet_address && user.wallet_address.startsWith("0x") ? "Connected wallet" : "Signed in as"}
                     </p>
                     <p className="text-sm font-semibold truncate" style={{ color: "var(--color-heading)" }}>
-                      {user.email}
+                      {displayId}
                     </p>
+                    {user.wallet_address && user.wallet_address.startsWith("0x") && user.email?.endsWith("@siwe.local") && (
+                      <p className="text-[10px] truncate mt-0.5" style={{ color: "var(--color-body-subtle)" }}>
+                        SIWE · self-custodial
+                      </p>
+                    )}
                   </div>
                   <button
                     onClick={() => {

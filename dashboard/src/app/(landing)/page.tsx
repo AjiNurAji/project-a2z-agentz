@@ -89,21 +89,21 @@ function LandingContent() {
             {/* Tagline */}
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] md:text-[11px] font-mono text-[var(--color-fg-cyan)] border backdrop-blur-sm" style={{ background: "color-mix(in srgb, var(--color-fg-cyan) 10%, transparent)", borderColor: "color-mix(in srgb, var(--color-fg-cyan) 20%, transparent)" }}>
               <Cpu className="w-3.5 h-3.5" />
-              <span>AMD Hackathon ACT II Participant</span>
+              <span>A2Z Agentz — Autonomous Agent-as-a-Service</span>
             </div>
 
             {/* Hero Heading */}
             <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-[var(--color-heading)] leading-[1.15] md:leading-[1.1]" style={{ fontFamily: "var(--font-serif)" }}>
               Autonomous <br />
               <span className="bg-gradient-to-r from-[var(--color-fg-cyan)] via-[var(--color-fg-brand)] to-[#b9a6c6] bg-clip-text text-transparent">
-                Agent-to-Agent
+                DeFi Trading
               </span>
-              <br />Web3 Airdrop Scavenger
+              <br />Agent on Base
             </h2>
 
             {/* Description */}
             <p className="text-sm md:text-base text-[var(--color-body-subtle)] max-w-xl leading-relaxed">
-              Unlock hands-free multi-agent yields. Agent A scans Web3 airdrops on Farcaster & social networks, scoring sentiment via AMD Instinct™ MI300X. Agent B validates and triggers atomic executions securely on Base L2.
+              Unlock hands-free multi-agent yields. Agent A scans Web3 opportunities across social and on-chain signals, scoring conviction with GPU-accelerated AI inference. Agent B validates and triggers atomic executions securely on Base L2.
             </p>
 
             {/* Call to Actions */}
@@ -125,7 +125,7 @@ function LandingContent() {
 
               <div className="text-[11px] text-[var(--color-body-subtle)] font-mono flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-[var(--color-success)] animate-pulse" />
-                <span>Base Sepolia mainnet-sync</span>
+                <span>Base Mainnet — live</span>
               </div>
             </div>
 
@@ -144,7 +144,7 @@ function LandingContent() {
                 </div>
                 <h3 className="text-sm font-semibold text-[var(--color-heading)]">OSINT Sentiment Parser</h3>
                 <p className="text-[11px] text-[var(--color-body-subtle)] leading-relaxed">
-                  Scrapes Neynar, Farcaster, and Base explorers. Runs AIM-tuned Qwen/Qwen2.5-72B-Instruct-AWQ on vLLM to analyze sentiment score. Trigger at score {'>'} 85.
+                  Scrapes Neynar, Farcaster, and Base explorers. Runs hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4 on vLLM to analyze sentiment and conviction. Trigger at score {'>'} 85.
                 </p>
               </div>
 
@@ -161,13 +161,13 @@ function LandingContent() {
                 </div>
                 <h3 className="text-sm font-semibold text-[var(--color-heading)]">Transaction Vault</h3>
                 <p className="text-[11px] text-[var(--color-body-subtle)] leading-relaxed">
-                  Signs ECDSA payloads from Scout. Uses Deepseek-V4-Flash via Fireworks AI as a strict guardrail before broadcasting secure transfers on Base.
+                  Signs ECDSA payloads from Scout. Uses DeepSeek-V4-Pro via Fireworks AI as a strict guardrail before broadcasting secure transfers on Base.
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Right Column: Live Agent-to-Agent Execution Console (GIF Showcase) */}
+          {/* Right Column: Live DeFi Trading Execution Console (GIF Showcase) */}
           <div className="lg:col-span-6 flex flex-col items-center justify-center relative select-none">
             {/* Ambient behind-card glow */}
             <div className="absolute inset-0 bg-gradient-to-r from-[var(--color-fg-cyan)]/5 to-[var(--color-fg-purple)]/10 blur-3xl opacity-60 rounded-full" />
@@ -205,7 +205,7 @@ function LandingContent() {
                 {/* The GIF Animation */}
                 <img 
                   src="/gif/A2Z-animation.gif" 
-                  alt="Autonomous Agent-to-Agent Web3 Scavenger Interaction" 
+                  alt="Autonomous DeFi Trading Agent Interaction" 
                   className="w-full h-full object-cover pointer-events-none select-none opacity-90 group-hover:opacity-100 transition-opacity duration-500"
                 />
 
@@ -221,7 +221,7 @@ function LandingContent() {
                 {/* HUD Overlay Elements - Top Right */}
                 <div className="absolute top-3 right-4 font-mono text-[8px] md:text-[9px] text-[var(--color-fg-brand)]/70 tracking-wider text-right flex flex-col gap-0.5">
                   <span>NETWORK: BASE_MAINNET_SYNC</span>
-                  <span>ROUTING: AMD_AIM_INSTINCT</span>
+                  <span>ROUTING: CLOUD_INFERENCE_ENGINE</span>
                 </div>
 
                 {/* Interactive labels matching robot position in the GIF */}
@@ -268,14 +268,20 @@ function LandingContent() {
       {/* Tech Stack / Bottom Footer */}
       <footer className="relative z-20 w-full py-6 md:py-8 border-t border-[var(--color-border-default)] backdrop-blur-md px-4 md:px-6 flex flex-col lg:flex-row gap-5 lg:gap-6 items-center justify-between text-[10px] md:text-xs" style={{ background: "color-mix(in srgb, var(--color-surface) 40%, transparent)" }}>
         <div className="text-[var(--color-body-subtle)] font-mono text-center lg:text-left w-full lg:w-auto">
-          Powered by <br className="md:hidden" /> <span className="text-[var(--color-heading)] font-semibold">AMD Instinct™ MI300X</span> &amp; <span className="text-[var(--color-heading)] font-semibold">Base L2</span>
+          Powered by <br className="md:hidden" /> <span className="text-[var(--color-heading)] font-semibold">Cloud GPU Inference</span> &amp; <span className="text-[var(--color-heading)] font-semibold">Base L2</span> — production-grade autonomous execution.
+        </div>
+
+        {/* Contact */}
+        <div className="flex flex-col items-center lg:items-end gap-1 text-[var(--color-body-subtle)]">
+          <span>Support: <a href="mailto:archbusins@gmail.com" className="text-[var(--color-fg-cyan)] font-semibold">archbusins@gmail.com</a></span>
+          <span>Web: <a href="https://archbusins.web.id" target="_blank" rel="noopener noreferrer" className="text-[var(--color-fg-cyan)] font-semibold">archbusins.web.id</a></span>
         </div>
 
         {/* Tech StackBadges */}
         <div className="flex flex-wrap justify-center lg:justify-end items-center gap-2 md:gap-3 w-full lg:w-auto">
-          <span className="px-2 md:px-2.5 py-1 rounded border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]" style={{ background: "color-mix(in srgb, var(--color-neutral-secondary-strong) 50%, transparent)" }}>AIM (AMD Inference Microservice)</span>
-          <span className="px-2 md:px-2.5 py-1 rounded border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]" style={{ background: "color-mix(in srgb, var(--color-neutral-secondary-strong) 50%, transparent)" }}>ROCm 6.x</span>
-          <span className="px-2 md:px-2.5 py-1 rounded border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]" style={{ background: "color-mix(in srgb, var(--color-neutral-secondary-strong) 50%, transparent)" }}>vLLM on ROCm</span>
+          <span className="px-2 md:px-2.5 py-1 rounded border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]" style={{ background: "color-mix(in srgb, var(--color-neutral-secondary-strong) 50%, transparent)" }}>Cloud GPU Inference</span>
+          <span className="px-2 md:px-2.5 py-1 rounded border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]" style={{ background: "color-mix(in srgb, var(--color-neutral-secondary-strong) 50%, transparent)" }}>Optimized Runtime</span>
+          <span className="px-2 md:px-2.5 py-1 rounded border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]" style={{ background: "color-mix(in srgb, var(--color-neutral-secondary-strong) 50%, transparent)" }}>LLM Serving Stack</span>
           <span className="px-2 md:px-2.5 py-1 rounded border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]" style={{ background: "color-mix(in srgb, var(--color-neutral-secondary-strong) 50%, transparent)" }}>LangGraph Python</span>
           <span className="px-2 md:px-2.5 py-1 rounded border border-[var(--color-border-default)] font-mono text-[9px] md:text-[10px]" style={{ background: "color-mix(in srgb, var(--color-neutral-secondary-strong) 50%, transparent)" }}>ChromaDB</span>
         </div>

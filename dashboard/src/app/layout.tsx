@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Inter, IBM_Plex_Serif, Geist_Mono } from "next/font/google";
+import "@rainbow-me/rainbowkit/styles.css";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
 import { AuthProvider } from "@/components/AuthProvider";
@@ -16,17 +17,17 @@ const ibmPlexSerif = IBM_Plex_Serif({
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "A2Z Agent — Autonomous Web3 Scavenger Dashboard",
+  title: "A2Z Agentz — Autonomous DeFi Trading Agent",
   description:
-    "Multi-agent AI dashboard for autonomous airdrop discovery and Agent-to-Agent payments on Base Network, powered by AMD Instinct MI300X and AIM-tuned Qwen/Qwen2.5-72B-Instruct-AWQ.",
+    "Multi-agent AI dashboard for autonomous DeFi trading on Base Network, powered by cloud GPU inference.",
   metadataBase: new URL("https://a2z-agent.vercel.app"),
-  keywords: ["web3", "ai agent", "airdrop", "base network", "autonomous"],
+  keywords: ["web3", "ai agent", "defi", "base network", "autonomous trading"],
   openGraph: {
-    title: "A2Z Agent — Autonomous Web3 Scavenger Dashboard",
+    title: "A2Z Agentz — Autonomous DeFi Trading Agent",
     description:
-      "Multi-agent AI dashboard for autonomous airdrop discovery and Agent-to-Agent payments on Base Network, powered by AMD Instinct MI300X and AIM-tuned Qwen/Qwen2.5-72B-Instruct-AWQ.",
+      "Multi-agent AI dashboard for autonomous DeFi trading on Base Network, powered by cloud GPU inference.",
     url: "https://a2z-agent.vercel.app",
-    siteName: "A2Z Agent",
+    siteName: "A2Z Agentz",
     type: "website",
     locale: "en_US",
     images: [
@@ -39,9 +40,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "A2Z Agent — Autonomous Web3 Scavenger Dashboard",
+    title: "A2Z Agentz — Autonomous DeFi Trading Agent",
     description:
-      "Multi-agent AI dashboard for autonomous airdrop discovery and Agent-to-Agent payments on Base Network, powered by AMD Instinct MI300X and AIM-tuned Qwen/Qwen2.5-72B-Instruct-AWQ.",
+      "Multi-agent AI dashboard for autonomous DeFi trading on Base Network, powered by cloud GPU inference.",
     images: ["/opengraph-image"],
   },
 };

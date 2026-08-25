@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { useAgentWebSocket } from "@/hooks/useAgentWebSocket";
 import { apiFetch } from "@/lib/api";
 import { mapLogToAgentMessage, mapRawTxToTransaction } from "@/lib/mappers";
+import { isGuestSession, MOCK_TRANSACTIONS, MOCK_APPROVAL_QUEUE, MOCK_AGENT_MESSAGES, MOCK_LOGS, MOCK_VECTOR_MEMORY, MOCK_KPI, MOCK_GAS_HISTORY, MOCK_TVL_HISTORY, MOCK_SUCCESS_HISTORY, startGuestSimulation } from "@/lib/mockData";
 import { KpiGridSkeleton, ChartSkeleton, TableSkeleton } from "@/components/ui/Skeleton";
 import { Skeleton } from "@/components/ui/Skeleton";
 
@@ -239,8 +240,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     onAgentLog: (log) => {
       setAgentMessages((prev) => [...prev, mapLogToAgentMessage(log)].slice(-50) as AgentMessage[]);
       // Surface Agent A/B live latency from broadcast metadata into health cards.
-      const sender = log?.data?.sender;
-      const meta = log?.data?.metadata;
+      
+      const sender = log.sender!;
+      const meta = log.metadata!;
       if (sender === "agent_a" && meta?.latencyMs) {
         setAgentHealth((prev) => ({
           ...prev,
@@ -270,7 +272,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   // X-API-Key / JWT on every fetch). The WebSocket is an enhancement, not a
   // gate — if it can't connect from the browser we still show live data
   // polled from /api/status (which carries the agent log buffer).
-  const usingReal = true;
+  const usingReal = !isGuestSession();
 
   const logCountRef = useRef(0);
 
@@ -313,6 +315,26 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const fetchDashboardData = useCallback(async () => {
+    // Guest / Demo mode: serve mock data only, never hit the real backend.
+    if (isGuestSession()) {
+      setTransactions(MOCK_TRANSACTIONS as any);
+      setApprovalQueue(MOCK_APPROVAL_QUEUE as any);
+      setAgentMessages(MOCK_AGENT_MESSAGES as any);
+      setLogs(MOCK_LOGS as any);
+      setVectorMemory(MOCK_VECTOR_MEMORY as any);
+      setKpiMetrics(MOCK_KPI as any);
+      setGasHistory(MOCK_GAS_HISTORY);
+      setTvlHistory(MOCK_TVL_HISTORY);
+      setSuccessHistory(MOCK_SUCCESS_HISTORY);
+      setAgentAStatus("online");
+      setAgentBStatus("online");
+      // Keep the demo feeling alive: stream fake executions + ticks.
+      startGuestSimulation({
+        setTransactions, setAgentMessages, setLogs, setKpiMetrics,
+        setGasHistory, setTvlHistory, setSuccessHistory,
+      });
+      return;
+    }
     try {
       const [statusData, statsData, sysData] = await Promise.all([
         apiFetch<{ logs?: Array<{ tx_hash_id: string; project_target_address: string; amount_usd: number; status: string; created_at: string }>; agent_logs?: Array<{ type: string; data: { sender?: string; content?: string; level?: string; message?: string; metadata?: Record<string, unknown> } }> }>("/api/status"),
@@ -320,9 +342,36 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         apiFetch<{ circuit_breaker: string; agent_health?: { ws_connections: number; agent_a_model: string; agent_b_model: string; agent_a_last_seen: number; agent_b_last_seen: number } }>("/api/system-status")
       ]);
 
-      if (statusData?.logs) {
-        const mappedTxs = statusData.logs.map(mapRawTxToTransaction) as Transaction[];
-        setTransactions(mappedTxs.slice(0, 50));
+      // /api/status returns `agent_logs` (not `logs`); fall back to both so
+      // executed transactions actually render in the dashboard. Agent B's
+      // execution logs carry txHash + projectName in metadata, so we map those
+      // directly (no dependency on the execution_logs DB table shape).
+      const rawLogs = (statusData?.agent_logs ?? statusData?.logs) as
+        | Array<{ type?: string; data?: { sender?: string; tx_hash_id?: string; txHash?: string; project_target_address?: string; target?: string; amount_usd?: number; amountUsd?: number; status?: string; created_at?: string; project_name?: string; projectName?: string; reason?: string } }>
+        | undefined;
+      if (rawLogs) {
+        const mappedTxs = rawLogs
+          .filter(
+            (l) =>
+              l?.type === "TRANSACTION" ||
+              l?.data?.tx_hash_id ||
+              (l?.data?.sender === "agent_b" && l?.data?.txHash),
+          )
+          .map((l) => {
+            const d = l.data || {};
+            return {
+              id: d.tx_hash_id || d.txHash || Math.random().toString(36).slice(2),
+              projectName: d.projectName || d.project_name || "On-Chain Target",
+              targetAddress: d.target || d.project_target_address || "",
+              amountUsd: Number(d.amountUsd ?? d.amount_usd ?? 0),
+              status: "success" as const,
+              txHash: d.txHash || d.tx_hash_id || "",
+              timestamp: new Date(),
+              reason: d.reason || "Autonomous Execution (Agent B)",
+              gasUsedGwei: 42,
+            };
+          }) as Transaction[];
+        if (mappedTxs.length) setTransactions(mappedTxs.slice(0, 50));
       }
 
       // Live agent logs from the backend broadcast buffer (works with or

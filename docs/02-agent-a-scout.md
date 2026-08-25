@@ -1,54 +1,88 @@
 # 02. Agent A (The Scout)
 
-**Agent A** is the intelligence brain of A2Z Agentz. Its job is to discover, classify, and filter Web3 opportunities (DeFi / Airdrop) that are capital-constrained (gas-fee poor) but still fundable.
+**Agent A** is the intelligence layer of A2Z Agentz. It discovers tokens on Base Network via DexScreener, enriches them with on-chain metrics, and scores them using a data-driven scoring engine running on **AMD Instinct™ MI300X**.
 
-## 1. Data Processing Pipeline
+## 1. Data Pipeline
 
-Agent A runs on a **1-hour Cron Job** to process batches, yet it completes an end-to-end pass in under **30 seconds** (target latency: < 30s on AMD Instinct MI300X).
+Agent A runs as an **APScheduler cron job** (every 60s), scraping DexScreener for newly created and trending tokens on Base.
 
-- **Data Sources**: Farcaster (via Neynar API) + on-chain block explorers.
-- **Anti-Bot Strategy**: Puppeteer / Selenium with a Stealth Plugin profile for lighter anti-bot airdrop pages.
+```
+DexScreener API → Strict Alpha Filter → ChromaDB semantic dedup → vLLM inference → scraping_queue
+```
 
-## 2. AMD-Native AI Implementation
+### Data Sources
+- **DexScreener**: token profiles, pair stats (liquidity, volume, price, FDV, age)
+- **Farcaster / Neynar**: social signals (optional, for Farcaster-native tokens)
 
-Agent A inference runs **100% on the AMD stack** — not a generic Qwen/Qwen2.5-72B-Instruct-AWQ, but a Web3-domain fine-tuned variant.
+### Strict Alpha Filter
+Tokens must pass minimum thresholds before reaching the LLM:
+- `AGENT_A_MIN_LIQUIDITY_USD` (default: $5,000)
+- `AGENT_A_MIN_VOLUME_24H` (default: $1,000)
+- `AGENT_A_MIN_FDV` (default: $50,000)
 
-| Layer | Tooling |
+## 2. Data-Driven Scoring (Not Random)
+
+Agent A's scoring is **deterministic and data-driven**, using real DexScreener metrics parsed from `DEX_ALPHA_SIGNAL` format:
+
+| Metric | Tier | Score Impact |
+|---|---|---|
+| **Liquidity** | >$500K / >$200K / >$50K / <$10K | +25 / +15 / +10 / -20 |
+| **24h Volume** | >$100K / >$10K / <$1K | +15 / +5 / -10 |
+| **Pair Age** | >7 days / 1-7 days / <1 hour | +10 / +5 / -15 |
+| **Price Change** | Positive / >500% pump | +5 / -10 |
+| **Market Cap** | >$1M / <$50K | +10 / -5 |
+| **TX Count 24h** | >1000 / <50 | +10 / -5 |
+| **Red Flags** | scam/rug/honeypot keywords | cap score ≤20 |
+
+**Base score**: 30. Max: 100.
+
+### Execution Thresholds
+- **Score ≥ 60**: eligible for micro-execution ($0.50 via Agent B)
+- **Score ≥ 85 + liquidity >$200K + volume >$10K**: full execution ($2.00)
+- **Score < 60 or red flags**: rejected (amount = $0)
+
+## 3. AMD-Native AI Implementation
+
+Agent A inference runs on **AMD Instinct™ MI300X** via ROCm + vLLM:
+
+| Layer | Technology |
 |---|---|
-| **Fine-tuning Platform** | **AMD AI Workbench** (no-code GUI, ROCm-backed) |
-| **Base Model** | Qwen/Qwen2.5-72B-Instruct-AWQ (pre-trained) |
-| **Fine-tune Method** | LoRA / QLoRA adapter on a Web3 sentiment dataset |
-| **Deployment Format** | **AMD Inference Microservice (vLLM)** — containerized |
-| **Serving Engine** | **vLLM** on AMD Instinct MI300X (ROCm backend) |
-| **Vector Cache** | ChromaDB (embedding-based de-duplication) |
+| **GPU** | AMD Instinct™ MI300X (AMD Developer Program) |
+| **Runtime** | ROCm 7.2 |
+| **Serving Engine** | vLLM (OpenAI-compatible API) |
+| **Model** | `hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4` |
+| **Quantization** | AWQ INT4 (fits on single 48GB GPU) |
+| **Tunnel** | Cloudflare Quick Tunnel → `*.trycloudflare.com` |
 
-### Fine-Tune Flow
+### Inference Verification
+Every inference call is logged with AMD provenance:
+```
+[AMD MI300X COMPUTE] Executing payload to ROCm vLLM endpoint=... model=Llama-3.1-8B-AWQ
+[AMD MI300X COMPUTE] vLLM returned | model=... latency=XXXms score=YY
+```
 
-1. **Dataset Curation**: Collect ~5,000–10,000 examples (Farcaster casts, on-chain announcements) labeled with sentiment (positive / neutral / negative) plus legit / scam labels.
-2. **AMD AI Workbench**: Import dataset → select Qwen/Qwen2.5-72B-Instruct-AWQ base → set hyperparameters (LoRA rank, learning rate) → launch the training job on AMD Instinct MI300X (allocated through AMD Developer Cloud credits).
-3. **Export Weights**: Export the training result as a LoRA adapter or full weights (`.safetensors` format).
-4. **Wrap for vLLM**: Build a new **AMD Inference Microservice** that loads the weights, tokenizer, and config. This vLLM service is what gets served.
+## 4. ChromaDB Semantic Dedup
 
-### Inference Flow (per cron tick)
+Prevents re-processing the same token across cycles:
+- **Collection**: `project_embeddings` (cosine space)
+- **Threshold**: 0.85 similarity
+- **Fail-open**: ChromaDB errors never block ingestion
+- **Persistent**: survives service restarts (PersistentClient)
 
-1. Agent A triggers the scraper -> collect raw text from Farcaster and on-chain sources.
-2. ChromaDB check: compute a *similarity score* against previously analyzed projects. If it closely matches a project already paid or rejected, skip it (saves GPU compute).
-3. **Inference request** to the vLLM endpoint (loading the vLLM-tuned LLM) on MI300X.
-4. The vLLM-tuned LLM returns: sentiment score (0-100), key entities, risk flags, and summary.
-5. Hybrid Scoring Engine combines 70% sentiment + 30% on-chain TVL.
-6. If the total is > 85 -> sign the JSON payload with Agent A's *Private Key* -> forward it to Agent B.
+## 5. LLM Prompt (Data-Driven)
 
-## 3. Hybrid Scoring Engine
+The system prompt instructs the Llama model to score based on DexScreener metrics:
+```
+SCORING RULES (use real data, not guesses):
+- Liquidity USD: >$500K → +25, >$200K → +15, >$50K → +10, <$10K → -20
+- 24h Volume: >$100K → +15, >$10K → +5, <$1K → -10
+- Pair Age: >7 days → +10, 1-7 days → +5, <1 hour → -15
+- Base score starts at 30
+- If description contains scam/rug/honeypot keywords → score ≤ 20
+```
 
-To keep the LLM from hallucinating, Agent A never decides 100% generatively:
+## 6. Fallback Strategy
 
-- **70% LLM Sentiment** — the vLLM-tuned LLM analyzes language context, backers (KOLs / whale wallets), and project narrative.
-- **30% On-chain Metrics** — verify the project's Smart Contract is deployed, verified on Basescan, and meets a minimum TVL (e.g., > $500,000).
-- **Threshold** — when the Total Score > 85, Agent A assembles a *JSON Payload* and signs it with its *Private Key* before sending it to Agent B.
-
-## 4. AMD Performance Advantage
-
-Compared with running a generic Qwen/Qwen2.5-72B-Instruct-AWQ on CPU or non-ROCm GPU hardware:
-- **Throughput**: vLLM on MI300X delivers > 2,000 tokens/s for batch inference — enough to process 50+ projects in parallel per cron tick.
-- **Latency (TTFT)**: < 100ms time-to-first-token on a single request (critical for real-time UX in the Dashboard).
-- **Cost**: $100 in AMD Developer Cloud credits equals roughly 50 hours of MI300X inference — enough for about 6 weeks of operation (longer than the 4-week hackathon window).
+If vLLM is unreachable or returns unparseable JSON:
+- **Mock inference**: uses the same data-driven scoring rules (no randomness)
+- **Agent B fallback**: Agent B trusts Agent A's score via `max(agent_a_score, agent_b_score)`

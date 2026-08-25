@@ -12,17 +12,16 @@
 | **Long Description** | TBD — link to `PRD.md` |
 | **Technology Tags** | `vLLM`, `ROCm`, `AMD Instinct`, `AMD GPU`, `Cloudflare Tunnel`, `OpenAI-compatible API`, `Starlette`, `PostgreSQL`, `Base Network`, `Web3`, `Next.js`, `Python` |
 | **Category Tags** | `AI Agents`, `Web3`, `Open Innovation` |
-| **GitHub Repository** | https://github.com/<YOUR-ORG>/project-a2z-agentz |
-| **Slide Deck URL** | https://docsend.com/view/<YOUR-SLIDE-DECK> |
-| **Demo Video URL** | https://youtu.be/<YOUR-VIDEO> |
-| **Live Demo / Hosted URL** | https://<YOUR-DOMAIN> |
+| **GitHub Repository** | https://github.com/axzss/project-a2z-agentz |
+| **Live Demo / Hosted URL** | https://project-a2z-agentz-gamma.vercel.app |
+| **Backend API** | https://project-a2z-agentz-production-dc3d.up.railway.app |
 
 ## 🎯 Why AMD? (Executive Summary for Pre-Screening)
 
 A2Z Agentz is architected to **prove AMD compute usage beyond doubt**:
 
 1. **Inference runs on AMD silicon only.** 
- The AI Brain is a dedicated AMD GPU server (AMD AI Developer Program instance) running **vLLM on ROCm** with Qwen/Qwen2.5-72B-Instruct-AWQ.
+ The AI Brain is a dedicated AMD GPU server (AMD AI Developer Program instance) running **vLLM on ROCm** with hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4.
 
 2. **Serving stack is AMD-native.** 
  No OpenAI API key is used for production inference. The model is served from a local AMD GPU process and exposed via an OpenAI-compatible API.
@@ -44,7 +43,7 @@ A2Z Agentz is architected to **prove AMD compute usage beyond doubt**:
 
 1. AMD Jupyter terminal showing the vLLM launch command and `rocm-smi` output.
 2. Cloudflare tunnel URL resolving to the AMD instance.
-3. Backend log showing `AI endpoint OK | model=Qwen/Qwen2.5-72B-Instruct-AWQ latency=XXXms`.
+3. Backend log showing `AI endpoint OK | model=hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4latency=XXXms`.
 4. Dashboard view with live logs + transaction result.
 
 ## 🚨 Disqualification Guardrails

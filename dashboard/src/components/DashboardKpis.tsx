@@ -92,10 +92,10 @@ export default function DashboardKpis() {
         value={kpiMetrics.projectsScanned.toLocaleString()}
         numericValue={kpiMetrics.projectsScanned}
         counterDecimals={0}
-        subValue="Farcaster + On-Chain"
+        subValue="Dexscreener + Base Network"
         icon={ScanSearch}
         color="accent"
-        iconTooltip="DeFi projects analyzed via Farcaster and on-chain signals"
+        iconTooltip="DeFi projects analyzed via DexScreener on-chain signals (Base Network)"
         index={4}
         showPulse={lastChangedIndex === 4}
       />

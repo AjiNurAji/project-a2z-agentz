@@ -27,16 +27,25 @@ def run_agent_a() -> None:
         logger.error("Agent A run failed: %s", exc, exc_info=True)
 
 
-def run_agent_b() -> None:
-    logger.info("Triggering Agent B (Vault)...")
+def run_agent_b_daemon() -> None:
+    """Blocking entry for the dedicated Agent B asyncio daemon task.
+
+    Agent B is NOT scheduled via APScheduler. Running an infinite
+    ``while True`` worker inside an APScheduler job triggers
+    'maximum number of running instances reached (1)' and silently kills
+    execution. Instead we run it as a long-lived asyncio task started once
+    in the Starlette lifespan (like poll_and_broadcast), so it polls the
+    queue continuously without being capped by max_instances.
+    """
+    logger.info("Starting Agent B (Vault) daemon (continuous poll)...")
     try:
-        from scheduler.agent_b_cycle import worker_loop as agent_b_cycle_main
+        from scheduler.agent_b_cycle import worker_loop
         import asyncio
-        asyncio.run(agent_b_cycle_main(poll_interval=0.1))
+        asyncio.run(worker_loop(poll_interval=2.0))
     except SystemExit:
         return
     except Exception as exc:  # noqa: BLE001
-        logger.error("Agent B run failed: %s", exc, exc_info=True)
+        logger.error("Agent B daemon crashed: %s", exc, exc_info=True)
 
 
 def start_scheduler() -> None:
@@ -51,14 +60,8 @@ def start_scheduler() -> None:
         replace_existing=True,
     )
 
-    scheduler.add_job(
-        run_agent_b,
-        trigger=IntervalTrigger(minutes=1),
-        next_run_time=datetime.now(),
-        id="agent_b_job",
-        name="Agent B Worker Cycle",
-        replace_existing=True,
-    )
+    # Agent B is now a daemon task (see main.py lifespan), not an APScheduler
+    # job, so it can poll forever without hitting max_instances limits.
 
     scheduler.start()
 

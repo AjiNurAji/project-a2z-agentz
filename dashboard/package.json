@@ -10,6 +10,8 @@
     "test:e2e": "vitest run"
   },
   "dependencies": {
+    "@rainbow-me/rainbowkit": "^2.2.0",
+    "@tanstack/react-query": "^5.59.0",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
     "lucide-react": "^1.20.0",
@@ -18,7 +20,10 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "recharts": "^3.8.1",
-    "three": "^0.184.0"
+    "siwe": "^2.3.0",
+    "three": "^0.184.0",
+    "viem": "^2.21.0",
+    "wagmi": "^2.14.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

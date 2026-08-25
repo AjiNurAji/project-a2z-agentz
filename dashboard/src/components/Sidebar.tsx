@@ -68,7 +68,7 @@ export default function Sidebar() {
               <h1 className="text-sm font-semibold text-[var(--color-heading)] leading-tight" style={{ fontFamily: "var(--font-serif)" }}>
                 A2Z Agent
               </h1>
-              <p className="text-[11px] text-[var(--color-body-subtle)]">AMD MI300X · Base</p>
+              <p className="text-[11px] text-[var(--color-body-subtle)]">Cloud GPU · Base</p>
             </motion.div>
           )}
         </AnimatePresence>

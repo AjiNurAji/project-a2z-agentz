@@ -21,3 +21,4 @@ bcrypt
 python-json-logger
 PyJWT>=2.8.0
 chromadb
+cryptography>=42.0.0
